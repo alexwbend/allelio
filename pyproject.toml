@@ -48,10 +48,10 @@ dev = [
 allelio = "allelio.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/allelio/allelio"
-Documentation = "https://github.com/allelio/allelio#readme"
-Repository = "https://github.com/allelio/allelio"
-Issues = "https://github.com/allelio/allelio/issues"
+Homepage = "https://github.com/alexwbend/allelio"
+Documentation = "https://github.com/alexwbend/allelio#readme"
+Repository = "https://github.com/alexwbend/allelio"
+Issues = "https://github.com/alexwbend/allelio/issues"
 
 [tool.setuptools.packages.find]
 include = ["allelio*"]
