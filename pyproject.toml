@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "allelio"
+version = "0.1.0"
+description = "Privacy-first local genomics analysis powered by AI"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Allelio Contributors"},
+]
+keywords = ["genomics", "genetics", "snp", "23andme", "ancestry", "ai", "privacy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "click>=8.1.0",
+    "ollama>=0.4.0",
+    "jinja2>=3.1.0",
+    "httpx>=0.25.0",
+    "aiofiles>=23.2.0",
+    "rich>=13.0.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "httpx",
+]
+
+[project.scripts]
+allelio = "allelio.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/allelio/allelio"
+Documentation = "https://github.com/allelio/allelio#readme"
+Repository = "https://github.com/allelio/allelio"
+Issues = "https://github.com/allelio/allelio/issues"
+
+[tool.setuptools.packages.find]
+include = ["allelio*"]
