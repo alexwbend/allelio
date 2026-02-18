@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allelio - Privacy-First Genomics Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0D9488;
+            --primary-light: #14B8A6;
+            --primary-dark: #0A7E73;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-900: #111827;
+            --warning: #FBBF24;
+            --warning-dark: #D97706;
+            --error: #EF4444;
+            --success: #10B981;
+            --info: #3B82F6;
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        body.dark-mode {
+            background-color: #1F2937;
+            color: #F3F4F6;
+        }
+
+        body.dark-mode .card {
+            background-color: #374151;
+            border-color: #4B5563;
+        }
+
+        body.dark-mode .header {
+            background-color: #1F2937;
+            border-color: #4B5563;
+        }
+
+        body.dark-mode .status-bar {
+            background-color: #374151;
+            border-color: #4B5563;
+        }
+
+        body.dark-mode .upload-zone {
+            border-color: #4B5563;
+            background-color: #2D3748;
+        }
+
+        body.dark-mode .disclaimer-banner {
+            background-color: #7C2D12;
+            border-color: #92400E;
+        }
+
+        /* Header */
+        .header {
+            background-color: white;
+            border-bottom: 1px solid var(--gray-200);
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            transition: var(--transition);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .tagline {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-style: italic;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .dark-mode-toggle {
+            background: none;
+            border: 1px solid var(--gray-300);
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+        }
+
+        .dark-mode-toggle:hover {
+            background-color: var(--gray-100);
+            border-color: var(--primary);
+        }
+
+        body.dark-mode .dark-mode-toggle {
+            border-color: var(--gray-600);
+        }
+
+        body.dark-mode .dark-mode-toggle:hover {
+            background-color: #4B5563;
+        }
+
+        /* Disclaimer Banner */
+        .disclaimer-banner {
+            background-color: #FCD34D;
+            border-bottom: 3px solid var(--warning-dark);
+            padding: 1rem 2rem;
+            text-align: center;
+            font-weight: 600;
+            color: #92400E;
+            transition: var(--transition);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background-color: white;
+            border: 1px solid var(--gray-200);
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            transition: var(--transition);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #EF4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background-color: #10B981;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .status-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-label {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        body.dark-mode .status-label {
+            color: #D1D5DB;
+        }
+
+        .status-value {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        body.dark-mode .status-value {
+            color: #F3F4F6;
+        }
+
+        /* Main Sections */
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Card */
+        .card {
+            background-color: white;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.1);
+        }
+
+        /* Upload Section */
+        .upload-zone {
+            border: 2px dashed var(--gray-300);
+            border-radius: var(--border-radius);
+            padding: 3rem 2rem;
+            text-align: center;
+            background-color: var(--gray-50);
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background-color: #E0F2F1;
+        }
+
+        .upload-zone.drag-over {
+            border-color: var(--primary);
+            background-color: #E0F2F1;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .upload-text h3 {
+            margin-bottom: 0.5rem;
+            color: var(--gray-900);
+        }
+
+        body.dark-mode .upload-text h3 {
+            color: #F3F4F6;
+        }
+
+        .upload-text p {
+            color: var(--gray-600);
+            margin-bottom: 0.5rem;
+        }
+
+        body.dark-mode .upload-text p {
+            color: #D1D5DB;
+        }
+
+        .file-formats {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+            margin: 1rem 0;
+        }
+
+        body.dark-mode .file-formats {
+            color: #9CA3AF;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: var(--transition);
+            margin-top: 1rem;
+        }
+
+        .upload-button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+        }
+
+        /* Privacy Badge */
+        .privacy-badge {
+            display: inline-block;
+            background-color: #E0F2F1;
+            color: var(--primary-dark);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-top: 1.5rem;
+        }
+
+        body.dark-mode .privacy-badge {
+            background-color: #0F766E;
+            color: #D1FCF0;
+        }
+
+        /* Progress Section */
+        .progress-section {
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            border: 1px solid var(--gray-200);
+        }
+
+        .progress-bar-container {
+            background-color: var(--gray-200);
+            border-radius: 10px;
+            height: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .progress-text {
+            color: var(--gray-600);
+            font-size: 0.95rem;
+            text-align: center;
+        }
+
+        body.dark-mode .progress-text {
+            color: #D1D5DB;
+        }
+
+        /* Results Section */
+        .results-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            flex-wrap: wrap;
+        }
+
+        body.dark-mode .results-tabs {
+            border-bottom-color: #4B5563;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--gray-600);
+            border-bottom: 3px solid transparent;
+            transition: var(--transition);
+            font-size: 0.95rem;
+        }
+
+        body.dark-mode .tab-button {
+            color: #D1D5DB;
+        }
+
+        .tab-button:hover {
+            color: var(--primary);
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Executive Summary */
+        .executive-summary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border-left: 5px solid white;
+        }
+
+        .summary-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-text {
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Result Card */
+        .result-card {
+            background-color: white;
+            border-left: 5px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid var(--gray-200);
+            border-left-width: 5px;
+        }
+
+        body.dark-mode .result-card {
+            background-color: #374151;
+            border-color: #4B5563;
+        }
+
+        .result-card:hover {
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.1);
+            transform: translateX(2px);
+        }
+
+        .result-card.pathogenic {
+            border-left-color: #EF4444;
+        }
+
+        .result-card.risk {
+            border-left-color: #F97316;
+        }
+
+        .result-card.trait {
+            border-left-color: #3B82F6;
+        }
+
+        .result-card.benign {
+            border-left-color: #10B981;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+
+        .result-title {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .result-rsid {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--primary);
+        }
+
+        .result-gene {
+            font-size: 0.95rem;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        body.dark-mode .result-gene {
+            color: #D1D5DB;
+        }
+
+        .result-meta {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-category {
+            background-color: #E0E7FF;
+            color: #4F46E5;
+        }
+
+        body.dark-mode .badge-category {
+            background-color: #312E81;
+            color: #A5B4FC;
+        }
+
+        .badge-pathogenic {
+            background-color: #FEE2E2;
+            color: #991B1B;
+        }
+
+        body.dark-mode .badge-pathogenic {
+            background-color: #7C2D12;
+            color: #FCA5A5;
+        }
+
+        .badge-risk {
+            background-color: #FED7AA;
+            color: #7C2D12;
+        }
+
+        body.dark-mode .badge-risk {
+            background-color: #7C2D12;
+            color: #FDBA74;
+        }
+
+        .badge-benign {
+            background-color: #D1FAE5;
+            color: #065F46;
+        }
+
+        body.dark-mode .badge-benign {
+            background-color: #064E3B;
+            color: #6EE7B7;
+        }
+
+        .result-genotype {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: var(--gray-700);
+            background-color: var(--gray-100);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        body.dark-mode .result-genotype {
+            background-color: #4B5563;
+            color: #F3F4F6;
+        }
+
+        .result-body {
+            display: none;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        body.dark-mode .result-body {
+            border-top-color: #4B5563;
+        }
+
+        .result-body.expanded {
+            display: block;
+        }
+
+        .result-explanation {
+            margin-bottom: 1rem;
+            color: var(--gray-700);
+            line-height: 1.7;
+        }
+
+        body.dark-mode .result-explanation {
+            color: #D1D5DB;
+        }
+
+        .result-sources {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .source-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background-color: var(--gray-100);
+            color: var(--primary);
+            text-decoration: none;
+            border-radius: var(--border-radius);
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: var(--transition);
+            border: 1px solid var(--gray-200);
+        }
+
+        body.dark-mode .source-link {
+            background-color: #4B5563;
+            border-color: #6B7280;
+            color: #A5D6FF;
+        }
+
+        .source-link:hover {
+            background-color: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Export Button */
+        .export-container {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        body.dark-mode .export-container {
+            border-top-color: #4B5563;
+        }
+
+        .export-button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.875rem 2rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        .export-button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+        }
+
+        .export-button:disabled {
+            background-color: var(--gray-300);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Alert/Toast */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-error {
+            background-color: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+        }
+
+        body.dark-mode .alert-error {
+            background-color: #7C2D12;
+            color: #FCA5A5;
+            border-color: #DC2626;
+        }
+
+        .alert-success {
+            background-color: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #A7F3D0;
+        }
+
+        body.dark-mode .alert-success {
+            background-color: #064E3B;
+            color: #6EE7B7;
+            border-color: #059669;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+
+            .header {
+                padding: 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .header-left {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .upload-zone {
+                padding: 2rem 1rem;
+            }
+
+            .upload-icon {
+                font-size: 2rem;
+            }
+
+            .status-bar {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .result-header {
+                flex-direction: column;
+            }
+
+            .results-tabs {
+                gap: 0.5rem;
+            }
+
+            .tab-button {
+                padding: 0.75rem 0.5rem;
+                font-size: 0.85rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">Allelio</div>
+                <div class="tagline">Privacy-first genomics analysis</div>
+            </div>
+            <div class="header-right">
+                <button class="dark-mode-toggle" id="darkModeToggle" title="Toggle dark mode">🌙</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Disclaimer Banner -->
+    <div class="disclaimer-banner">
+        ⚠️ For educational purposes only. Not medical advice.
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Alert Area -->
+        <div id="alertArea"></div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="dbIndicator"></div>
+                <div class="status-text">
+                    <div class="status-label">Database Status</div>
+                    <div class="status-value" id="dbStatus">Loading...</div>
+                </div>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator" id="ollamaIndicator"></div>
+                <div class="status-text">
+                    <div class="status-label">Ollama Status</div>
+                    <div class="status-value" id="ollamaStatus">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div id="uploadSection" class="section">
+            <div class="card">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-text">
+                        <h3>Upload Your Genetic Data</h3>
+                        <p>Drag and drop your file here, or click to browse</p>
+                    </div>
+                    <div class="file-formats">
+                        Supported: 23andMe, AncestryDNA, VCF
+                    </div>
+                    <button class="upload-button">Choose File</button>
+                    <input type="file" id="fileInput" class="file-input" accept=".txt,.csv,.vcf" />
+                    <div class="privacy-badge">🔒 Your data never leaves this computer</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progressSection" class="section hidden">
+            <div class="progress-section">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="progress-text" id="progressText">Analyzing your genetic data...</div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="section hidden">
+            <!-- Executive Summary -->
+            <div class="executive-summary" id="executiveSummary" style="display: none;">
+                <div class="summary-title">Analysis Summary</div>
+                <div class="summary-text" id="summaryText"></div>
+            </div>
+
+            <!-- Category Tabs -->
+            <div class="results-tabs" id="resultsTabs"></div>
+
+            <!-- Results Container -->
+            <div id="resultsContainer"></div>
+
+            <!-- Export -->
+            <div class="export-container">
+                <button class="export-button" id="exportButton">📥 Export Report</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let darkMode = false;
+        let currentCategory = 'all';
+        let analysisResults = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            fetchStatus();
+        });
+
+        // Setup Event Listeners
+        function setupEventListeners() {
+            // Dark Mode Toggle
+            document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+
+            // Upload Zone
+            const uploadZone = document.getElementById('uploadZone');
+            const fileInput = document.getElementById('fileInput');
+
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('drag-over');
+            });
+
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('drag-over');
+            });
+
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('drag-over');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    handleFileSelect(files[0]);
+                }
+            });
+
+            uploadZone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFileSelect(e.target.files[0]);
+                }
+            });
+
+            // Export Button
+            document.getElementById('exportButton').addEventListener('click', exportReport);
+        }
+
+        // Dark Mode Toggle
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark-mode');
+            document.getElementById('darkModeToggle').textContent = darkMode ? '☀️' : '🌙';
+        }
+
+        // Fetch Status
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                // Update Database Status
+                const dbIndicator = document.getElementById('dbIndicator');
+                const dbStatus = document.getElementById('dbStatus');
+                if (data.database_ready) {
+                    dbIndicator.classList.add('connected');
+                    dbStatus.textContent = 'Database Ready';
+                } else {
+                    dbIndicator.classList.remove('connected');
+                    dbStatus.textContent = 'Database Not Set Up';
+                }
+
+                // Update Ollama Status
+                const ollamaIndicator = document.getElementById('ollamaIndicator');
+                const ollamaStatus = document.getElementById('ollamaStatus');
+                if (data.ollama_connected) {
+                    ollamaIndicator.classList.add('connected');
+                    ollamaStatus.textContent = 'Ollama Connected';
+                } else {
+                    ollamaIndicator.classList.remove('connected');
+                    ollamaStatus.textContent = 'Ollama Disconnected';
+                }
+            } catch (error) {
+                console.error('Error fetching status:', error);
+                showAlert('Could not connect to server', 'error');
+            }
+        }
+
+        // Handle File Select
+        async function handleFileSelect(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Hide upload section, show progress
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('progressSection').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+
+            // Animate progress bar
+            let progress = 0;
+            const progressBar = document.getElementById('progressBar');
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 30;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = progress + '%';
+            }, 500);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+
+                if (!response.ok) {
+                    throw new Error('Analysis failed');
+                }
+
+                const data = await response.json();
+                analysisResults = data;
+
+                // Show results
+                setTimeout(() => {
+                    displayResults();
+                    document.getElementById('progressSection').classList.add('hidden');
+                    document.getElementById('resultsSection').classList.remove('hidden');
+                }, 500);
+            } catch (error) {
+                console.error('Error analyzing file:', error);
+                clearInterval(progressInterval);
+                document.getElementById('uploadSection').classList.remove('hidden');
+                document.getElementById('progressSection').classList.add('hidden');
+                showAlert('Error analyzing file: ' + error.message, 'error');
+            }
+        }
+
+        // Display Results
+        function displayResults() {
+            if (!analysisResults) return;
+
+            // Executive Summary
+            const executiveSummary = document.getElementById('executiveSummary');
+            const summaryText = document.getElementById('summaryText');
+            if (analysisResults.summary) {
+                summaryText.textContent = analysisResults.summary;
+                executiveSummary.style.display = 'block';
+            }
+
+            // Create Category Tabs
+            const categories = ['all', 'health_conditions', 'risk_factors', 'pharmacogenomics', 'traits'];
+            const categoryLabels = {
+                'all': 'All',
+                'health_conditions': 'Health Conditions',
+                'risk_factors': 'Risk Factors',
+                'pharmacogenomics': 'Pharmacogenomics',
+                'traits': 'Traits'
+            };
+
+            const tabsContainer = document.getElementById('resultsTabs');
+            tabsContainer.innerHTML = '';
+
+            categories.forEach(cat => {
+                const button = document.createElement('button');
+                button.className = 'tab-button' + (cat === 'all' ? ' active' : '');
+                button.textContent = categoryLabels[cat];
+                button.addEventListener('click', () => selectCategory(cat));
+                tabsContainer.appendChild(button);
+            });
+
+            // Render Results
+            renderResultCards();
+        }
+
+        // Select Category
+        function selectCategory(category) {
+            currentCategory = category;
+
+            // Update active tab
+            document.querySelectorAll('.tab-button').forEach((btn, idx) => {
+                btn.classList.toggle('active', btn.textContent === document.querySelectorAll('.tab-button')[['all', 'health_conditions', 'risk_factors', 'pharmacogenomics', 'traits'].indexOf(category)].textContent);
+            });
+
+            renderResultCards();
+        }
+
+        // Render Result Cards
+        function renderResultCards() {
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = '';
+
+            if (!analysisResults || !analysisResults.results) return;
+
+            let results = analysisResults.results;
+
+            // Filter by category
+            if (currentCategory !== 'all') {
+                results = results.filter(r => r.category === currentCategory);
+            }
+
+            if (results.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No results found for this category.</p>';
+                return;
+            }
+
+            results.forEach((result, idx) => {
+                const card = createResultCard(result);
+                container.appendChild(card);
+            });
+        }
+
+        // Create Result Card
+        function createResultCard(result) {
+            const card = document.createElement('div');
+            card.className = 'result-card ' + (result.significance || 'benign');
+
+            const significance = result.significance || 'benign';
+            const significanceBadgeClass = {
+                'pathogenic': 'badge-pathogenic',
+                'risk': 'badge-risk',
+                'benign': 'badge-benign',
+                'trait': 'badge-benign'
+            }[significance] || 'badge-benign';
+
+            const categoryBadgeClass = {
+                'health_conditions': 'badge-category',
+                'risk_factors': 'badge-category',
+                'pharmacogenomics': 'badge-category',
+                'traits': 'badge-category'
+            }[result.category] || 'badge-category';
+
+            card.innerHTML = `
+                <div class="result-header">
+                    <div class="result-title">
+                        <div class="result-rsid">${result.rsid}</div>
+                        <div class="result-gene">${result.gene || 'Gene: Unknown'}</div>
+                        <div class="result-meta">
+                            <span class="badge ${categoryBadgeClass}">${result.category.replace('_', ' ')}</span>
+                            <span class="badge ${significanceBadgeClass}">${significance}</span>
+                        </div>
+                    </div>
+                    <div class="result-genotype">${result.genotype}</div>
+                </div>
+                <div class="result-body">
+                    <div class="result-explanation">${result.explanation || 'No explanation available.'}</div>
+                    <div class="result-sources">
+                        ${result.clinvar_id ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/${result.clinvar_id}/" target="_blank" class="source-link">ClinVar</a>` : ''}
+                        ${result.pubmed_id ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${result.pubmed_id}/" target="_blank" class="source-link">PubMed</a>` : ''}
+                    </div>
+                </div>
+            `;
+
+            card.addEventListener('click', () => {
+                card.querySelector('.result-body').classList.toggle('expanded');
+            });
+
+            return card;
+        }
+
+        // Export Report
+        async function exportReport() {
+            if (!analysisResults) return;
+
+            try {
+                const button = document.getElementById('exportButton');
+                button.disabled = true;
+
+                const response = await fetch('/api/export', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(analysisResults)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Export failed');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'allelio-report.html';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showAlert('Report exported successfully', 'success');
+                button.disabled = false;
+            } catch (error) {
+                console.error('Error exporting report:', error);
+                showAlert('Error exporting report: ' + error.message, 'error');
+                document.getElementById('exportButton').disabled = false;
+            }
+        }
+
+        // Show Alert
+        function showAlert(message, type) {
+            const alertArea = document.getElementById('alertArea');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} show`;
+            alert.textContent = message;
+            alertArea.appendChild(alert);
+
+            setTimeout(() => {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 300);
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

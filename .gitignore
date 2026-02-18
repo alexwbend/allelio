@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Allelio data (user-specific, should not be committed)
+*.db
+*.db-wal
+*.db-shm
+
+# Uploaded genotype files (never commit genetic data!)
+*.vcf
+*.vcf.gz
+*23andme*.txt
+*ancestry*.csv
+
+# Environment variables
+.env
+.env.local

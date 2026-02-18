@@ -1,0 +1,156 @@
+================================================================================
+                    ALLELIO DOCUMENTATION FILES MANIFEST
+================================================================================
+
+Project: Allelio (renamed from SNPeek)
+Version: 0.1.0
+Date Created: February 16, 2026
+Format: Microsoft Word (.docx) - Office Open XML format
+
+================================================================================
+FILE 1: Allelio_User_Guide.docx (10 KB)
+================================================================================
+
+PURPOSE: Complete step-by-step user guide for Allelio analysis
+
+CONTENTS:
+  ✓ Introduction
+  ✓ Prerequisites (Python 3.9+, Ollama, 4-8GB RAM)
+  ✓ Step 1: Installation (pip install allelio)
+  ✓ Step 2: Setup (allelio setup - downloads ClinVar and GWAS databases)
+  ✓ Step 3: Getting Raw DNA Data (23andMe, AncestryDNA instructions)
+  ✓ Step 4: Running Analysis (allelio analyze myfile.txt)
+  ✓ Step 5: Using Web UI (allelio serve → http://localhost:8000)
+  ✓ Step 6: Understanding Results (Health Conditions, Risk Factors, Pharmacogenomics, Traits, Carrier Status)
+  ✓ Clinical Significance Levels Table (Pathogenic, Likely Pathogenic, Uncertain, Likely Benign, Benign)
+  ✓ Step 7: AI-Generated Explanations (powered by local Ollama)
+  ✓ Step 8: Generating Reports (allelio analyze myfile.txt --report)
+  ✓ Step 9: Updating Databases (allelio update)
+  ✓ Troubleshooting Table (Ollama not found, database download fails, no variants found, slow analysis)
+  ✓ Privacy & Disclaimer
+  ✓ Support & Resources
+
+FORMATTING:
+  - Font: Arial, US Letter size
+  - Clean professional layout
+  - Code blocks with gray background for commands
+  - Numbered steps and bulleted lists
+  - Professional tables for reference data
+
+================================================================================
+FILE 2: Allelio_Disclaimers.docx (11 KB)
+================================================================================
+
+PURPOSE: Comprehensive legal and medical disclaimers for Allelio
+
+CONTENTS (14 Sections):
+
+  1. Medical Disclaimer
+     - NOT a medical device/advice, educational only, always consult healthcare providers
+
+  2. Genetic Information Limitations
+     - SNPs aren't destiny, multifactorial conditions, genotyping errors, population bias
+
+  3. AI-Generated Content Disclaimer
+     - LLMs can hallucinate, not medically trained, not peer-reviewed
+
+  4. Psychological and Emotional Impact
+     - Distressing findings possible, APOE/Alzheimer's warning, genetic counseling recommended
+
+  5. Privacy and Data Handling
+     - Local-only processing, no cloud transmission, user responsible for file security
+
+  6. Special Warnings for High-Impact Variants (Table)
+     - BRCA1/2 (breast, ovarian cancer), APOE4 (Alzheimer's), TP53 (Li-Fraumeni),
+     - MLH1/MSH2/MSH6/PMS2 (Lynch Syndrome)
+     - Each with recommendations for professional consultation
+
+  7. Software Disclaimer and Limitation of Liability
+     - AS-IS, no warranty, no liability for damages
+
+  8. Third-Party Data Sources
+     - ClinVar (NCBI), GWAS Catalog (EBI), Ollama, 23andMe/AncestryDNA
+
+  9. Research Use and Regulatory Status
+     - Not FDA-approved, not CLIA/CAP certified
+
+  10. User Responsibilities (8 numbered commitments)
+      - Not medical device, won't self-diagnose, will consult professionals, accepts risks,
+      - Responsible for security, AI may err, won't discriminate, won't analyze others without consent
+
+  11. Genetic Discrimination
+      - GINA protections and limitations (life insurance, disability, long-term care, <15 employees)
+
+  12. Use by Children and Minors
+      - Not intended for under-18 without parental consent and supervision
+
+  13. Changes to These Disclaimers
+      - May be updated
+
+  14. Where to Find Help (Resources)
+      - NSGC (genetic counselor finder), ClinVar, GWAS, NHGRI, MedlinePlus
+
+FORMATTING:
+  - Font: Arial, US Letter size
+  - Professional legal document style
+  - Warning boxes with amber/yellow shading (FFF8DC) for critical notices
+  - Numbered sections and bullet points
+  - Professional tables for special variant warnings
+  - Version number and date in header
+
+================================================================================
+TECHNICAL DETAILS
+================================================================================
+
+File Format: Microsoft Word 2007+ (.docx)
+  - Valid Office Open XML format
+  - Compressed ZIP archive containing:
+    - word/document.xml (content)
+    - word/styles.xml (formatting)
+    - word/numbering.xml (bullets/lists)
+    - [Content_Types].xml (format specification)
+    - Relationships files (_rels/)
+    - Document properties (docProps/)
+
+Creation Method:
+  - Generated using Node.js 'docx' package
+  - JavaScript generators: create_user_guide.js, create_disclaimers.js
+  - Programmatic document generation ensures consistency and accuracy
+
+Compatibility:
+  - Opens in Microsoft Word, Google Docs, LibreOffice, Pages
+  - Preserves formatting across platforms
+  - Standard Office document format
+
+================================================================================
+BRANDING & CONTENT NOTES
+================================================================================
+
+✓ All "SNPeek" references replaced with "Allelio"
+✓ Full Allelio branding throughout both documents
+✓ Project description: "Open-source, privacy-first, local genomics analysis tool"
+✓ Key messaging: "All data stays local," "MIT Licensed," "A gift to humanity"
+✓ Educational focus: NOT medical device, NOT FDA approved, NOT CLIA certified
+✓ Privacy-first messaging: All processing local, databases downloaded once, no cloud transmission
+
+================================================================================
+RECOMMENDATIONS FOR USE
+================================================================================
+
+1. User Guide should be:
+   - Provided to all new Allelio users
+   - Distributed with software package
+   - Available on project website/documentation
+
+2. Disclaimers should be:
+   - Reviewed and accepted by users before using Allelio
+   - Available in all major languages (if distributed internationally)
+   - Updated as software evolves and regulations change
+   - Reviewed annually for completeness
+
+3. Both documents should be:
+   - Included in GitHub repository
+   - Cited in README and installation documentation
+   - Referenced in software license section
+
+================================================================================
