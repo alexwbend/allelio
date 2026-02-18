@@ -46,3 +46,9 @@ htmlcov/
 # Environment variables
 .env
 .env.local
+
+# Private / internal documents (never publish)
+allelio_report.html
+ROADMAP.md
+Publishing_Allelio_on_GitHub.docx
+paper_outline.md
