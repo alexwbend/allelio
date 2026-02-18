@@ -39,7 +39,7 @@ Using Ollama (a local AI model), Allelio generates clear summaries of complex ge
 ```bash
 pip install allelio
 allelio setup          # one-time database download (~500 MB)
-allelio serve          # launch web UI at http://localhost:8000
+allelio serve          # launch web UI at http://localhost:8080
 ```
 
 For AI explanations, install [Ollama](https://ollama.com) and run `ollama pull llama3.1:8b`.
@@ -50,7 +50,7 @@ See the [README](README.md) for full documentation.
 
 ## What's next
 
-See our [ROADMAP](ROADMAP.md) for planned improvements including gnomAD population frequency integration, gene-level variant grouping, polygenic risk score estimates, and PharmGKB pharmacogenomics support.
+Future improvements are in the works, including gnomAD population frequency integration, gene-level variant grouping, polygenic risk score estimates, and PharmGKB pharmacogenomics support. Stay tuned via [GitHub Issues](https://github.com/alexwbend/allelio/issues) for updates.
 
 ---
 

@@ -78,7 +78,7 @@ allelio setup
 allelio serve
 ```
 
-Then open your browser to **http://localhost:8000**. You'll see a clean interface where you can upload your DNA file, browse your variants, read AI explanations, and export a full report.
+Then open your browser to **http://localhost:8080**. You'll see a clean interface where you can upload your DNA file, browse your variants, read AI explanations, and export a full report.
 
 ### Or use the command line
 
@@ -161,7 +161,7 @@ allelio/
 Whether you're a bioinformatician, a developer, a designer, or just someone who wants to help — contributions are welcome.
 
 **Ways to help:**
-- Report bugs or suggest features via [GitHub Issues](https://github.com/yourusername/allelio/issues)
+- Report bugs or suggest features via [GitHub Issues](https://github.com/alexwbend/allelio/issues)
 - Submit pull requests
 - Improve documentation or write tutorials
 - Test on different platforms and file formats
@@ -170,7 +170,7 @@ Whether you're a bioinformatician, a developer, a designer, or just someone who 
 **To set up a development environment:**
 
 ```bash
-git clone https://github.com/yourusername/allelio.git
+git clone https://github.com/alexwbend/allelio.git
 cd allelio
 pip install -e ".[dev]"
 ```
