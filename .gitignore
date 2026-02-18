@@ -47,17 +47,13 @@ htmlcov/
 .env
 .env.local
 
-# Private / internal documents (never publish)
-allelio_report.html
-ROADMAP.md
-Publishing_Allelio_on_GitHub.docx
-paper_outline.md
-docs/Allelio_Project_Brief.docx
-docs/Allelio_Presentation.pptx
-docs/Allelio_How_It_Works_Guide.docx
-docs/FILE_MANIFEST.txt
-docs/create_disclaimers.js
-docs/create_user_guide.js
+# Internal docs and generated reports
+*.docx
+*.pptx
 docs/blog/
-docs/landing_page.html
+docs/*.js
+docs/*.html
+docs/*.txt
+ROADMAP.md
 LANDING_PAGE.md
+paper_outline.md
