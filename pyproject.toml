@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "allelio"
-version = "0.1.0"
+version = "0.2.0"
 description = "Privacy-first local genomics analysis powered by AI"
 readme = "README.md"
 license = {text = "MIT"}

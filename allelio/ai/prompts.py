@@ -51,8 +51,10 @@ def format_clinvar_summary(clinvar_entries: List[dict]) -> str:
         significance = entry.get('clinical_significance', 'Unknown')
         condition = entry.get('condition', 'Unknown condition')
         review_status = entry.get('review_status', 'criteria provided, single submitter')
-        
-        line = f"- {condition}: {significance} ({review_status})"
+        review_stars = entry.get('review_stars', 0)
+        stars_display = "\u2605" * review_stars + "\u2606" * (4 - review_stars)
+
+        line = f"- {condition}: {significance} ({stars_display} {review_status})"
         formatted_lines.append(line)
     
     if formatted_lines:
@@ -127,6 +129,7 @@ def build_variant_prompt(result) -> str:
             'clinical_significance': getattr(e, 'clinical_significance', None),
             'condition': getattr(e, 'conditions', None),
             'review_status': getattr(e, 'review_status', None),
+            'review_stars': getattr(e, 'review_stars', 0),
         })
     gwas_dicts = []
     for e in (result.gwas_entries or []):
