@@ -7,6 +7,47 @@ from enum import Enum
 from allelio.database.store import AllelioDB
 
 
+# ClinVar review status to star rating mapping (0-4 stars)
+# See: https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/
+REVIEW_STATUS_STARS = {
+    "practice guideline": 4,
+    "reviewed by expert panel": 3,
+    "criteria provided, multiple submitters, no conflicts": 2,
+    "criteria provided, multiple submitters": 2,
+    "criteria provided, conflicting interpretations": 1,
+    "criteria provided, single submitter": 1,
+    "no assertion for the individual variant": 0,
+    "no assertion criteria provided": 0,
+    "no assertion provided": 0,
+}
+
+
+def _get_review_stars(review_status: Optional[str]) -> int:
+    """Convert ClinVar review status string to a 0-4 star rating.
+
+    Args:
+        review_status: ClinVar review status string
+
+    Returns:
+        Integer star rating from 0 (lowest confidence) to 4 (highest)
+    """
+    if not review_status:
+        return 0
+
+    status_lower = review_status.lower().strip()
+
+    # Exact match first
+    if status_lower in REVIEW_STATUS_STARS:
+        return REVIEW_STATUS_STARS[status_lower]
+
+    # Substring match for variations in formatting
+    for key, stars in REVIEW_STATUS_STARS.items():
+        if key in status_lower:
+            return stars
+
+    return 0
+
+
 # Significance ranking for clinical significance strings
 SIGNIFICANCE_RANKS = {
     "pathogenic": 1,
@@ -50,6 +91,7 @@ class ClinVarEntry:
     clinical_significance: Optional[str] = None
     conditions: Optional[str] = None
     review_status: Optional[str] = None
+    review_stars: int = 0
 
 
 @dataclass
@@ -74,7 +116,7 @@ class VariantResult:
     clinvar_entries: List[ClinVarEntry] = field(default_factory=list)
     gwas_entries: List[GWASEntry] = field(default_factory=list)
     category: str = VariantCategory.UNKNOWN.value
-    significance_rank: int = 999
+    significance_rank: float = 999
 
 
 def _determine_category(clinvar_entry: Optional[ClinVarEntry], gwas_entries: List[GWASEntry]) -> str:
@@ -190,12 +232,14 @@ def analyze_variants(
         clinvar_entry = None
         if data["clinvar"]:
             cv_data = data["clinvar"][0]
+            review_status = cv_data.get("review_status")
             clinvar_entry = ClinVarEntry(
                 rsid=cv_data.get("rsid"),
                 gene=cv_data.get("gene"),
                 clinical_significance=cv_data.get("clinical_significance"),
                 conditions=cv_data.get("conditions"),
-                review_status=cv_data.get("review_status")
+                review_status=review_status,
+                review_stars=_get_review_stars(review_status),
             )
         
         # Create GWAS entries
@@ -214,13 +258,16 @@ def analyze_variants(
         # Determine category
         category = _determine_category(clinvar_entry, gwas_entries)
         
-        # Get significance rank from ClinVar
-        sig_rank = 999
+        # Get significance rank from ClinVar, weighted by review quality
+        sig_rank = 999.0
         if clinvar_entry and clinvar_entry.clinical_significance:
-            sig_rank = _get_significance_rank(clinvar_entry.clinical_significance)
+            base_rank = _get_significance_rank(clinvar_entry.clinical_significance)
+            # Weight by review stars: higher stars lower the rank (more significant)
+            # Max adjustment is 0.4 (4 stars * 0.1), so ranks never cross tiers
+            sig_rank = base_rank - (clinvar_entry.review_stars * 0.1)
         elif gwas_entries:
             # For GWAS-only variants, use a default rank
-            sig_rank = SIGNIFICANCE_RANKS.get("association", 4)
+            sig_rank = float(SIGNIFICANCE_RANKS.get("association", 4))
         
         # Skip benign variants unless requested
         if not include_benign and sig_rank >= 8:

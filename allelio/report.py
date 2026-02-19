@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 import html as html_escape
 
+from allelio.analysis.lookup import _get_review_stars
+
 
 def _get_gene(variant) -> str:
     """Extract gene name from a VariantResult's sub-entries."""
@@ -33,6 +35,26 @@ def _get_clinical_significance(variant) -> str:
     if variant.clinvar_entries:
         return getattr(variant.clinvar_entries[0], 'clinical_significance', None) or "Unknown"
     return "GWAS association"
+
+
+def _get_review_stars_html(variant) -> str:
+    """Generate star rating HTML for a variant's ClinVar review status.
+
+    Returns an HTML span with filled/empty stars and a color indicator.
+    """
+    if not variant.clinvar_entries:
+        return ""
+    entry = variant.clinvar_entries[0]
+    stars = getattr(entry, 'review_stars', 0)
+    filled = "\u2605" * stars        # ★
+    empty = "\u2606" * (4 - stars)   # ☆
+    if stars >= 3:
+        color = "#16a34a"  # green
+    elif stars >= 1:
+        color = "#d97706"  # amber
+    else:
+        color = "#9ca3af"  # gray
+    return f'<span style="color: {color}; letter-spacing: 2px;">{filled}{empty}</span>'
 
 
 def _format_explanation_html(text: str) -> str:
@@ -100,6 +122,7 @@ def generate_html_report(
         gene = _get_gene(variant)
         conditions = _get_conditions(variant)
         clin_sig = _get_clinical_significance(variant)
+        review_stars_html = _get_review_stars_html(variant)
         genotype = variant.genotype or "-"
 
         clinvar_url = f"https://www.ncbi.nlm.nih.gov/clinvar/?term={variant.rsid}"
@@ -137,6 +160,15 @@ def generate_html_report(
                     <span class="label">Clinical Significance:</span>
                     <span class="value">{html_escape.escape(clin_sig)}</span>
                 </div>
+'''
+        if review_stars_html:
+            card_html += f'''
+                <div class="info-row">
+                    <span class="label">Review Quality:</span>
+                    <span class="value">{review_stars_html}</span>
+                </div>
+'''
+        card_html += f'''
                 <div class="info-row">
                     <span class="label">Condition / Trait:</span>
                     <span class="value">{html_escape.escape(conditions)}</span>
@@ -172,19 +204,29 @@ def generate_html_report(
     categories_html = ""
 
     sections = [
-        (traits, "Trait Associations", "#2563eb", "Variants associated with traits identified in genome-wide studies."),
-        (health_conditions, "Health Conditions", "#dc2626", "Variants classified as pathogenic or likely pathogenic by ClinVar."),
-        (risk_factors, "Risk Factors", "#ea580c", "Variants associated with increased risk for certain conditions."),
-        (pharma, "Pharmacogenomics", "#7c3aed", "Variants that may affect drug metabolism or response."),
-        (carrier, "Carrier Status", "#16a34a", "Benign or carrier-status variants."),
+        (health_conditions, "Health Conditions", "#dc2626", "health-conditions", "Variants classified as pathogenic or likely pathogenic by ClinVar."),
+        (risk_factors, "Risk Factors", "#ea580c", "risk-factors", "Variants associated with increased risk for certain conditions."),
+        (pharma, "Pharmacogenomics", "#7c3aed", "pharmacogenomics", "Variants that may affect drug metabolism or response."),
+        (traits, "Trait Associations", "#2563eb", "traits", "Variants associated with traits identified in genome-wide studies."),
+        (carrier, "Carrier Status", "#16a34a", "carrier-status", "Benign or carrier-status variants."),
     ]
 
-    for variant_list, title, color, description in sections:
+    # Build tab navigation — only for sections that have results
+    active_sections = [(vl, t, c, sid, d) for vl, t, c, sid, d in sections if vl]
+    tab_nav_html = ""
+    if len(active_sections) > 1:
+        tab_nav_html = '<nav class="tab-nav" id="tab-nav">\n'
+        for _, title, color, section_id, _ in active_sections:
+            count = len([vl for vl, t, c, sid, d in active_sections if sid == section_id][0])
+            tab_nav_html += f'  <a href="#{section_id}" class="tab-link" style="--tab-color: {color};">{title} <span class="tab-count">{count}</span></a>\n'
+        tab_nav_html += '</nav>\n'
+
+    for variant_list, title, color, section_id, description in sections:
         if not variant_list:
             continue
         # Show up to 100 per category
         display_list = sorted(variant_list, key=lambda x: x.significance_rank)[:100]
-        categories_html += f'<section class="category-section">\n'
+        categories_html += f'<section class="category-section" id="{section_id}">\n'
         categories_html += f'<h2 class="category-title" style="color: {color}; border-color: {color};">{title} ({len(variant_list)})</h2>\n'
         categories_html += f'<p class="category-desc">{description}</p>\n'
         categories_html += '<div class="variants-grid">\n'
@@ -195,6 +237,7 @@ def generate_html_report(
 
     # If no categories matched, show all results
     if not categories_html and results:
+        tab_nav_html = ""
         categories_html = '<section class="category-section">\n'
         categories_html += '<h2 class="category-title">All Findings</h2>\n'
         categories_html += '<div class="variants-grid">\n'
@@ -517,10 +560,61 @@ def generate_html_report(
             color: #9ca3af;
         }}
 
+        .tab-nav {{
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: white;
+            display: flex;
+            gap: 4px;
+            padding: 12px 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e5e7eb;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }}
+
+        .tab-link {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4b5563;
+            background: #f3f4f6;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }}
+
+        .tab-link:hover {{
+            color: var(--tab-color);
+            background: color-mix(in srgb, var(--tab-color) 10%, white);
+            border-color: var(--tab-color);
+        }}
+
+        .tab-count {{
+            font-size: 11px;
+            font-weight: 700;
+            background: #e5e7eb;
+            color: #6b7280;
+            padding: 1px 7px;
+            border-radius: 10px;
+        }}
+
+        .tab-link:hover .tab-count {{
+            background: color-mix(in srgb, var(--tab-color) 20%, white);
+            color: var(--tab-color);
+        }}
+
         @media print {{
             body {{ background-color: white; }}
             .container {{ max-width: 100%; }}
             header {{ break-after: avoid; }}
+            .tab-nav {{ display: none; }}
             .category-section {{ break-inside: avoid; }}
             .variant-card {{ break-inside: avoid; page-break-inside: avoid; }}
             a {{ text-decoration: underline; }}
@@ -563,6 +657,8 @@ def generate_html_report(
         </div>
 
         {ai_note}
+
+        {tab_nav_html}
 
         {categories_html}
 

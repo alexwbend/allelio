@@ -7,7 +7,9 @@ from .lookup import (
     VariantCategory,
     analyze_variants,
     SIGNIFICANCE_RANKS,
+    REVIEW_STATUS_STARS,
     HIGH_IMPACT_GENES,
+    _get_review_stars,
 )
 
 __all__ = [
@@ -17,5 +19,7 @@ __all__ = [
     "VariantCategory",
     "analyze_variants",
     "SIGNIFICANCE_RANKS",
+    "REVIEW_STATUS_STARS",
     "HIGH_IMPACT_GENES",
+    "_get_review_stars",
 ]

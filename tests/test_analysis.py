@@ -4,14 +4,17 @@ import pytest
 from typing import List
 
 from allelio.parsers.base import Variant
+from allelio.database.store import AllelioDB
 from allelio.analysis.lookup import (
     analyze_variants,
     VariantResult,
     VariantCategory,
     _get_significance_rank,
+    _get_review_stars,
     _determine_category,
     ClinVarEntry,
     GWASEntry,
+    REVIEW_STATUS_STARS,
 )
 
 
@@ -377,9 +380,217 @@ class TestAnalyzeVariantsIntegration:
         variants = [
             Variant(rsid="rs429358", chromosome="19", position=45411941, genotype="--"),
         ]
-        
+
         # Should not raise error
         results = analyze_variants(variants, sample_db)
-        
+
         # Results behavior depends on implementation
         assert isinstance(results, list)
+
+
+class TestReviewStars:
+    """Tests for ClinVar review status star rating mapping."""
+
+    def test_practice_guideline_gets_4_stars(self):
+        assert _get_review_stars("practice guideline") == 4
+
+    def test_expert_panel_gets_3_stars(self):
+        assert _get_review_stars("reviewed by expert panel") == 3
+
+    def test_multiple_submitters_gets_2_stars(self):
+        assert _get_review_stars("criteria provided, multiple submitters, no conflicts") == 2
+
+    def test_single_submitter_gets_1_star(self):
+        assert _get_review_stars("criteria provided, single submitter") == 1
+
+    def test_conflicting_interpretations_gets_1_star(self):
+        assert _get_review_stars("criteria provided, conflicting interpretations") == 1
+
+    def test_no_assertion_gets_0_stars(self):
+        assert _get_review_stars("no assertion criteria provided") == 0
+        assert _get_review_stars("no assertion provided") == 0
+
+    def test_none_returns_0(self):
+        assert _get_review_stars(None) == 0
+
+    def test_empty_string_returns_0(self):
+        assert _get_review_stars("") == 0
+
+    def test_unknown_string_returns_0(self):
+        assert _get_review_stars("some unknown review status") == 0
+
+    def test_case_insensitive(self):
+        assert _get_review_stars("Practice Guideline") == 4
+        assert _get_review_stars("REVIEWED BY EXPERT PANEL") == 3
+
+    def test_all_known_statuses_have_mapping(self):
+        """Every key in REVIEW_STATUS_STARS should return its mapped value."""
+        for status, expected_stars in REVIEW_STATUS_STARS.items():
+            assert _get_review_stars(status) == expected_stars
+
+
+class TestReviewStarsOnClinVarEntry:
+    """Tests for review_stars field on ClinVarEntry populated during analysis."""
+
+    def test_review_stars_populated(self, sample_db):
+        """Test that review_stars is populated on ClinVarEntry after analysis."""
+        variants = [
+            Variant(rsid="rs429358", chromosome="19", position=45411941, genotype="CT"),
+        ]
+        results = analyze_variants(variants, sample_db)
+        assert len(results) > 0
+        entry = results[0].clinvar_entries[0]
+        # rs429358 has review_status="criteria provided, single submitter" -> 1 star
+        assert entry.review_stars == 1
+
+    def test_review_stars_multiple_submitters(self, sample_db):
+        """Test review_stars for a variant with multiple submitters."""
+        variants = [
+            Variant(rsid="rs762551", chromosome="11", position=62326389, genotype="AA"),
+        ]
+        results = analyze_variants(variants, sample_db)
+        assert len(results) > 0
+        entry = results[0].clinvar_entries[0]
+        # rs762551 has review_status="criteria provided, multiple submitters" -> 2 stars
+        assert entry.review_stars == 2
+
+
+class TestWeightedSignificanceRanking:
+    """Tests for significance rank weighting by review stars."""
+
+    def test_significance_rank_is_float(self, sample_db):
+        """Test that significance_rank is now a float."""
+        variants = [
+            Variant(rsid="rs429358", chromosome="19", position=45411941, genotype="CT"),
+        ]
+        results = analyze_variants(variants, sample_db)
+        assert len(results) > 0
+        assert isinstance(results[0].significance_rank, float)
+
+    def test_higher_stars_give_lower_rank(self, tmp_dir):
+        """Test that within the same significance tier, higher stars = lower rank."""
+        from pathlib import Path
+
+        db_path = str(Path(tmp_dir) / "weighted_test.db")
+        db = AllelioDB(db_path=db_path)
+        db.initialize()
+
+        # Two pathogenic variants, different review quality
+        db.insert_clinvar_batch([
+            {
+                "rsid": "rs_expert",
+                "gene": "TESTGENE",
+                "clinical_significance": "pathogenic",
+                "conditions": "Test condition",
+                "review_status": "reviewed by expert panel",
+                "last_evaluated": "2024-01-01",
+            },
+            {
+                "rsid": "rs_single",
+                "gene": "TESTGENE",
+                "clinical_significance": "pathogenic",
+                "conditions": "Test condition",
+                "review_status": "criteria provided, single submitter",
+                "last_evaluated": "2024-01-01",
+            },
+        ])
+
+        variants = [
+            Variant(rsid="rs_single", chromosome="1", position=100, genotype="AA"),
+            Variant(rsid="rs_expert", chromosome="1", position=200, genotype="AA"),
+        ]
+
+        results = analyze_variants(variants, db)
+        assert len(results) == 2
+
+        expert = next(r for r in results if r.rsid == "rs_expert")
+        single = next(r for r in results if r.rsid == "rs_single")
+
+        # Both are pathogenic (base rank 1), but expert panel (3 stars) should
+        # have a lower rank than single submitter (1 star)
+        assert expert.significance_rank < single.significance_rank
+
+        # Expert: 1 - 3*0.1 = 0.7, Single: 1 - 1*0.1 = 0.9
+        assert expert.significance_rank == pytest.approx(0.7)
+        assert single.significance_rank == pytest.approx(0.9)
+
+    def test_stars_never_cross_significance_tiers(self, tmp_dir):
+        """Test that star weighting never makes a benign variant outrank a pathogenic one."""
+        from pathlib import Path
+
+        db_path = str(Path(tmp_dir) / "tier_test.db")
+        db = AllelioDB(db_path=db_path)
+        db.initialize()
+
+        db.insert_clinvar_batch([
+            {
+                "rsid": "rs_pathogenic_0star",
+                "gene": "GENE1",
+                "clinical_significance": "pathogenic",
+                "conditions": "Condition A",
+                "review_status": "no assertion criteria provided",
+                "last_evaluated": "2024-01-01",
+            },
+            {
+                "rsid": "rs_likely_pathogenic_4star",
+                "gene": "GENE2",
+                "clinical_significance": "likely pathogenic",
+                "conditions": "Condition B",
+                "review_status": "practice guideline",
+                "last_evaluated": "2024-01-01",
+            },
+        ])
+
+        variants = [
+            Variant(rsid="rs_likely_pathogenic_4star", chromosome="1", position=200, genotype="AA"),
+            Variant(rsid="rs_pathogenic_0star", chromosome="1", position=100, genotype="AA"),
+        ]
+
+        results = analyze_variants(variants, db)
+        assert len(results) == 2
+
+        pathogenic = next(r for r in results if r.rsid == "rs_pathogenic_0star")
+        likely_path = next(r for r in results if r.rsid == "rs_likely_pathogenic_4star")
+
+        # Pathogenic (rank 1, 0 stars) = 1.0
+        # Likely pathogenic (rank 2, 4 stars) = 1.6
+        # Pathogenic must still rank higher (lower number)
+        assert pathogenic.significance_rank < likely_path.significance_rank
+
+    def test_sorted_order_respects_weighted_rank(self, tmp_dir):
+        """Test that results list is sorted by weighted rank."""
+        from pathlib import Path
+
+        db_path = str(Path(tmp_dir) / "sort_test.db")
+        db = AllelioDB(db_path=db_path)
+        db.initialize()
+
+        db.insert_clinvar_batch([
+            {
+                "rsid": "rs_a",
+                "gene": "G1",
+                "clinical_significance": "risk factor",
+                "conditions": "C1",
+                "review_status": "practice guideline",
+                "last_evaluated": "2024-01-01",
+            },
+            {
+                "rsid": "rs_b",
+                "gene": "G2",
+                "clinical_significance": "risk factor",
+                "conditions": "C2",
+                "review_status": "no assertion criteria provided",
+                "last_evaluated": "2024-01-01",
+            },
+        ])
+
+        variants = [
+            Variant(rsid="rs_b", chromosome="1", position=200, genotype="AA"),
+            Variant(rsid="rs_a", chromosome="1", position=100, genotype="AA"),
+        ]
+
+        results = analyze_variants(variants, db)
+        assert len(results) == 2
+        # rs_a (4 stars) should come before rs_b (0 stars)
+        assert results[0].rsid == "rs_a"
+        assert results[1].rsid == "rs_b"
