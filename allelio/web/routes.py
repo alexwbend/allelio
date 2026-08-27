@@ -7,7 +7,6 @@ from typing import List, Dict, Any, Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from starlette.concurrency import run_in_executor
 
 from allelio import __version__
 from allelio.parsers import parse_genotype_file
@@ -24,7 +23,7 @@ router = APIRouter()
 async def read_root(request: Request) -> str:
     """Serve the main HTML page."""
     try:
-        return templates.TemplateResponse("index.html", {"request": request})
+        return templates.TemplateResponse(request, "index.html")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load index page: {str(e)}")
 
@@ -35,7 +34,7 @@ async def get_status() -> Dict[str, Any]:
     try:
         # Check ollama availability
         ai_engine = AIEngine()
-        ollama_available = ai_engine.check_connection()
+        ollama_available = await ai_engine.check_connection()
     except Exception:
         ollama_available = False
 
@@ -51,7 +50,7 @@ async def get_status() -> Dict[str, Any]:
         db = AllelioDB()
         db_ready = db.is_initialized()
         if db_ready:
-            stats = db.get_statistics()
+            stats = db.get_stats()
             db_stats = {
                 "clinvar_entries": stats.get("clinvar_entries", 0),
                 "gwas_entries": stats.get("gwas_entries", 0),
@@ -125,7 +124,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
 
         # Create AI engine and check connection
         ai_engine = AIEngine()
-        if not ai_engine.check_connection():
+        if not await ai_engine.check_connection():
             raise HTTPException(
                 status_code=503,
                 detail="AI service (Ollama) is not available"
@@ -168,10 +167,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         # Format results
         formatted_results = []
         for i, variant in enumerate(analysis_results):
-            warnings = get_variant_warnings(
-                variant.rsid,
-                variant.genotype if hasattr(variant, 'genotype') else None,
-            )
+            warnings = get_variant_warnings(variant)
             
             result_dict = {
                 "rsid": variant.rsid,

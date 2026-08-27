@@ -925,7 +925,7 @@
                 // Update Database Status
                 const dbIndicator = document.getElementById('dbIndicator');
                 const dbStatus = document.getElementById('dbStatus');
-                if (data.database_ready) {
+                if (data.db_ready) {
                     dbIndicator.classList.add('connected');
                     dbStatus.textContent = 'Database Ready';
                 } else {
@@ -936,7 +936,7 @@
                 // Update Ollama Status
                 const ollamaIndicator = document.getElementById('ollamaIndicator');
                 const ollamaStatus = document.getElementById('ollamaStatus');
-                if (data.ollama_connected) {
+                if (data.ollama_available) {
                     ollamaIndicator.classList.add('connected');
                     ollamaStatus.textContent = 'Ollama Connected';
                 } else {
