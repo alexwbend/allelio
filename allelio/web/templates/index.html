@@ -431,6 +431,7 @@
         .summary-text {
             font-size: 0.95rem;
             line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         /* Result Card */
@@ -593,6 +594,7 @@
             margin-bottom: 1rem;
             color: var(--gray-700);
             line-height: 1.7;
+            white-space: pre-wrap;
         }
 
         body.dark-mode .result-explanation {
@@ -1155,8 +1157,8 @@
                 <div class="result-body">
                     <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
                     <div class="result-sources">
-                        ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" class="source-link">ClinVar</a>` : ''}
-                        ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" class="source-link">PubMed</a>` : ''}
+                        ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" rel="noopener noreferrer" class="source-link">ClinVar</a>` : ''}
+                        ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" rel="noopener noreferrer" class="source-link">PubMed</a>` : ''}
                     </div>
                 </div>
             `;
