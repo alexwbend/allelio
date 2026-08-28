@@ -1046,6 +1046,11 @@
         }
 
         // Display Results
+        // "Health Conditions" -> "health_conditions"
+        function slugify(category) {
+            return (category || '').toLowerCase().replace(/ /g, '_');
+        }
+
         function displayResults() {
             if (!analysisResults) return;
 
@@ -1105,7 +1110,9 @@
 
             // Filter by category
             if (currentCategory !== 'all') {
-                results = results.filter(r => r.category === currentCategory);
+                // The tabs are keyed on slugs; the analyser emits labels like
+                // "Health Conditions", so every tab but All matched nothing.
+                results = results.filter(r => slugify(r.category) === currentCategory);
             }
 
             if (results.length === 0) {
