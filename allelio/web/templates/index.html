@@ -1046,14 +1046,15 @@
             }
 
             // Create Category Tabs
-            const categories = ['all', 'health_conditions', 'carrier_status', 'risk_factors', 'pharmacogenomics', 'traits'];
+            const categories = ['all', 'health_conditions', 'carrier_status', 'risk_factors', 'pharmacogenomics', 'traits', 'unknown'];
             const categoryLabels = {
                 'all': 'All',
                 'health_conditions': 'Health Conditions',
                 'carrier_status': 'Carrier Status',
                 'risk_factors': 'Risk Factors',
                 'pharmacogenomics': 'Pharmacogenomics',
-                'traits': 'Traits'
+                'traits': 'Traits',
+                'unknown': 'Uncategorized'
             };
 
             const tabsContainer = document.getElementById('resultsTabs');
@@ -1062,6 +1063,7 @@
             categories.forEach(cat => {
                 const button = document.createElement('button');
                 button.className = 'tab-button' + (cat === 'all' ? ' active' : '');
+                button.dataset.category = cat;
                 button.textContent = categoryLabels[cat];
                 button.addEventListener('click', () => selectCategory(cat));
                 tabsContainer.appendChild(button);
@@ -1075,9 +1077,11 @@
         function selectCategory(category) {
             currentCategory = category;
 
-            // Update active tab
-            document.querySelectorAll('.tab-button').forEach((btn, idx) => {
-                btn.classList.toggle('active', btn.textContent === document.querySelectorAll('.tab-button')[['all', 'health_conditions', 'risk_factors', 'pharmacogenomics', 'traits'].indexOf(category)].textContent);
+            // Update active tab. This used to look the tab up by position in a
+            // second, hardcoded category list; anything missing from that list
+            // indexed to -1 and threw.
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === category);
             });
 
             renderResultCards();
@@ -1126,6 +1130,7 @@
             const categoryBadgeClass = {
                 'health_conditions': 'badge-category',
                 'carrier_status': 'badge-category',
+                'unknown': 'badge-category',
                 'risk_factors': 'badge-category',
                 'pharmacogenomics': 'badge-category',
                 'traits': 'badge-category'

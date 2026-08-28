@@ -180,7 +180,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             )
 
         # Generate executive summary
-        _progress.update(stage="Summarising", done=0, total=0)
+        _progress.update(stage="Summarizing", done=0, total=0)
         try:
             if not ai_available:
                 raise RuntimeError("ollama unavailable")
