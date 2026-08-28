@@ -1,6 +1,8 @@
 """API routes for Allelio web interface."""
 
 import asyncio
+import json
+import os
 import tempfile
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -91,6 +93,8 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         with open(temp_file_path, "wb") as f:
             f.write(content)
 
+        _progress.update(stage="Reading your file", done=0, total=0)
+
         # Parse genotype file
         loop = asyncio.get_event_loop()
         genotypes = await loop.run_in_executor(
@@ -112,6 +116,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             )
 
         # Analyze variants
+        _progress.update(stage=f"Matching {len(genotypes):,} variants against ClinVar and GWAS")
         analysis_results = await loop.run_in_executor(
             None, analyze_variants, genotypes, db
         )
@@ -122,13 +127,10 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 detail="No variants found in database"
             )
 
-        # Create AI engine and check connection
+        # Create AI engine. Ollama is optional — the README promises the tool
+        # still works without it, minus the plain-English explanations.
         ai_engine = AIEngine()
-        if not await ai_engine.check_connection():
-            raise HTTPException(
-                status_code=503,
-                detail="AI service (Ollama) is not available"
-            )
+        ai_available = await ai_engine.check_connection()
 
         # Get top 50 significant variants
         sorted_results = sorted(
@@ -138,33 +140,33 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         )
         top_variants = sorted_results[:50]
 
-        # Generate AI explanations for significant variants
+        # Generate AI explanations for significant variants. One call per
+        # variant, run a few at a time — sequentially this took 12 minutes.
         explanations = {}
-        for i, variant in enumerate(top_variants):
-            try:
-                explanation = await ai_engine.generate_explanation(
-                    variant.rsid,
-                    variant.chromosome,
-                    variant.position,
-                    variant.genotype,
-                    variant.clinvar_data if hasattr(variant, 'clinvar_data') else None,
-                    variant.gwas_data if hasattr(variant, 'gwas_data') else None,
-                )
-                explanations[variant.rsid] = explanation
-            except Exception:
-                explanations[variant.rsid] = "Explanation generation failed"
+        if ai_available:
+            _progress.update(
+                stage="Writing explanations", done=0, total=len(top_variants)
+            )
+
+            def on_explained(done: int, total: int) -> None:
+                _progress.update(done=done, total=total)
+
+            explanations = await ai_engine.explain_variants_batch(
+                top_variants, progress_callback=on_explained
+            )
 
         # Generate executive summary
+        _progress.update(stage="Summarising", done=0, total=0)
         try:
-            summary = await ai_engine.generate_summary(
-                total_variants=len(analysis_results),
-                significant_variants=len(top_variants),
-                top_categories=_get_top_categories(analysis_results),
-            )
+            if not ai_available:
+                raise RuntimeError("ollama unavailable")
+            summary = await ai_engine.generate_summary(top_variants)
         except Exception:
-            summary = "Unable to generate summary at this time"
+            summary = ("AI summary unavailable. Variant findings below come "
+                       "straight from ClinVar and the GWAS Catalog.")
 
         # Format results
+        _progress.update(stage="Building your report")
         formatted_results = []
         for i, variant in enumerate(analysis_results):
             warnings = get_variant_warnings(variant)
@@ -183,12 +185,14 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             }
             formatted_results.append(result_dict)
 
-        return {
+        payload = {
             "summary": summary,
             "results": formatted_results,
             "total_variants": len(analysis_results),
             "analyzed_at": _get_timestamp(),
         }
+        _save_last_analysis(payload)
+        return payload
 
     except HTTPException:
         raise
@@ -199,11 +203,42 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         )
     finally:
         # Clean up temp file
+        _progress.update(stage="idle", done=0, total=0)
         if temp_file_path and Path(temp_file_path).exists():
             try:
                 Path(temp_file_path).unlink()
             except Exception:
                 pass
+
+
+LAST_ANALYSIS_PATH = Path(os.path.expanduser("~/.allelio/last_analysis.json"))
+
+# A whole-genome run takes minutes. Without real numbers the page looks hung,
+# so the analyse route publishes its stage here and the browser polls it.
+_progress: Dict[str, Any] = {"stage": "idle", "done": 0, "total": 0}
+
+
+@router.get("/api/progress")
+async def get_progress() -> Dict[str, Any]:
+    """Where the current analysis has got to."""
+    return _progress
+
+
+def _save_last_analysis(payload: Dict[str, Any]) -> None:
+    """Keep the most recent run so a page reload does not mean a re-upload."""
+    try:
+        LAST_ANALYSIS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        LAST_ANALYSIS_PATH.write_text(json.dumps(payload))
+    except Exception:
+        pass
+
+
+@router.get("/api/last")
+async def get_last_analysis() -> Dict[str, Any]:
+    """Return the most recent analysis, or 404 if there has not been one."""
+    if not LAST_ANALYSIS_PATH.exists():
+        raise HTTPException(status_code=404, detail="No previous analysis")
+    return json.loads(LAST_ANALYSIS_PATH.read_text())
 
 
 @router.post("/api/export")

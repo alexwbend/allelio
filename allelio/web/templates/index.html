@@ -867,7 +867,39 @@
         document.addEventListener('DOMContentLoaded', () => {
             setupEventListeners();
             fetchStatus();
+            loadLastAnalysis();
         });
+
+        // Restore the previous run so a reload does not require re-uploading.
+        async function loadLastAnalysis() {
+            try {
+                const response = await fetch('/api/last');
+                if (!response.ok) return;
+                analysisResults = await response.json();
+                displayResults();
+                document.getElementById('resultsSection').classList.remove('hidden');
+                // A restored run is finished: no progress bar, no upload prompt.
+                document.getElementById('progressSection').classList.add('hidden');
+                // Hide the upload panel so a finished run does not look like a
+                // prompt, but leave one way back to it.
+                const upload = document.getElementById('uploadSection');
+                if (upload) {
+                    upload.classList.add('hidden');
+                    const again = document.createElement('button');
+                    again.className = 'btn btn-secondary';
+                    again.textContent = 'Analyze another file';
+                    again.style.cssText = 'display:block;margin:0 auto 1.5rem;';
+                    again.onclick = () => {
+                        upload.classList.remove('hidden');
+                        again.remove();
+                    };
+                    const results = document.getElementById('resultsSection');
+                    results.parentNode.insertBefore(again, results);
+                }
+            } catch (e) {
+                // No previous run — the upload panel stands on its own.
+            }
+        }
 
         // Setup Event Listeners
         function setupEventListeners() {
@@ -959,14 +991,28 @@
             document.getElementById('progressSection').classList.remove('hidden');
             document.getElementById('resultsSection').classList.add('hidden');
 
-            // Animate progress bar
-            let progress = 0;
+            // Poll the server for real progress. A whole genome takes minutes;
+            // a bar that fakes its way to 90% and stops looks like a hang.
             const progressBar = document.getElementById('progressBar');
-            const progressInterval = setInterval(() => {
-                progress += Math.random() * 30;
-                if (progress > 90) progress = 90;
-                progressBar.style.width = progress + '%';
-            }, 500);
+            const progressText = document.getElementById('progressText');
+            progressBar.style.width = '2%';
+            progressText.textContent = 'Uploading...';
+            const progressInterval = setInterval(async () => {
+                try {
+                    const r = await fetch('/api/progress');
+                    if (!r.ok) return;
+                    const p = await r.json();
+                    if (p.stage === 'idle') return;
+                    progressText.textContent = p.total
+                        ? `${p.stage} — ${p.done} of ${p.total}`
+                        : `${p.stage}...`;
+                    if (p.total) {
+                        progressBar.style.width = (10 + 80 * p.done / p.total) + '%';
+                    }
+                } catch (e) {
+                    // Server busy or restarting — the next tick tries again.
+                }
+            }, 1000);
 
             try {
                 const response = await fetch('/api/analyze', {
@@ -1067,7 +1113,19 @@
                 return;
             }
 
-            results.forEach((result, idx) => {
+            // Cap the DOM: a full genome yields tens of thousands of results and
+            // rendering them all locks the browser. Results are already ordered
+            // by significance, so the cap keeps the ones that matter.
+            const RENDER_LIMIT = 200;
+            const shown = results.slice(0, RENDER_LIMIT);
+            if (results.length > RENDER_LIMIT) {
+                const note = document.createElement('p');
+                note.style.cssText = 'text-align:center;color:var(--gray-600);padding:1rem;';
+                note.textContent = `Showing the top ${RENDER_LIMIT} of ${results.length.toLocaleString()} findings. Export the report for the full set.`;
+                container.appendChild(note);
+            }
+
+            shown.forEach((result, idx) => {
                 const card = createResultCard(result);
                 container.appendChild(card);
             });

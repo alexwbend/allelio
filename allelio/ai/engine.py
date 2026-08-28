@@ -220,16 +220,22 @@ class AIEngine:
             
             # Classify based on available data
             if clinvar or (gwas and len(gwas) > 0):
+                # clinvar/gwas hold ClinVarEntry and GWASEntry objects, not dicts.
                 has_clinvar_pathogenic = any(
-                    'pathogenic' in str(e.get('clinical_significance', '')).lower()
+                    'pathogenic' in str(getattr(e, 'clinical_significance', '')).lower()
                     for e in clinvar
                 )
-                
-                if has_clinvar_pathogenic or (gwas and any(
-                    float(e.get('p_value', '1.0').split('e-')[1]) > 5 
-                    for e in gwas 
-                    if 'e-' in str(e.get('p_value', ''))
-                )):
+
+                def _strong_gwas(e) -> bool:
+                    p = str(getattr(e, 'p_value', ''))
+                    if 'e-' not in p:
+                        return False
+                    try:
+                        return float(p.split('e-')[1]) > 5
+                    except ValueError:
+                        return False
+
+                if has_clinvar_pathogenic or any(_strong_gwas(e) for e in gwas):
                     high_impact.append(result)
                 elif clinvar or gwas:
                     moderate.append(result)
@@ -249,6 +255,27 @@ class AIEngine:
             summary_parts.append(f"- {len(moderate)} variant(s) with moderate research associations")
         if low:
             summary_parts.append(f"- {len(low)} variant(s) with limited available data")
+
+        # The model was previously handed counts alone and asked to summarise
+        # findings it had never been shown, so it answered by saying so. List them.
+        listed = (high_impact + moderate)[:25]
+        if listed:
+            summary_parts.append("\nThe findings:")
+            for r in listed:
+                gene = ""
+                for e in (r.clinvar_entries or []):
+                    gene = getattr(e, 'gene', '') or gene
+                for e in (r.gwas_entries or []):
+                    gene = gene or getattr(e, 'gene', '')
+                sig = ""
+                for e in (r.clinvar_entries or []):
+                    sig = getattr(e, 'clinical_significance', '') or sig
+                traits = [getattr(e, 'trait', '') for e in (r.gwas_entries or [])]
+                traits = [t for t in traits if t][:2]
+                bits = [b for b in (gene, sig, "; ".join(traits)) if b]
+                summary_parts.append(
+                    f"- {r.rsid} ({r.genotype}): " + (" — ".join(bits) if bits else "no annotation")
+                )
         
         summary_parts.append(
             "\nPlease provide a brief 2-3 paragraph executive summary of these findings, "
