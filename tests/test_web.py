@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from allelio.ai.engine import AIEngine
-from allelio.analysis.lookup import ClinVarEntry, VariantResult
+from allelio.analysis.lookup import ClinVarEntry, GWASEntry, VariantResult
 from allelio.web.app import app
 
 
@@ -71,13 +71,14 @@ def test_progress_starts_idle(client: TestClient) -> None:
     assert client.get("/api/progress").json()["stage"] == "idle"
 
 
-def test_cors_rejects_foreign_origins(client: TestClient) -> None:
-    """A page on the open web must not be able to read a genome off localhost."""
-    allowed = client.get("/api/status", headers={"Origin": "http://localhost:3000"})
-    assert allowed.headers.get("access-control-allow-origin") == "http://localhost:3000"
+def test_no_cross_origin_reads(client: TestClient) -> None:
+    """A page on the open web must not be able to read a genome off localhost.
 
-    blocked = client.get("/api/status", headers={"Origin": "https://example.com"})
-    assert "access-control-allow-origin" not in blocked.headers
+    The UI is same-origin with the API, so the app grants no origin anything.
+    """
+    for origin in ("https://example.com", "http://localhost:3000"):
+        response = client.get("/api/status", headers={"Origin": origin})
+        assert "access-control-allow-origin" not in response.headers
 
 
 @pytest.mark.asyncio
@@ -122,3 +123,54 @@ def test_result_cards_get_a_gene_and_a_significance() -> None:
     )
     assert _significance_of(benign) == "benign"
     assert _gene_of(benign) is None
+
+
+def test_conflicting_interpretations_are_not_pathogenic() -> None:
+    """ClinVar's commonest ambiguous term contains the word "pathogenic"; a
+    substring match painted those variants with the red badge."""
+    from allelio.web.routes import _significance_of
+
+    conflicting = VariantResult(
+        rsid="rs1",
+        clinvar_entries=[
+            ClinVarEntry(
+                rsid="rs1",
+                clinical_significance="Conflicting interpretations of pathogenicity",
+            )
+        ],
+    )
+    assert _significance_of(conflicting) != "pathogenic"
+
+
+@pytest.mark.asyncio
+async def test_summary_prompt_names_the_gwas_gene() -> None:
+    """GWASEntry calls it mapped_gene, so reading .gene left GWAS-only variants
+    reaching the model with no gene at all."""
+    engine = AIEngine()
+    engine.client = StubClient(reply="Noted.")
+    engine.available = True
+
+    variant = VariantResult(
+        rsid="rs2",
+        gwas_entries=[GWASEntry(rsid="rs2", trait="Height", mapped_gene="HMGA2")],
+    )
+    await engine.generate_summary([variant])
+
+    assert "HMGA2" in engine.client.prompts[0]
+
+
+def test_exported_report_escapes_the_uploaded_file() -> None:
+    """Genotypes are copied verbatim out of the user's file and the report is
+    opened in a browser."""
+    from allelio.web.routes import _generate_html_report
+
+    html = _generate_html_report(
+        {
+            "summary": "<script>alert(1)</script>",
+            "results": [{"rsid": "rs1", "genotype": "<img src=x onerror=alert(1)>"}],
+        }
+    )
+    assert "<script>alert(1)</script>" not in html
+    assert "<img src=x" not in html
+    assert "&lt;script&gt;" in html
+    assert "&lt;img src=x" in html

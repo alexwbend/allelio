@@ -179,8 +179,6 @@ class AIEngine:
         async def explain_with_semaphore(result):
             async with semaphore:
                 explanation = await self.explain_variant(result)
-                if progress_callback:
-                    progress_callback(len(explanations), len(results))
                 return result.rsid, explanation
         
         # Track completions for callback
@@ -226,10 +224,11 @@ class AIEngine:
             # Classify based on available data
             if clinvar or (gwas and len(gwas) > 0):
                 # clinvar/gwas hold ClinVarEntry and GWASEntry objects, not dicts.
-                has_clinvar_pathogenic = any(
-                    'pathogenic' in str(getattr(e, 'clinical_significance', '')).lower()
-                    for e in clinvar
-                )
+                def _pathogenic(e) -> bool:
+                    sig = str(getattr(e, 'clinical_significance', '')).lower()
+                    return 'pathogenic' in sig and 'conflicting' not in sig
+
+                has_clinvar_pathogenic = any(_pathogenic(e) for e in clinvar)
 
                 def _strong_gwas(e) -> bool:
                     p = str(getattr(e, 'p_value', ''))
@@ -271,7 +270,7 @@ class AIEngine:
                 for e in (r.clinvar_entries or []):
                     gene = getattr(e, 'gene', '') or gene
                 for e in (r.gwas_entries or []):
-                    gene = gene or getattr(e, 'gene', '')
+                    gene = gene or getattr(e, 'mapped_gene', '')
                 sig = ""
                 for e in (r.clinvar_entries or []):
                     sig = getattr(e, 'clinical_significance', '') or sig

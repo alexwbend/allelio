@@ -867,39 +867,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             setupEventListeners();
             fetchStatus();
-            loadLastAnalysis();
         });
-
-        // Restore the previous run so a reload does not require re-uploading.
-        async function loadLastAnalysis() {
-            try {
-                const response = await fetch('/api/last');
-                if (!response.ok) return;
-                analysisResults = await response.json();
-                displayResults();
-                document.getElementById('resultsSection').classList.remove('hidden');
-                // A restored run is finished: no progress bar, no upload prompt.
-                document.getElementById('progressSection').classList.add('hidden');
-                // Hide the upload panel so a finished run does not look like a
-                // prompt, but leave one way back to it.
-                const upload = document.getElementById('uploadSection');
-                if (upload) {
-                    upload.classList.add('hidden');
-                    const again = document.createElement('button');
-                    again.className = 'export-button';
-                    again.textContent = 'Analyze another file';
-                    again.style.cssText = 'display:block;margin:0 auto 1.5rem;';
-                    again.onclick = () => {
-                        upload.classList.remove('hidden');
-                        again.remove();
-                    };
-                    const results = document.getElementById('resultsSection');
-                    results.parentNode.insertBefore(again, results);
-                }
-            } catch (e) {
-                // No previous run — the upload panel stands on its own.
-            }
-        }
 
         // Setup Event Listeners
         function setupEventListeners() {
@@ -1046,6 +1014,21 @@
         }
 
         // Display Results
+        // Result fields are read out of the uploaded file or written by the
+        // model; neither is trusted markup.
+        function esc(value) {
+            if (value === null || value === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = value;
+            return div.innerHTML;
+        }
+
+        // ClinVar and PubMed IDs land inside a URL, where escaping HTML is not
+        // enough — anything but digits is not an ID.
+        function idFor(value) {
+            return /^\d+$/.test(String(value ?? '')) ? String(value) : '';
+        }
+
         // "Health Conditions" -> "health_conditions"
         function slugify(category) {
             return (category || '').toLowerCase().replace(/ /g, '_');
@@ -1063,10 +1046,11 @@
             }
 
             // Create Category Tabs
-            const categories = ['all', 'health_conditions', 'risk_factors', 'pharmacogenomics', 'traits'];
+            const categories = ['all', 'health_conditions', 'carrier_status', 'risk_factors', 'pharmacogenomics', 'traits'];
             const categoryLabels = {
                 'all': 'All',
                 'health_conditions': 'Health Conditions',
+                'carrier_status': 'Carrier Status',
                 'risk_factors': 'Risk Factors',
                 'pharmacogenomics': 'Pharmacogenomics',
                 'traits': 'Traits'
@@ -1141,6 +1125,7 @@
 
             const categoryBadgeClass = {
                 'health_conditions': 'badge-category',
+                'carrier_status': 'badge-category',
                 'risk_factors': 'badge-category',
                 'pharmacogenomics': 'badge-category',
                 'traits': 'badge-category'
@@ -1149,20 +1134,20 @@
             card.innerHTML = `
                 <div class="result-header">
                     <div class="result-title">
-                        <div class="result-rsid">${result.rsid}</div>
-                        <div class="result-gene">${result.gene || 'Gene: Unknown'}</div>
+                        <div class="result-rsid">${esc(result.rsid)}</div>
+                        <div class="result-gene">${esc(result.gene) || 'Gene: Unknown'}</div>
                         <div class="result-meta">
-                            <span class="badge ${categoryBadgeClass}">${result.category.replace('_', ' ')}</span>
-                            <span class="badge ${significanceBadgeClass}">${significance}</span>
+                            <span class="badge ${categoryBadgeClass}">${esc(result.category).replace('_', ' ')}</span>
+                            <span class="badge ${significanceBadgeClass}">${esc(significance)}</span>
                         </div>
                     </div>
-                    <div class="result-genotype">${result.genotype}</div>
+                    <div class="result-genotype">${esc(result.genotype)}</div>
                 </div>
                 <div class="result-body">
-                    <div class="result-explanation">${result.explanation || 'No explanation available.'}</div>
+                    <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
                     <div class="result-sources">
-                        ${result.clinvar_id ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/${result.clinvar_id}/" target="_blank" class="source-link">ClinVar</a>` : ''}
-                        ${result.pubmed_id ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${result.pubmed_id}/" target="_blank" class="source-link">PubMed</a>` : ''}
+                        ${idFor(result.clinvar_id) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/${idFor(result.clinvar_id)}/" target="_blank" class="source-link">ClinVar</a>` : ''}
+                        ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" class="source-link">PubMed</a>` : ''}
                     </div>
                 </div>
             `;

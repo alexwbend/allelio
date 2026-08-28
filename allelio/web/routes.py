@@ -1,9 +1,8 @@
 """API routes for Allelio web interface."""
 
 import asyncio
-import json
-import os
 import tempfile
+from html import escape
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -84,6 +83,8 @@ def _significance_of(variant) -> str:
     """Bucket a result into the four badges the results list knows how to draw."""
     for entry in (variant.clinvar_entries or []):
         significance = (entry.clinical_significance or "").lower()
+        if "conflicting" in significance:
+            continue
         if "pathogenic" in significance and "benign" not in significance:
             return "pathogenic"
         if "risk" in significance:
@@ -159,13 +160,9 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         ai_engine = AIEngine()
         ai_available = await ai_engine.check_connection()
 
-        # Get top 50 significant variants
-        sorted_results = sorted(
-            analysis_results,
-            key=lambda x: x.significance_score if hasattr(x, 'significance_score') else 0,
-            reverse=True
-        )
-        top_variants = sorted_results[:50]
+        # analyze_variants already returns these most-significant-first, so the
+        # top 50 are the 50 worth spending an AI call on.
+        top_variants = analysis_results[:50]
 
         # Generate AI explanations for significant variants. One call per
         # variant, run a few at a time — sequentially this took 12 minutes.
@@ -222,7 +219,6 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             "total_variants": len(analysis_results),
             "analyzed_at": _get_timestamp(),
         }
-        _save_last_analysis(payload)
         return payload
 
     except HTTPException:
@@ -242,8 +238,6 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 pass
 
 
-LAST_ANALYSIS_PATH = Path(os.path.expanduser("~/.allelio/last_analysis.json"))
-
 # A whole-genome run takes minutes. Without real numbers the page looks hung,
 # so the analyse route publishes its stage here and the browser polls it.
 _progress: Dict[str, Any] = {"stage": "idle", "done": 0, "total": 0}
@@ -253,23 +247,6 @@ _progress: Dict[str, Any] = {"stage": "idle", "done": 0, "total": 0}
 async def get_progress() -> Dict[str, Any]:
     """Where the current analysis has got to."""
     return _progress
-
-
-def _save_last_analysis(payload: Dict[str, Any]) -> None:
-    """Keep the most recent run so a page reload does not mean a re-upload."""
-    try:
-        LAST_ANALYSIS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        LAST_ANALYSIS_PATH.write_text(json.dumps(payload))
-    except Exception:
-        pass
-
-
-@router.get("/api/last")
-async def get_last_analysis() -> Dict[str, Any]:
-    """Return the most recent analysis, or 404 if there has not been one."""
-    if not LAST_ANALYSIS_PATH.exists():
-        raise HTTPException(status_code=404, detail="No previous analysis")
-    return json.loads(LAST_ANALYSIS_PATH.read_text())
 
 
 @router.post("/api/export")
@@ -327,7 +304,7 @@ def _get_timestamp() -> str:
 
 def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     """Generate HTML report from analysis data."""
-    summary = analysis_data.get("summary", "No summary available")
+    summary = escape(str(analysis_data.get("summary") or "No summary available"))
     results = analysis_data.get("results", [])
     total_variants = analysis_data.get("total_variants", 0)
     analyzed_at = analysis_data.get("analyzed_at", "Unknown")
@@ -335,12 +312,17 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     # Build results table HTML
     results_html = ""
     for result in results[:100]:  # Limit to first 100 for report
-        rsid = result.get("rsid", "N/A")
-        chrom = result.get("chromosome", "N/A")
-        pos = result.get("position", "N/A")
-        genotype = result.get("genotype", "N/A")
-        category = result.get("category", "N/A")
-        explanation = result.get("explanation", "N/A")
+        # These come from the uploaded file and the model, and the report is
+        # opened in a browser — none of it is trusted markup.
+        def field(name):
+            return escape(str(result.get(name) or "N/A"))
+
+        rsid = field("rsid")
+        chrom = field("chromosome")
+        pos = field("position")
+        genotype = field("genotype")
+        category = field("category")
+        explanation = field("explanation")
         
         results_html += f"""
         <tr>
