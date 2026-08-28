@@ -1120,19 +1120,7 @@
                 return;
             }
 
-            // Cap the DOM: a full genome yields tens of thousands of results and
-            // rendering them all locks the browser. Results are already ordered
-            // by significance, so the cap keeps the ones that matter.
-            const RENDER_LIMIT = 200;
-            const shown = results.slice(0, RENDER_LIMIT);
-            if (results.length > RENDER_LIMIT) {
-                const note = document.createElement('p');
-                note.style.cssText = 'text-align:center;color:var(--gray-600);padding:1rem;';
-                note.textContent = `Showing the top ${RENDER_LIMIT} of ${results.length.toLocaleString()} findings. Export the report for the full set.`;
-                container.appendChild(note);
-            }
-
-            shown.forEach((result, idx) => {
+            results.forEach((result, idx) => {
                 const card = createResultCard(result);
                 container.appendChild(card);
             });
