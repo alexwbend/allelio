@@ -4,7 +4,7 @@ import asyncio
 import tempfile
 from html import escape
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from allelio import __version__
 from allelio.parsers import parse_genotype_file
 from allelio.database.store import AllelioDB
-from allelio.analysis.lookup import analyze_variants, VariantResult
+from allelio.analysis.lookup import analyze_variants
 from allelio.ai.engine import AIEngine
 from allelio.ai.safety import get_variant_warnings
 from allelio.web.app import templates
@@ -285,17 +285,6 @@ async def export_report(analysis_data: Dict[str, Any]) -> FileResponse:
         )
 
 
-def _get_top_categories(results: List[VariantResult]) -> List[str]:
-    """Extract top categories from analysis results."""
-    categories = {}
-    for result in results:
-        category = result.category if hasattr(result, 'category') else "Unknown"
-        categories[category] = categories.get(category, 0) + 1
-    
-    sorted_cats = sorted(categories.items(), key=lambda x: x[1], reverse=True)
-    return [cat[0] for cat in sorted_cats[:5]]
-
-
 def _get_timestamp() -> str:
     """Get current timestamp in ISO format."""
     from datetime import datetime
@@ -306,8 +295,8 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     """Generate HTML report from analysis data."""
     summary = escape(str(analysis_data.get("summary") or "No summary available"))
     results = analysis_data.get("results", [])
-    total_variants = analysis_data.get("total_variants", 0)
-    analyzed_at = analysis_data.get("analyzed_at", "Unknown")
+    total_variants = escape(str(analysis_data.get("total_variants", 0)))
+    analyzed_at = escape(str(analysis_data.get("analyzed_at") or "Unknown"))
 
     # Build results table HTML
     results_html = ""

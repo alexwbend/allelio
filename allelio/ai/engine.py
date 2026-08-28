@@ -225,18 +225,20 @@ class AIEngine:
             if clinvar or (gwas and len(gwas) > 0):
                 # clinvar/gwas hold ClinVarEntry and GWASEntry objects, not dicts.
                 def _pathogenic(e) -> bool:
+                    # Same test the results list badges on, so the summary and
+                    # the cards cannot disagree about one variant.
                     sig = str(getattr(e, 'clinical_significance', '')).lower()
-                    return 'pathogenic' in sig and 'conflicting' not in sig
+                    if 'conflicting' in sig or 'benign' in sig:
+                        return False
+                    return 'pathogenic' in sig
 
                 has_clinvar_pathogenic = any(_pathogenic(e) for e in clinvar)
 
                 def _strong_gwas(e) -> bool:
-                    p = str(getattr(e, 'p_value', ''))
-                    if 'e-' not in p:
-                        return False
+                    p = getattr(e, 'p_value', None)
                     try:
-                        return float(p.split('e-')[1]) > 5
-                    except ValueError:
+                        return p is not None and float(p) < 1e-5
+                    except (TypeError, ValueError):
                         return False
 
                 if has_clinvar_pathogenic or any(_strong_gwas(e) for e in gwas):

@@ -174,3 +174,41 @@ def test_exported_report_escapes_the_uploaded_file() -> None:
     assert "<img src=x" not in html
     assert "&lt;script&gt;" in html
     assert "&lt;img src=x" in html
+
+
+def test_exported_report_escapes_its_own_header() -> None:
+    """/api/export takes an arbitrary dict, so the report's own two fields are
+    no more trusted than the rows."""
+    from allelio.web.routes import _generate_html_report
+
+    html = _generate_html_report(
+        {"analyzed_at": "<script>alert(1)</script>", "total_variants": "<b>x</b>"}
+    )
+    assert "<script>alert(1)</script>" not in html
+    assert "<b>x</b>" not in html
+
+
+def test_strong_gwas_reads_the_smallest_p_values() -> None:
+    """p_value is a float column; 6,271 rows hold 0.0, which has no exponent to
+    string-slice, so the strongest associations were read as the weakest."""
+    from allelio.ai.engine import AIEngine
+
+    engine = AIEngine()
+    engine.client = StubClient(reply="Noted.")
+    engine.available = True
+
+    import asyncio
+
+    strong = VariantResult(
+        rsid="rs3",
+        gwas_entries=[GWASEntry(rsid="rs3", trait="Height", p_value=0.0)],
+    )
+    weak = VariantResult(
+        rsid="rs4",
+        gwas_entries=[GWASEntry(rsid="rs4", trait="Height", p_value=0.5)],
+    )
+    # Weak one first: only a working p-value test reorders them.
+    asyncio.run(engine.generate_summary([weak, strong]))
+    prompt = engine.client.prompts[0]
+
+    assert prompt.index("rs3") < prompt.index("rs4")

@@ -1023,10 +1023,14 @@
             return div.innerHTML;
         }
 
-        // ClinVar and PubMed IDs land inside a URL, where escaping HTML is not
-        // enough — anything but digits is not an ID.
+        // These land inside a URL, where escaping HTML is not enough. A PubMed
+        // ID is digits; an rsID is rs or i followed by digits.
         function idFor(value) {
             return /^\d+$/.test(String(value ?? '')) ? String(value) : '';
+        }
+
+        function rsidFor(value) {
+            return /^(rs|i)\d+$/.test(String(value ?? '')) ? String(value) : '';
         }
 
         // "Health Conditions" -> "health_conditions"
@@ -1151,7 +1155,7 @@
                 <div class="result-body">
                     <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
                     <div class="result-sources">
-                        ${idFor(result.clinvar_id) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/${idFor(result.clinvar_id)}/" target="_blank" class="source-link">ClinVar</a>` : ''}
+                        ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" class="source-link">ClinVar</a>` : ''}
                         ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" class="source-link">PubMed</a>` : ''}
                     </div>
                 </div>
