@@ -352,7 +352,10 @@ async def test_explanations_give_up_and_return_what_finished() -> None:
         deadline=0.5,
     )
 
-    assert explanations == {"rs_fast": "done"}
+    assert explanations["rs_fast"] == "done"
+    # Cut off, not dropped: an empty string would leave the card reading "No
+    # explanation available", which is worse than having no model at all.
+    assert "rs_slow" in explanations["rs_slow"]
 
 
 def test_a_warning_is_not_printed_twice() -> None:

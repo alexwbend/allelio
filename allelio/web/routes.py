@@ -367,6 +367,9 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         <meta charset="UTF-8">
         <title>Allelio Analysis Report</title>
         <style>
+            td {{
+                white-space: pre-wrap;
+            }}
             .warning {{
                 margin: 0.5em 0 0;
                 padding: 0.5em;

@@ -1043,8 +1043,20 @@
                     progressText.textContent = p.total
                         ? `${p.stage} — ${p.done} of ${p.total}`
                         : `${p.stage}...`;
+                    // Only the explanation phase has a count. Without this the
+                    // bar sits at 10% through every other stage, one of which
+                    // can take half an hour.
+                    const stageWidths = {
+                        'Reading your file': 5,
+                        'Summarizing': 92,
+                        'Building your report': 96
+                    };
                     if (p.total) {
                         progressBar.style.width = (10 + 80 * p.done / p.total) + '%';
+                    } else if (p.stage in stageWidths) {
+                        progressBar.style.width = stageWidths[p.stage] + '%';
+                    } else if (p.stage.startsWith('Matching')) {
+                        progressBar.style.width = '8%';
                     }
                 } catch (e) {
                     // Server busy or restarting — the next tick tries again.
@@ -1215,9 +1227,9 @@
                     </div>
                     <div class="result-genotype">${esc(result.genotype)}</div>
                 </div>
+                ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                 <div class="result-body">
                     <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
-                    ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                     <div class="result-sources">
                         ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" rel="noopener noreferrer" class="source-link">ClinVar</a>` : ''}
                         ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" rel="noopener noreferrer" class="source-link">PubMed</a>` : ''}

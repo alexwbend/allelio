@@ -26,8 +26,10 @@ DEFAULT_HOST = "http://localhost:11434"
 REQUEST_TIMEOUT = 300
 
 # Fifty variants, three at a time, at the per-request timeout is over an hour
-# of staring at a progress bar. Cap the batch and keep what finished.
-BATCH_DEADLINE = 900
+# of staring at a progress bar. Cap the batch and keep what finished. Thirty
+# minutes clears a full run of this project's own default model on an M1 Max
+# with room to spare; fifteen did not.
+BATCH_DEADLINE = 1800
 
 
 class AIEngine:
@@ -186,9 +188,17 @@ class AIEngine:
                 explanation = await self.explain_variant(result)
                 return result.rsid, explanation
         
-        # Track completions for callback
-        explanations = {}
+        # Seeded, not empty: a variant the deadline cuts off still deserves the
+        # gene, the ClinVar call and the GWAS traits that _fallback_explanation
+        # writes. A finished task overwrites its seed.
+        explanations = {
+            r.rsid: self._fallback_explanation(
+                r, reason="Explanation ran past the time limit"
+            )
+            for r in results
+        }
         
+        done = 0
         tasks = [
             asyncio.ensure_future(explain_with_semaphore(result))
             for result in results
@@ -207,10 +217,14 @@ class AIEngine:
                     # One variant that fails outside explain_variant's own
                     # guard used to cost one explanation. It should not cost
                     # the whole upload, minutes after the analysis is done.
+                    done += 1
+                    if progress_callback:
+                        progress_callback(done, len(results))
                     continue
                 explanations[rsid] = explanation
+                done += 1
                 if progress_callback:
-                    progress_callback(len(explanations), len(results))
+                    progress_callback(done, len(results))
         except asyncio.TimeoutError:
             pass
         finally:
