@@ -15,10 +15,12 @@ app = FastAPI(
     description="Privacy-first local genomics analysis powered by AI",
 )
 
-# Add CORS middleware for local development
+# The UI is served from this same app, so CORS only needs to cover a dev
+# server on another loopback port. A wildcard with credentials let any page
+# the user visited POST their genome to localhost and read the result back.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
