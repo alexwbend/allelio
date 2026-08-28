@@ -20,6 +20,11 @@ from .safety import check_safety, get_variant_warnings, wrap_with_disclaimer
 DEFAULT_MODEL = "llama3.1:8b"
 DEFAULT_HOST = "http://localhost:11434"
 
+# Sixty seconds is not enough for the default 8B model on a warm machine
+# once a few explanations run at once; every other one came back as a
+# timeout fallback.
+REQUEST_TIMEOUT = 300
+
 
 class AIEngine:
     """
@@ -127,7 +132,7 @@ class AIEngine:
                     ],
                     stream=False
                 ),
-                timeout=60
+                timeout=REQUEST_TIMEOUT
             )
             
             explanation = response['message']['content']
@@ -301,7 +306,7 @@ class AIEngine:
                     ],
                     stream=False
                 ),
-                timeout=60
+                timeout=REQUEST_TIMEOUT
             )
             
             summary = response['message']['content']

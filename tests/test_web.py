@@ -105,3 +105,20 @@ async def test_summary_prompt_lists_the_variants() -> None:
     prompt = engine.client.prompts[0]
     assert "rs1" in prompt and "rs2" in prompt
     assert "APOE" in prompt
+
+
+def test_result_cards_get_a_gene_and_a_significance() -> None:
+    """The list drew every variant as "Gene: Unknown" and BENIGN, including the
+    pathogenic ones, because the route sent fields the page does not read."""
+    from allelio.web.routes import _gene_of, _significance_of
+
+    variant = _variant()
+    assert _gene_of(variant) == "APOE"
+    assert _significance_of(variant) == "pathogenic"
+
+    benign = VariantResult(
+        rsid="rs1",
+        clinvar_entries=[ClinVarEntry(rsid="rs1", clinical_significance="Benign")],
+    )
+    assert _significance_of(benign) == "benign"
+    assert _gene_of(benign) is None

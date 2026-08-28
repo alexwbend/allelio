@@ -69,6 +69,33 @@ async def get_status() -> Dict[str, Any]:
     }
 
 
+def _gene_of(variant) -> Optional[str]:
+    """Gene symbol for a result, from ClinVar first and GWAS as a fallback."""
+    for entry in (variant.clinvar_entries or []):
+        if entry.gene:
+            return entry.gene
+    for entry in (variant.gwas_entries or []):
+        if entry.mapped_gene:
+            return entry.mapped_gene
+    return None
+
+
+def _significance_of(variant) -> str:
+    """Bucket a result into the four badges the results list knows how to draw."""
+    for entry in (variant.clinvar_entries or []):
+        significance = (entry.clinical_significance or "").lower()
+        if "pathogenic" in significance and "benign" not in significance:
+            return "pathogenic"
+        if "risk" in significance:
+            return "risk"
+    if variant.gwas_entries:
+        return "risk"
+    for entry in (variant.clinvar_entries or []):
+        if "benign" in (entry.clinical_significance or "").lower():
+            return "benign"
+    return "trait"
+
+
 @router.post("/api/analyze")
 async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
     """
@@ -179,8 +206,12 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 "category": variant.category if hasattr(variant, 'category') else "Unknown",
                 "significance_rank": i + 1,
                 "explanation": explanations.get(variant.rsid, ""),
-                "clinvar_data": variant.clinvar_data if hasattr(variant, 'clinvar_data') else None,
-                "gwas_data": variant.gwas_data if hasattr(variant, 'gwas_data') else None,
+                "gene": _gene_of(variant),
+                "significance": _significance_of(variant),
+                "pubmed_id": next(
+                    (e.pubmed_id for e in (variant.gwas_entries or []) if e.pubmed_id),
+                    None,
+                ),
                 "warnings": warnings,
             }
             formatted_results.append(result_dict)
