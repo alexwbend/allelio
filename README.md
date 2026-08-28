@@ -25,7 +25,7 @@ No programming experience is needed to use Allelio's web interface — just uplo
 2. **Looks up your variants** in two major scientific databases:
    - [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) — clinically significant genetic variants curated by the NIH
    - [GWAS Catalog](https://www.ebi.ac.uk/gwas/) — genome-wide association studies linking variants to traits and conditions
-3. **Explains findings in plain English** using a local AI model (Ollama), so you don't need a genetics degree to understand the results
+3. **Explains findings in plain English** using a local AI model — Ollama, or any OpenAI-compatible server you already run — so you don't need a genetics degree to understand the results
 4. **Generates a report** you can save, print, or share with your doctor
 
 All of this runs entirely on your computer. Nothing is uploaded anywhere.
@@ -55,6 +55,7 @@ We take this seriously, and you'll see reminders throughout the tool.
   - [Download Ollama](https://ollama.com) and install it
   - Then open a terminal and run: `ollama pull llama3.1:8b` (downloads a ~4 GB model)
   - If you skip this, Allelio still works — you just won't get AI-written explanations
+  - Already running something else? See [Using a different local model](#using-a-different-local-model)
 
 ### Install Allelio
 
@@ -97,9 +98,59 @@ allelio analyze my_23andme_data.txt --top 50
 # Skip AI explanations for faster results
 allelio analyze my_23andme_data.txt --no-ai
 
+# Name the model to explain with
+allelio analyze my_23andme_data.txt --model mistral-nemo:12b
+
 # Only show trait associations (no disease risks)
 allelio analyze my_23andme_data.txt --traits-only
 ```
+
+---
+
+## Using a different local model
+
+Ollama is the default, not the requirement. If you already run a model server
+that speaks the OpenAI API — llama.cpp, LM Studio, vLLM, llama-swap — point
+Allelio at it:
+
+```bash
+# LM Studio
+export ALLELIO_OPENAI_BASE=http://127.0.0.1:1234/v1
+
+# llama.cpp --server, naming the model explicitly
+export ALLELIO_OPENAI_BASE=http://127.0.0.1:8080/v1
+export ALLELIO_MODEL=qwen2.5-14b-instruct
+```
+
+Include the `/v1` — that is the part servers disagree about. If you don't set
+`ALLELIO_MODEL`, Allelio asks the server what it is serving, and uses that name
+when the answer is a single model. Servers that keep a dozen configured — a
+llama-swap config, say — need `ALLELIO_MODEL`, because there is nothing to
+infer; the alias from your llama-swap config works there, not just the full
+model id. If the server lists what it serves and the name you gave is not
+in that list, Allelio says so, skips the explanations and writes the report
+anyway — the findings never needed a model, and no name is put on someone
+else's answers. A server that will not list its models at all, like a bare
+`llama.cpp`, is simply asked; if it has not got that model it says so, and
+again nothing is credited. `ALLELIO_MODEL` works with plain Ollama too.
+
+Whichever you use, the web interface and `allelio info` both print the model
+that is actually answering, and every explanation says who wrote it — the model
+by name, or nobody, in which case the card is the variant's own ClinVar and
+GWAS Catalog data and says so. A run where the model answers for some variants
+and not others is reported as exactly that, on the page and in the report.
+
+**The address has to be on your machine.** `127.0.0.1`, `::1` or a name that
+resolves to one of them — anything else is refused, with the reason, before any analysis starts.
+This is not a configuration preference: every prompt Allelio sends contains the
+variant it is asking about, so a hosted endpoint in that setting would be
+reading your genome. There is deliberately no way to send an API key, and no
+proxy is used even if one is configured for the rest of your system.
+
+Ollama's `-cloud` models are the exception the address check cannot see: the
+request goes to `127.0.0.1:11434` and the Ollama daemon forwards it to
+ollama.com. Allelio refuses those by name. Anything you have pulled locally is
+fine.
 
 ---
 
@@ -131,7 +182,12 @@ The reference databases are stored locally on your machine after the initial dow
 
 Your genome is deeply personal. Allelio was built with that in mind:
 
-- **No cloud processing** — analysis runs entirely on your hardware
+- **No cloud processing** — analysis runs entirely on your hardware, and the AI
+  model has to be running on this machine too, and a remote address or an Ollama
+  `-cloud` model is refused rather than warned about. The address is resolved
+  and then connected to by address, so a name cannot point somewhere else
+  afterwards; a proxy configured on the system is ignored rather than refused,
+  and a loopback port can still be a proxy Allelio cannot see through
 - **No accounts or sign-ups** — just install and use
 - **No telemetry or tracking** — Allelio doesn't phone home, ever
 - **No data storage** — your file is read during analysis and never saved by Allelio
@@ -148,7 +204,7 @@ allelio/
 ├── parsers/      # File readers for 23andMe, AncestryDNA, VCF
 ├── database/     # ClinVar and GWAS data download, storage, and querying
 ├── analysis/     # Variant annotation and cross-referencing
-├── ai/           # Local LLM integration via Ollama
+├── ai/           # Local LLM integration — Ollama or any OpenAI-compatible server
 ├── web/          # Flask-based web interface
 ├── cli.py        # Command-line interface
 └── report.py     # HTML report generation

@@ -3,7 +3,9 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 import html as html_escape
+from urllib.parse import quote
 
+from allelio.ai.attribution import Explanation, attribution
 from allelio.analysis.lookup import _get_review_stars
 
 
@@ -74,7 +76,7 @@ def _format_explanation_html(text: str) -> str:
 
 def generate_html_report(
     results: List[Any],
-    explanations: Dict[str, str],
+    explanations: Dict[str, Explanation],
     summary: str,
     metadata: Dict[str, Any],
 ) -> str:
@@ -82,10 +84,12 @@ def generate_html_report(
 
     Args:
         results: List of VariantResult objects with analysis data
-        explanations: Dict mapping rsid -> AI explanation text
+        explanations: Dict mapping rsid -> Explanation — the text, and the
+                      name of the model that wrote it where one did
         summary: Executive summary string
-        metadata: Dict with keys: generated_at, db_version, model_used,
-                  file_analyzed, total_variants, significant_variants
+        metadata: Dict with keys: generated_at, db_version, file_analyzed,
+                  total_variants, significant_variants. Who wrote the
+                  explanations is not among them — see below.
 
     Returns:
         Complete HTML report as a string
@@ -94,7 +98,12 @@ def generate_html_report(
     # Prepare data
     generated_at = metadata.get("generated_at", datetime.now().isoformat())
     db_version = metadata.get("db_version", "Unknown")
-    model_used = metadata.get("model_used", "None")
+    # Read off the cards this report is about to render, never passed in
+    # beside them: a name and a count that travel separately from the pages
+    # they describe are a name and a count that can describe other pages.
+    credit = attribution(explanations)
+    model_used = credit.model or "none"
+    explained_count = credit.written
     file_analyzed = metadata.get("file_analyzed", "Unknown")
     total_variants = metadata.get("total_variants", 0)
     significant_variants = metadata.get("significant_variants", 0)
@@ -108,7 +117,13 @@ def generate_html_report(
     other = [r for r in results if r.category in ("Unknown",)]
 
     def generate_variant_card(variant, explanation=None):
-        """Generate HTML for a single variant card."""
+        """Generate HTML for a single variant card.
+
+        `explanation` is an Explanation — the text and, where a model wrote it,
+        its name. The heading over that text says which of the two the reader
+        is looking at: a fallback card reads like an explanation and used to be
+        headed "AI Analysis" all the same.
+        """
         category_colors = {
             "Health Conditions": "#dc2626",
             "Risk Factors": "#ea580c",
@@ -125,8 +140,9 @@ def generate_html_report(
         review_stars_html = _get_review_stars_html(variant)
         genotype = variant.genotype or "-"
 
-        clinvar_url = f"https://www.ncbi.nlm.nih.gov/clinvar/?term={variant.rsid}"
-        pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={gene}+{variant.rsid}" if gene != "Unknown" else "#"
+        rsid = html_escape.escape(quote(str(variant.rsid or ""), safe=""))
+        clinvar_url = f"https://www.ncbi.nlm.nih.gov/clinvar/?term={rsid}"
+        pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={quote(gene, safe='')}+{rsid}" if gene != "Unknown" else "#"
 
         # Rank label
         rank = variant.significance_rank
@@ -146,8 +162,8 @@ def generate_html_report(
         card_html = f'''
         <div class="variant-card" style="border-left: 5px solid {color};">
             <div class="variant-header">
-                <h3>{variant.rsid}</h3>
-                <span class="badge" style="background-color: {color};">{variant.category}</span>
+                <h3>{html_escape.escape(str(variant.rsid or ""))}</h3>
+                <span class="badge" style="background-color: {color};">{html_escape.escape(str(variant.category or ""))}</span>
                 <span class="significance" style="background-color: {rank_color}20; color: {rank_color};">{rank_label}</span>
             </div>
 
@@ -179,15 +195,20 @@ def generate_html_report(
                 </div>
                 <div class="info-row">
                     <span class="label">Chromosome:</span>
-                    <span class="value">{variant.chromosome or "N/A"}</span>
+                    <span class="value">{html_escape.escape(str(variant.chromosome or "N/A"))}</span>
                 </div>
             </div>
 '''
         if explanation:
+            heading = (
+                f"AI Analysis — {html_escape.escape(explanation.model)}"
+                if explanation.model
+                else "No model wrote this — data from ClinVar and the GWAS Catalog"
+            )
             card_html += f'''
             <div class="explanation">
-                <h4>AI Analysis</h4>
-                {_format_explanation_html(explanation)}
+                <h4>{heading}</h4>
+                {_format_explanation_html(explanation.text)}
             </div>
 '''
 
@@ -246,10 +267,18 @@ def generate_html_report(
             categories_html += generate_variant_card(variant, explanation)
         categories_html += '</div>\n</section>\n'
 
-    # AI explanation count
+    # Says which cards, not how many pages there are: a variant whose call
+    # failed still gets an entry — its own data, wrapped in the disclaimer —
+    # and reporting that as the model's work credits it for pages it never
+    # wrote. On a run where every call answered the two numbers are the same
+    # and it reads as it always did.
     ai_note = ""
-    if explanations:
-        ai_note = f'<div class="ai-note"><strong>AI Explanations:</strong> {len(explanations)} variants analyzed with {model_used}</div>'
+    if explained_count:
+        ai_note = (
+            f'<div class="ai-note"><strong>AI Explanations:</strong> '
+            f'{explained_count} of {credit.total} variants analyzed with '
+            f'{html_escape.escape(str(model_used))}</div>'
+        )
 
     html = f'''<!DOCTYPE html>
 <html lang="en">
@@ -646,7 +675,7 @@ def generate_html_report(
                 <div class="stat-label">Significant Findings</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">{len(explanations)}</div>
+                <div class="stat-value">{explained_count}</div>
                 <div class="stat-label">AI Explanations</div>
             </div>
         </div>
@@ -669,7 +698,7 @@ def generate_html_report(
             <div class="footer-section">
                 <strong>Analysis Details</strong><br>
                 File: {html_escape.escape(file_analyzed)}<br>
-                AI Model: {html_escape.escape(model_used)}<br>
+                AI Model: {html_escape.escape(str(model_used))}<br>
                 Generated: {generated_at}
             </div>
 
