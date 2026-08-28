@@ -199,7 +199,15 @@ class AIEngine:
         # hold the upload open for well over an hour on a slow model.
         try:
             for coro in asyncio.as_completed(tasks, timeout=deadline):
-                rsid, explanation = await coro
+                try:
+                    rsid, explanation = await coro
+                except asyncio.TimeoutError:
+                    raise
+                except Exception:
+                    # One variant that fails outside explain_variant's own
+                    # guard used to cost one explanation. It should not cost
+                    # the whole upload, minutes after the analysis is done.
+                    continue
                 explanations[rsid] = explanation
                 if progress_callback:
                     progress_callback(len(explanations), len(results))

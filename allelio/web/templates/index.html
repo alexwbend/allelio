@@ -477,6 +477,10 @@
             border-left-color: #6B7280;
         }
 
+        .result-card.association {
+            border-left-color: #06B6D4;
+        }
+
         .result-card.benign {
             border-left-color: #10B981;
         }
@@ -576,6 +580,16 @@
         body.dark-mode .badge-trait {
             background-color: #1E3A8A;
             color: #93C5FD;
+        }
+
+        .badge-association {
+            background-color: #CFFAFE;
+            color: #155E75;
+        }
+
+        body.dark-mode .badge-association {
+            background-color: #164E63;
+            color: #A5F3FC;
         }
 
         .badge-uncertain {
@@ -1183,6 +1197,7 @@
                 'pathogenic': 'badge-pathogenic',
                 'conflicting': 'badge-conflicting',
                 'uncertain': 'badge-uncertain',
+                'association': 'badge-association',
                 'risk': 'badge-risk',
                 'benign': 'badge-benign',
                 'trait': 'badge-trait'
@@ -1202,7 +1217,7 @@
                 </div>
                 <div class="result-body">
                     <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
-                    ${result.explanation ? '' : (result.warnings || []).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
+                    ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                     <div class="result-sources">
                         ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" rel="noopener noreferrer" class="source-link">ClinVar</a>` : ''}
                         ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" rel="noopener noreferrer" class="source-link">PubMed</a>` : ''}

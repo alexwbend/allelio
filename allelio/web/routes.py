@@ -101,10 +101,11 @@ def _significance_of(variant) -> str:
         if "risk" in significance:
             return "risk"
     if variant.gwas_entries:
-        # A GWAS row on its own is an association, not a risk — 37,108 of the
-        # 62,057 findings on a real genome. The analyser has already read the
-        # trait text and decided which of them are risk factors.
-        return "risk" if variant.category == "Risk Factors" else "trait"
+        # A GWAS row on its own is an association and nothing stronger — 37,108
+        # of the 62,057 findings on a real genome. Calling them all a risk
+        # over-states every one; calling them all a trait quietly demotes type 2
+        # diabetes and coronary artery disease. Say what the row actually is.
+        return "association"
     return "trait"
 
 
@@ -202,7 +203,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                        "straight from ClinVar and the GWAS Catalog.")
 
         # Format results
-        _progress.update(stage="Building your report")
+        _progress.update(stage="Building your report", done=0, total=0)
         formatted_results = []
         for i, variant in enumerate(analysis_results):
             warnings = get_variant_warnings(variant)
@@ -338,11 +339,14 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
 
         # The safety layer computes these for BRCA1/2, TP53, Lynch and APOE.
         # A report that omits them is the one place they matter most.
-        # explain_variant runs these through wrap_with_disclaimer, so for the
-        # variants that got an explanation they are already in it.
-        warnings = "" if result.get("explanation") else "".join(
+        # explain_variant folds these into the explanation via
+        # wrap_with_disclaimer — but only on the path where the model answered.
+        # A fallback explanation carries no warning, so test the text itself.
+        explanation_text = str(result.get("explanation") or "")
+        warnings = "".join(
             f'<p class="warning">{escape(str(w))}</p>'
             for w in (result.get("warnings") or [])
+            if str(w) not in explanation_text
         )
 
         results_html += f"""

@@ -1,4 +1,3 @@
-import asyncio
 """Tests for the web interface.
 
 The web module went unexercised long enough to accumulate a startup crash, two
@@ -6,6 +5,8 @@ missing awaits and three wrong method names, so these cover the wiring: the
 routes answer, CORS is not open to the world, and the AI engine's two entry
 points survive a round trip against a stubbed client.
 """
+
+import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
@@ -240,6 +241,9 @@ def test_exported_report_carries_the_counselling_warnings() -> None:
             "results": [
                 {
                     "rsid": "rs1",
+                    # What _fallback_explanation writes: no disclaimer, because
+                    # only the path where the model answered adds one.
+                    "explanation": "ClinVar: Pathogenic. Gene: BRCA1.",
                     "warnings": ["Talk to a genetic counselor."],
                 }
             ]
@@ -293,23 +297,24 @@ def test_upload_cannot_choose_where_it_lands() -> None:
     victim_dir.rmdir()
 
 
-def test_a_gwas_association_is_not_a_risk() -> None:
-    """37,108 of the 62,057 findings on a real genome are GWAS-only traits.
-    They were all badged RISK while their own tab said Traits."""
+def test_a_gwas_row_is_an_association_and_nothing_stronger() -> None:
+    """37,108 of the 62,057 findings on a real genome are GWAS-only. Badging
+    them all RISK over-states height; badging them all TRAIT demotes type 2
+    diabetes. Only 2,068 of the 553,549 GWAS rsIDs have a trait string the
+    analyser can tell apart, so neither guess is available."""
     from allelio.web.routes import _significance_of
 
-    trait = VariantResult(
-        rsid="rs1",
-        gwas_entries=[GWASEntry(rsid="rs1", trait="Height")],
-        category="Traits",
-    )
-    risk = VariantResult(
-        rsid="rs2",
-        gwas_entries=[GWASEntry(rsid="rs2", trait="Coronary artery disease risk")],
-        category="Risk Factors",
-    )
-    assert _significance_of(trait) == "trait"
-    assert _significance_of(risk) == "risk"
+    for trait, category in [
+        ("Height", "Traits"),
+        ("Type 2 diabetes", "Traits"),
+        ("Coronary artery disease risk", "Risk Factors"),
+    ]:
+        variant = VariantResult(
+            rsid="rs1",
+            gwas_entries=[GWASEntry(rsid="rs1", trait=trait)],
+            category=category,
+        )
+        assert _significance_of(variant) == "association"
 
 
 def test_uncertain_significance_is_not_a_trait() -> None:
@@ -367,3 +372,19 @@ def test_a_warning_is_not_printed_twice() -> None:
         }
     )
     assert html.count("talk to a genetic counselor.") == 1
+
+
+def test_a_fallback_explanation_still_gets_its_warning() -> None:
+    """explain_variant only runs wrap_with_disclaimer on the path where the
+    model answered. Without Ollama every top-50 variant takes the other one."""
+    from allelio.web.routes import _generate_html_report
+
+    warning = "Genetic counseling is strongly recommended."
+    wrapped = _generate_html_report(
+        {"results": [{"rsid": "rs1", "explanation": f"x {warning}", "warnings": [warning]}]}
+    )
+    fallback = _generate_html_report(
+        {"results": [{"rsid": "rs1", "explanation": "ClinVar: Pathogenic.", "warnings": [warning]}]}
+    )
+    assert wrapped.count(warning) == 1
+    assert fallback.count(warning) == 1
