@@ -2,11 +2,13 @@
 
 import asyncio
 import os
+import socket
 from pathlib import Path
 from typing import Optional
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
@@ -278,13 +280,61 @@ def serve(port: int, host: str):
     Start an interactive web server for variant analysis and exploration.
     """
     console.print("\n[bold cyan]Allelio Web Interface[/bold cyan]\n")
-    console.print(f"Starting Allelio web interface on {host}:{port}...\n")
-    console.print(f"Open [bold cyan]http://{host}:{port}[/bold cyan] in your browser\n")
-    
+    # escape: rich reads "[" as the start of a style tag, and --host takes
+    # whatever the shell hands it.
+    console.print(f"Starting Allelio web interface on {escape(host)}:{port}...\n")
+
+    # The app rejects Host headers it does not recognise, which is what stops a
+    # remote page from reaching this server by pointing its own domain at
+    # 127.0.0.1. Whatever the operator chose to bind belongs on the list; it has
+    # to be set before the app module is imported.
+    # An empty --host binds everywhere; there is no URL in it to print.
+    browse_to = host or "localhost"
+    if not os.environ.get("ALLELIO_ALLOWED_HOSTS"):
+        try:
+            # inet_aton takes every legacy spelling of "all interfaces" — 0,
+            # 0.0, 0x0 — that comparing against "0.0.0.0" would miss, and it
+            # does no lookups, so a hostname simply raises.
+            binds_everywhere = socket.inet_aton(host) == b"\x00\x00\x00\x00"
+        except OSError:
+            binds_everywhere = False
+
+        # Starlette strips the port by splitting the Host header on ":", so no
+        # IPv6 literal on the list could ever match; neither could a bind
+        # address nobody types into a browser. Lowercased because that is how
+        # browsers send it and starlette compares exactly.
+        # An empty --host binds everywhere too: asyncio special-cases it into a
+        # getaddrinfo with AI_PASSIVE, which answers 0.0.0.0 and ::.
+        extra = [] if binds_everywhere or not host or ":" in host else [host.lower()]
+        os.environ["ALLELIO_ALLOWED_HOSTS"] = ",".join(
+            dict.fromkeys(["localhost", "127.0.0.1"] + extra)
+        )
+        if not extra:
+            # Printing the bound address here would send them to a URL that
+            # answers 400.
+            browse_to = "localhost"
+            console.print(
+                f"[bold yellow]⚠[/bold yellow] Bound to {escape(host) or 'every interface'}, but "
+                "browse to "
+                "localhost — "
+                "the host check has no way to match that address.\n"
+                "  That check is what stops a web page you visit from reading your genome "
+                "off this server, which has no password on it.\n"
+                "  To let another machine reach it, name that machine: "
+                "ALLELIO_ALLOWED_HOSTS=192.168.1.50 allelio serve --host 0.0.0.0\n",
+                style="yellow",
+            )
+
+    # A bare IPv6 literal needs brackets or the browser reads the last colon as
+    # the port separator, and rich reads "[::1]" as a style tag.
+    url = f"http://[{browse_to}]:{port}" if ":" in browse_to else f"http://{browse_to}:{port}"
+    console.print(f"Open [bold cyan]{escape(url)}[/bold cyan] in your browser\n")
+
     try:
         import uvicorn
+
         from allelio.web.app import app
-        
+
         uvicorn.run(app, host=host, port=port, log_level="info")
     except ImportError:
         console.print("[bold red]✗[/bold red] Web server dependencies not installed\n", style="red")
