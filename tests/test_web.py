@@ -1,3 +1,4 @@
+import asyncio
 """Tests for the web interface.
 
 The web module went unexercised long enough to accumulate a startup crash, two
@@ -261,3 +262,108 @@ def test_export_does_not_leave_the_report_in_the_temp_directory() -> None:
 
     assert response.status_code == 200
     assert set(temp_dir.glob("allelio_report_*")) == before
+
+
+def test_upload_cannot_choose_where_it_lands() -> None:
+    """The multipart filename is raw header data, and multipart is a
+    CORS-safelisted content type, so any page could have posted this. The route
+    writes the body to the name it is given and then unlinks it, so the damage
+    is an overwrite followed by a delete."""
+    import tempfile
+    from pathlib import Path
+
+    victim_dir = Path(tempfile.mkdtemp(prefix="allelio_probe_"))
+    victim = victim_dir / "victim.txt"
+    victim.write_text("do not touch")
+
+    client = TestClient(app)
+    client.post(
+        "/api/analyze",
+        files={
+            "file": (
+                f"{victim_dir.name}/victim.txt",
+                b"rs1\t1\t1\tAA\n",
+            )
+        },
+    )
+
+    assert victim.exists(), "the upload deleted a file it chose the name of"
+    assert victim.read_text() == "do not touch"
+    victim.unlink()
+    victim_dir.rmdir()
+
+
+def test_a_gwas_association_is_not_a_risk() -> None:
+    """37,108 of the 62,057 findings on a real genome are GWAS-only traits.
+    They were all badged RISK while their own tab said Traits."""
+    from allelio.web.routes import _significance_of
+
+    trait = VariantResult(
+        rsid="rs1",
+        gwas_entries=[GWASEntry(rsid="rs1", trait="Height")],
+        category="Traits",
+    )
+    risk = VariantResult(
+        rsid="rs2",
+        gwas_entries=[GWASEntry(rsid="rs2", trait="Coronary artery disease risk")],
+        category="Risk Factors",
+    )
+    assert _significance_of(trait) == "trait"
+    assert _significance_of(risk) == "risk"
+
+
+def test_uncertain_significance_is_not_a_trait() -> None:
+    """1,236,063 ClinVar rows — the plurality — say "Uncertain significance".
+    Drawn as a trait, a variant nobody can interpret reads as harmless."""
+    from allelio.web.routes import _significance_of
+
+    variant = VariantResult(
+        rsid="rs1",
+        clinvar_entries=[
+            ClinVarEntry(rsid="rs1", clinical_significance="Uncertain significance")
+        ],
+    )
+    assert _significance_of(variant) == "uncertain"
+
+
+@pytest.mark.asyncio
+async def test_explanations_give_up_and_return_what_finished() -> None:
+    """Fifty variants at three at a time, each allowed 300s, can hold the
+    upload open for over an hour."""
+    from allelio.ai.engine import AIEngine
+
+    engine = AIEngine()
+    engine.available = True
+
+    async def slow_or_not(result):
+        if result.rsid == "rs_slow":
+            await asyncio.sleep(30)
+        return "done"
+
+    engine.explain_variant = slow_or_not
+
+    explanations = await engine.explain_variants_batch(
+        [VariantResult(rsid="rs_fast"), VariantResult(rsid="rs_slow")],
+        deadline=0.5,
+    )
+
+    assert explanations == {"rs_fast": "done"}
+
+
+def test_a_warning_is_not_printed_twice() -> None:
+    """explain_variant already folds the counselling warning into the
+    explanation via wrap_with_disclaimer."""
+    from allelio.web.routes import _generate_html_report
+
+    html = _generate_html_report(
+        {
+            "results": [
+                {
+                    "rsid": "rs1",
+                    "explanation": "Note: talk to a genetic counselor.",
+                    "warnings": ["Note: talk to a genetic counselor."],
+                }
+            ]
+        }
+    )
+    assert html.count("talk to a genetic counselor.") == 1

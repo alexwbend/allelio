@@ -25,6 +25,10 @@ DEFAULT_HOST = "http://localhost:11434"
 # timeout fallback.
 REQUEST_TIMEOUT = 300
 
+# Fifty variants, three at a time, at the per-request timeout is over an hour
+# of staring at a progress bar. Cap the batch and keep what finished.
+BATCH_DEADLINE = 900
+
 
 class AIEngine:
     """
@@ -157,7 +161,8 @@ class AIEngine:
         self,
         results: List,
         max_concurrent: int = 3,
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        deadline: float = BATCH_DEADLINE
     ) -> Dict[str, str]:
         """
         Generate AI explanations for multiple variants with concurrency control.
@@ -184,16 +189,27 @@ class AIEngine:
         # Track completions for callback
         explanations = {}
         
-        # Create all tasks
-        tasks = [explain_with_semaphore(result) for result in results]
-        
-        # Execute with progress tracking
-        for coro in asyncio.as_completed(tasks):
-            rsid, explanation = await coro
-            explanations[rsid] = explanation
-            if progress_callback:
-                progress_callback(len(explanations), len(results))
-        
+        tasks = [
+            asyncio.ensure_future(explain_with_semaphore(result))
+            for result in results
+        ]
+
+        # Whatever is done when the clock runs out is what the user gets. The
+        # per-request timeout on its own lets 50 variants, three at a time,
+        # hold the upload open for well over an hour on a slow model.
+        try:
+            for coro in asyncio.as_completed(tasks, timeout=deadline):
+                rsid, explanation = await coro
+                explanations[rsid] = explanation
+                if progress_callback:
+                    progress_callback(len(explanations), len(results))
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         return explanations
     
     async def generate_summary(self, results: List) -> str:

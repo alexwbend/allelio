@@ -85,21 +85,26 @@ def _significance_of(variant) -> str:
     """Bucket a result into the badges the results list knows how to draw.
 
     ClinVar has the last word. "Conflicting classifications of pathogenicity"
-    is 130,833 rsIDs and sorts to the very top of the report, so it needs to
-    say so rather than borrow either neighbour's colour.
+    is 130,833 rsIDs and "Uncertain significance" is 1,236,063 — both sort high
+    enough to reach the report, and neither is a trait or a benign call.
     """
     for entry in (variant.clinvar_entries or []):
         significance = (entry.clinical_significance or "").lower()
         if "conflicting" in significance:
             return "conflicting"
+        if "uncertain" in significance:
+            return "uncertain"
         if "pathogenic" in significance and "benign" not in significance:
             return "pathogenic"
-        if "benign" in significance:
+        if "benign" in significance or "protective" in significance:
             return "benign"
         if "risk" in significance:
             return "risk"
     if variant.gwas_entries:
-        return "risk"
+        # A GWAS row on its own is an association, not a risk — 37,108 of the
+        # 62,057 findings on a real genome. The analyser has already read the
+        # trait text and decided which of them are risk factors.
+        return "risk" if variant.category == "Risk Factors" else "trait"
     return "trait"
 
 
@@ -116,15 +121,18 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
 
-        # Save uploaded file to temp location
-        temp_dir = tempfile.gettempdir()
-        temp_file_path = Path(temp_dir) / file.filename
-        
         content = await file.read()
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
-        
-        with open(temp_file_path, "wb") as f:
+
+        # The multipart filename is raw header data: "../../../.zshenv" resolves
+        # out of the temp directory, and multipart is CORS-safelisted, so any
+        # page could have posted here. mkstemp picks the name and the mode —
+        # this file is the user's entire genome and the temp directory is shared.
+        # Only the .gz suffix matters to the parser.
+        suffix = ".gz" if file.filename.endswith(".gz") else ""
+        fd, temp_file_path = tempfile.mkstemp(prefix="allelio_upload_", suffix=suffix)
+        with os.fdopen(fd, "wb") as f:
             f.write(content)
 
         _progress.update(stage="Reading your file", done=0, total=0)
@@ -132,7 +140,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         # Parse genotype file
         loop = asyncio.get_event_loop()
         genotypes = await loop.run_in_executor(
-            None, parse_genotype_file, str(temp_file_path)
+            None, parse_genotype_file, temp_file_path
         )
         
         if not genotypes:
@@ -330,7 +338,9 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
 
         # The safety layer computes these for BRCA1/2, TP53, Lynch and APOE.
         # A report that omits them is the one place they matter most.
-        warnings = "".join(
+        # explain_variant runs these through wrap_with_disclaimer, so for the
+        # variants that got an explanation they are already in it.
+        warnings = "" if result.get("explanation") else "".join(
             f'<p class="warning">{escape(str(w))}</p>'
             for w in (result.get("warnings") or [])
         )
