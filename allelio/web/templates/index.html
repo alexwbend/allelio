@@ -469,6 +469,10 @@
             border-left-color: #3B82F6;
         }
 
+        .result-card.conflicting {
+            border-left-color: #8B5CF6;
+        }
+
         .result-card.benign {
             border-left-color: #10B981;
         }
@@ -560,6 +564,26 @@
             color: #6EE7B7;
         }
 
+        .badge-trait {
+            background-color: #DBEAFE;
+            color: #1E3A8A;
+        }
+
+        body.dark-mode .badge-trait {
+            background-color: #1E3A8A;
+            color: #93C5FD;
+        }
+
+        .badge-conflicting {
+            background-color: #EDE9FE;
+            color: #5B21B6;
+        }
+
+        body.dark-mode .badge-conflicting {
+            background-color: #4C1D95;
+            color: #C4B5FD;
+        }
+
         .result-genotype {
             font-family: 'Courier New', monospace;
             font-weight: 600;
@@ -599,6 +623,21 @@
 
         body.dark-mode .result-explanation {
             color: #D1D5DB;
+        }
+
+        .result-warning {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border-left: 3px solid #B45309;
+            border-radius: 4px;
+            background-color: #FEF3C7;
+            color: #78350F;
+            font-size: 0.875rem;
+        }
+
+        body.dark-mode .result-warning {
+            background-color: #451A03;
+            color: #FCD34D;
         }
 
         .result-sources {
@@ -1128,19 +1167,11 @@
             const significance = result.significance || 'benign';
             const significanceBadgeClass = {
                 'pathogenic': 'badge-pathogenic',
+                'conflicting': 'badge-conflicting',
                 'risk': 'badge-risk',
                 'benign': 'badge-benign',
-                'trait': 'badge-benign'
+                'trait': 'badge-trait'
             }[significance] || 'badge-benign';
-
-            const categoryBadgeClass = {
-                'health_conditions': 'badge-category',
-                'carrier_status': 'badge-category',
-                'unknown': 'badge-category',
-                'risk_factors': 'badge-category',
-                'pharmacogenomics': 'badge-category',
-                'traits': 'badge-category'
-            }[result.category] || 'badge-category';
 
             card.innerHTML = `
                 <div class="result-header">
@@ -1148,7 +1179,7 @@
                         <div class="result-rsid">${esc(result.rsid)}</div>
                         <div class="result-gene">${esc(result.gene) || 'Gene: Unknown'}</div>
                         <div class="result-meta">
-                            <span class="badge ${categoryBadgeClass}">${esc(result.category).replace('_', ' ')}</span>
+                            <span class="badge badge-category">${esc(result.category).replace('_', ' ')}</span>
                             <span class="badge ${significanceBadgeClass}">${esc(significance)}</span>
                         </div>
                     </div>
@@ -1156,6 +1187,7 @@
                 </div>
                 <div class="result-body">
                     <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
+                    ${(result.warnings || []).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                     <div class="result-sources">
                         ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" rel="noopener noreferrer" class="source-link">ClinVar</a>` : ''}
                         ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" rel="noopener noreferrer" class="source-link">PubMed</a>` : ''}

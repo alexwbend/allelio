@@ -125,9 +125,10 @@ def test_result_cards_get_a_gene_and_a_significance() -> None:
     assert _gene_of(benign) is None
 
 
-def test_conflicting_interpretations_are_not_pathogenic() -> None:
-    """ClinVar's commonest ambiguous term contains the word "pathogenic"; a
-    substring match painted those variants with the red badge."""
+def test_conflicting_classifications_get_their_own_badge() -> None:
+    """ClinVar's commonest ambiguous term contains the word "pathogenic", so a
+    substring match painted 130k variants with the red badge — and calling them
+    a trait instead painted them green. They are neither."""
     from allelio.web.routes import _significance_of
 
     conflicting = VariantResult(
@@ -135,11 +136,25 @@ def test_conflicting_interpretations_are_not_pathogenic() -> None:
         clinvar_entries=[
             ClinVarEntry(
                 rsid="rs1",
-                clinical_significance="Conflicting interpretations of pathogenicity",
+                # The term the shipped ClinVar dump actually uses.
+                clinical_significance="Conflicting classifications of pathogenicity",
             )
         ],
     )
-    assert _significance_of(conflicting) != "pathogenic"
+    assert _significance_of(conflicting) == "conflicting"
+
+
+def test_clinvar_benign_survives_a_gwas_hit() -> None:
+    """Any GWAS row used to be checked before ClinVar's benign call, so a
+    variant ClinVar calls benign came out orange."""
+    from allelio.web.routes import _significance_of
+
+    variant = VariantResult(
+        rsid="rs1",
+        clinvar_entries=[ClinVarEntry(rsid="rs1", clinical_significance="Benign")],
+        gwas_entries=[GWASEntry(rsid="rs1", trait="Height", p_value=1e-9)],
+    )
+    assert _significance_of(variant) == "benign"
 
 
 @pytest.mark.asyncio
@@ -212,3 +227,37 @@ def test_strong_gwas_reads_the_smallest_p_values() -> None:
     prompt = engine.client.prompts[0]
 
     assert prompt.index("rs3") < prompt.index("rs4")
+
+
+def test_exported_report_carries_the_counselling_warnings() -> None:
+    """The safety layer computes a warning for BRCA1/2, TP53, Lynch and APOE.
+    Every consumer dropped it on the floor."""
+    from allelio.web.routes import _generate_html_report
+
+    html = _generate_html_report(
+        {
+            "results": [
+                {
+                    "rsid": "rs1",
+                    "warnings": ["Talk to a genetic counselor."],
+                }
+            ]
+        }
+    )
+    assert "Talk to a genetic counselor." in html
+
+
+def test_export_does_not_leave_the_report_in_the_temp_directory() -> None:
+    """The report holds the user's genotypes, and the system temp directory is
+    world-readable."""
+    import tempfile
+    from pathlib import Path
+
+    temp_dir = Path(tempfile.gettempdir())
+    before = set(temp_dir.glob("allelio_report_*"))
+
+    client = TestClient(app)
+    response = client.post("/api/export", json={"results": [{"rsid": "rs1"}]})
+
+    assert response.status_code == 200
+    assert set(temp_dir.glob("allelio_report_*")) == before

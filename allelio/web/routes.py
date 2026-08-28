@@ -1,6 +1,7 @@
 """API routes for Allelio web interface."""
 
 import asyncio
+import os
 import tempfile
 from html import escape
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
+from starlette.background import BackgroundTask
 
 from allelio import __version__
 from allelio.parsers import parse_genotype_file
@@ -80,20 +82,24 @@ def _gene_of(variant) -> Optional[str]:
 
 
 def _significance_of(variant) -> str:
-    """Bucket a result into the four badges the results list knows how to draw."""
+    """Bucket a result into the badges the results list knows how to draw.
+
+    ClinVar has the last word. "Conflicting classifications of pathogenicity"
+    is 130,833 rsIDs and sorts to the very top of the report, so it needs to
+    say so rather than borrow either neighbour's colour.
+    """
     for entry in (variant.clinvar_entries or []):
         significance = (entry.clinical_significance or "").lower()
         if "conflicting" in significance:
-            continue
+            return "conflicting"
         if "pathogenic" in significance and "benign" not in significance:
             return "pathogenic"
+        if "benign" in significance:
+            return "benign"
         if "risk" in significance:
             return "risk"
     if variant.gwas_entries:
         return "risk"
-    for entry in (variant.clinvar_entries or []):
-        if "benign" in (entry.clinical_significance or "").lower():
-            return "benign"
     return "trait"
 
 
@@ -166,18 +172,16 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
 
         # Generate AI explanations for significant variants. One call per
         # variant, run a few at a time — sequentially this took 12 minutes.
-        explanations = {}
-        if ai_available:
-            _progress.update(
-                stage="Writing explanations", done=0, total=len(top_variants)
-            )
+        _progress.update(
+            stage="Writing explanations", done=0, total=len(top_variants)
+        )
 
-            def on_explained(done: int, total: int) -> None:
-                _progress.update(done=done, total=total)
+        def on_explained(done: int, total: int) -> None:
+            _progress.update(done=done, total=total)
 
-            explanations = await ai_engine.explain_variants_batch(
-                top_variants, progress_callback=on_explained
-            )
+        explanations = await ai_engine.explain_variants_batch(
+            top_variants, progress_callback=on_explained
+        )
 
         # Generate executive summary
         _progress.update(stage="Summarizing", done=0, total=0)
@@ -263,17 +267,20 @@ async def export_report(analysis_data: Dict[str, Any]) -> FileResponse:
         # Generate HTML report (using report generator when available)
         html_content = _generate_html_report(analysis_data)
 
-        # Create temp file for report
-        temp_dir = tempfile.gettempdir()
-        temp_report_path = Path(temp_dir) / f"allelio_report_{_get_timestamp()}.html"
-
-        with open(temp_report_path, "w") as f:
+        # mkstemp gives the file 0600, and the report holds the user's
+        # genotypes. Explicit encoding because the report declares UTF-8 and
+        # the model writes em dashes.
+        fd, temp_report_path = tempfile.mkstemp(
+            prefix="allelio_report_", suffix=".html"
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(html_content)
 
         return FileResponse(
-            path=str(temp_report_path),
+            path=temp_report_path,
             filename=f"allelio_report_{_get_timestamp()}.html",
             media_type="text/html",
+            background=BackgroundTask(_unlink, temp_report_path),
         )
 
     except HTTPException:
@@ -283,6 +290,14 @@ async def export_report(analysis_data: Dict[str, Any]) -> FileResponse:
             status_code=500,
             detail=f"Report generation failed: {str(e)}"
         )
+
+
+def _unlink(path: str) -> None:
+    """Remove the exported report once it has been sent."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 def _get_timestamp() -> str:
@@ -312,7 +327,14 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         genotype = field("genotype")
         category = field("category")
         explanation = field("explanation")
-        
+
+        # The safety layer computes these for BRCA1/2, TP53, Lynch and APOE.
+        # A report that omits them is the one place they matter most.
+        warnings = "".join(
+            f'<p class="warning">{escape(str(w))}</p>'
+            for w in (result.get("warnings") or [])
+        )
+
         results_html += f"""
         <tr>
             <td>{rsid}</td>
@@ -320,7 +342,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
             <td>{pos}</td>
             <td>{genotype}</td>
             <td>{category}</td>
-            <td>{explanation}</td>
+            <td>{explanation}{warnings}</td>
         </tr>
         """
 
@@ -331,6 +353,13 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         <meta charset="UTF-8">
         <title>Allelio Analysis Report</title>
         <style>
+            .warning {{
+                margin: 0.5em 0 0;
+                padding: 0.5em;
+                border-left: 3px solid #B45309;
+                background: #FEF3C7;
+                color: #78350F;
+            }}
             body {{
                 font-family: Arial, sans-serif;
                 margin: 20px;
