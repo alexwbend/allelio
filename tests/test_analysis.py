@@ -240,9 +240,36 @@ class TestSignificanceRanking:
     def test_significance_ranking_unknown(self, sample_db):
         """Test ranking for unknown significance."""
         rank = _get_significance_rank("unknown_significance_string")
-        
+
         # Unknown should get a default rank
         assert rank > 0
+
+    def test_significance_ranking_conflicting_is_not_pathogenic(self):
+        """Conflicting classifications must not rank as pathogenic.
+
+        The current ClinVar dump uses "Conflicting classifications of
+        pathogenicity", which contains the substring "pathogenic". A plain
+        substring match ranked it 1, level with a genuine pathogenic call.
+        """
+        rank = _get_significance_rank("Conflicting classifications of pathogenicity")
+
+        assert rank == 6
+        assert rank != _get_significance_rank("pathogenic")
+
+    def test_category_conflicting_is_not_a_health_condition(self):
+        """Conflicting variants must not file under Health Conditions.
+
+        _determine_category had the same substring problem, so the same
+        variants landed under Health Conditions alongside real pathogenic ones.
+        """
+        entry = ClinVarEntry(
+            rsid="rs1",
+            clinical_significance="Conflicting classifications of pathogenicity",
+        )
+        category = _determine_category(entry, [])
+
+        assert category != VariantCategory.HEALTH_CONDITIONS.value
+        assert category == VariantCategory.UNKNOWN.value
 
 
 class TestClinvarEntries:
