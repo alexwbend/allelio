@@ -27,7 +27,7 @@ class AllelioDB:
     
     def _connect(self) -> None:
         """Establish database connection and enable WAL mode."""
-        self.conn = sqlite3.connect(str(self.db_path))
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         # Enable WAL mode for better concurrent read performance
