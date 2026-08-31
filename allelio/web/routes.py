@@ -1,18 +1,20 @@
 """API routes for Allelio web interface."""
 
 import asyncio
+import os
 import tempfile
+from html import escape
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
-from starlette.concurrency import run_in_executor
+from starlette.background import BackgroundTask
 
 from allelio import __version__
 from allelio.parsers import parse_genotype_file
 from allelio.database.store import AllelioDB
-from allelio.analysis.lookup import analyze_variants, VariantResult
+from allelio.analysis.lookup import analyze_variants
 from allelio.ai.engine import AIEngine
 from allelio.ai.safety import get_variant_warnings
 from allelio.web.app import templates
@@ -24,7 +26,7 @@ router = APIRouter()
 async def read_root(request: Request) -> str:
     """Serve the main HTML page."""
     try:
-        return templates.TemplateResponse("index.html", {"request": request})
+        return templates.TemplateResponse(request, "index.html")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load index page: {str(e)}")
 
@@ -35,7 +37,7 @@ async def get_status() -> Dict[str, Any]:
     try:
         # Check ollama availability
         ai_engine = AIEngine()
-        ollama_available = ai_engine.check_connection()
+        ollama_available = await ai_engine.check_connection()
     except Exception:
         ollama_available = False
 
@@ -51,7 +53,7 @@ async def get_status() -> Dict[str, Any]:
         db = AllelioDB()
         db_ready = db.is_initialized()
         if db_ready:
-            stats = db.get_statistics()
+            stats = db.get_stats()
             db_stats = {
                 "clinvar_entries": stats.get("clinvar_entries", 0),
                 "gwas_entries": stats.get("gwas_entries", 0),
@@ -68,6 +70,45 @@ async def get_status() -> Dict[str, Any]:
     }
 
 
+def _gene_of(variant) -> Optional[str]:
+    """Gene symbol for a result, from ClinVar first and GWAS as a fallback."""
+    for entry in (variant.clinvar_entries or []):
+        if entry.gene:
+            return entry.gene
+    for entry in (variant.gwas_entries or []):
+        if entry.mapped_gene:
+            return entry.mapped_gene
+    return None
+
+
+def _significance_of(variant) -> str:
+    """Bucket a result into the badges the results list knows how to draw.
+
+    ClinVar has the last word. "Conflicting classifications of pathogenicity"
+    is 130,833 rsIDs and "Uncertain significance" is 1,236,063 — both sort high
+    enough to reach the report, and neither is a trait or a benign call.
+    """
+    for entry in (variant.clinvar_entries or []):
+        significance = (entry.clinical_significance or "").lower()
+        if "conflicting" in significance:
+            return "conflicting"
+        if "uncertain" in significance:
+            return "uncertain"
+        if "pathogenic" in significance and "benign" not in significance:
+            return "pathogenic"
+        if "benign" in significance or "protective" in significance:
+            return "benign"
+        if "risk" in significance:
+            return "risk"
+    if variant.gwas_entries:
+        # A GWAS row on its own is an association and nothing stronger — 37,108
+        # of the 62,057 findings on a real genome. Calling them all a risk
+        # over-states every one; calling them all a trait quietly demotes type 2
+        # diabetes and coronary artery disease. Say what the row actually is.
+        return "association"
+    return "trait"
+
+
 @router.post("/api/analyze")
 async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
     """
@@ -81,21 +122,26 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
 
-        # Save uploaded file to temp location
-        temp_dir = tempfile.gettempdir()
-        temp_file_path = Path(temp_dir) / file.filename
-        
         content = await file.read()
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
-        
-        with open(temp_file_path, "wb") as f:
+
+        # The multipart filename is raw header data: "../../../.zshenv" resolves
+        # out of the temp directory, and multipart is CORS-safelisted, so any
+        # page could have posted here. mkstemp picks the name and the mode —
+        # this file is the user's entire genome and the temp directory is shared.
+        # Only the .gz suffix matters to the parser.
+        suffix = ".gz" if file.filename.endswith(".gz") else ""
+        fd, temp_file_path = tempfile.mkstemp(prefix="allelio_upload_", suffix=suffix)
+        with os.fdopen(fd, "wb") as f:
             f.write(content)
+
+        _progress.update(stage="Reading your file", done=0, total=0)
 
         # Parse genotype file
         loop = asyncio.get_event_loop()
         genotypes = await loop.run_in_executor(
-            None, parse_genotype_file, str(temp_file_path)
+            None, parse_genotype_file, temp_file_path
         )
         
         if not genotypes:
@@ -113,6 +159,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             )
 
         # Analyze variants
+        _progress.update(stage=f"Matching {len(genotypes):,} variants against ClinVar and GWAS")
         analysis_results = await loop.run_in_executor(
             None, analyze_variants, genotypes, db
         )
@@ -123,55 +170,43 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 detail="No variants found in database"
             )
 
-        # Create AI engine and check connection
+        # Create AI engine. Ollama is optional — the README promises the tool
+        # still works without it, minus the plain-English explanations.
         ai_engine = AIEngine()
-        if not ai_engine.check_connection():
-            raise HTTPException(
-                status_code=503,
-                detail="AI service (Ollama) is not available"
-            )
+        ai_available = await ai_engine.check_connection()
 
-        # Get top 50 significant variants
-        sorted_results = sorted(
-            analysis_results,
-            key=lambda x: x.significance_score if hasattr(x, 'significance_score') else 0,
-            reverse=True
+        # analyze_variants already returns these most-significant-first, so the
+        # top 50 are the 50 worth spending an AI call on.
+        top_variants = analysis_results[:50]
+
+        # Generate AI explanations for significant variants. One call per
+        # variant, run a few at a time — sequentially this took 12 minutes.
+        _progress.update(
+            stage="Writing explanations", done=0, total=len(top_variants)
         )
-        top_variants = sorted_results[:50]
 
-        # Generate AI explanations for significant variants
-        explanations = {}
-        for i, variant in enumerate(top_variants):
-            try:
-                explanation = await ai_engine.generate_explanation(
-                    variant.rsid,
-                    variant.chromosome,
-                    variant.position,
-                    variant.genotype,
-                    variant.clinvar_data if hasattr(variant, 'clinvar_data') else None,
-                    variant.gwas_data if hasattr(variant, 'gwas_data') else None,
-                )
-                explanations[variant.rsid] = explanation
-            except Exception:
-                explanations[variant.rsid] = "Explanation generation failed"
+        def on_explained(done: int, total: int) -> None:
+            _progress.update(done=done, total=total)
+
+        explanations = await ai_engine.explain_variants_batch(
+            top_variants, progress_callback=on_explained
+        )
 
         # Generate executive summary
+        _progress.update(stage="Summarizing", done=0, total=0)
         try:
-            summary = await ai_engine.generate_summary(
-                total_variants=len(analysis_results),
-                significant_variants=len(top_variants),
-                top_categories=_get_top_categories(analysis_results),
-            )
+            if not ai_available:
+                raise RuntimeError("ollama unavailable")
+            summary = await ai_engine.generate_summary(top_variants)
         except Exception:
-            summary = "Unable to generate summary at this time"
+            summary = ("AI summary unavailable. Variant findings below come "
+                       "straight from ClinVar and the GWAS Catalog.")
 
         # Format results
+        _progress.update(stage="Building your report", done=0, total=0)
         formatted_results = []
         for i, variant in enumerate(analysis_results):
-            warnings = get_variant_warnings(
-                variant.rsid,
-                variant.genotype if hasattr(variant, 'genotype') else None,
-            )
+            warnings = get_variant_warnings(variant)
             
             result_dict = {
                 "rsid": variant.rsid,
@@ -181,18 +216,23 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 "category": variant.category if hasattr(variant, 'category') else "Unknown",
                 "significance_rank": i + 1,
                 "explanation": explanations.get(variant.rsid, ""),
-                "clinvar_data": variant.clinvar_data if hasattr(variant, 'clinvar_data') else None,
-                "gwas_data": variant.gwas_data if hasattr(variant, 'gwas_data') else None,
+                "gene": _gene_of(variant),
+                "significance": _significance_of(variant),
+                "pubmed_id": next(
+                    (e.pubmed_id for e in (variant.gwas_entries or []) if e.pubmed_id),
+                    None,
+                ),
                 "warnings": warnings,
             }
             formatted_results.append(result_dict)
 
-        return {
+        payload = {
             "summary": summary,
             "results": formatted_results,
             "total_variants": len(analysis_results),
             "analyzed_at": _get_timestamp(),
         }
+        return payload
 
     except HTTPException:
         raise
@@ -203,11 +243,23 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         )
     finally:
         # Clean up temp file
+        _progress.update(stage="idle", done=0, total=0)
         if temp_file_path and Path(temp_file_path).exists():
             try:
                 Path(temp_file_path).unlink()
             except Exception:
                 pass
+
+
+# A whole-genome run takes minutes. Without real numbers the page looks hung,
+# so the analyse route publishes its stage here and the browser polls it.
+_progress: Dict[str, Any] = {"stage": "idle", "done": 0, "total": 0}
+
+
+@router.get("/api/progress")
+async def get_progress() -> Dict[str, Any]:
+    """Where the current analysis has got to."""
+    return _progress
 
 
 @router.post("/api/export")
@@ -224,17 +276,20 @@ async def export_report(analysis_data: Dict[str, Any]) -> FileResponse:
         # Generate HTML report (using report generator when available)
         html_content = _generate_html_report(analysis_data)
 
-        # Create temp file for report
-        temp_dir = tempfile.gettempdir()
-        temp_report_path = Path(temp_dir) / f"allelio_report_{_get_timestamp()}.html"
-
-        with open(temp_report_path, "w") as f:
+        # mkstemp gives the file 0600, and the report holds the user's
+        # genotypes. Explicit encoding because the report declares UTF-8 and
+        # the model writes em dashes.
+        fd, temp_report_path = tempfile.mkstemp(
+            prefix="allelio_report_", suffix=".html"
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(html_content)
 
         return FileResponse(
-            path=str(temp_report_path),
+            path=temp_report_path,
             filename=f"allelio_report_{_get_timestamp()}.html",
             media_type="text/html",
+            background=BackgroundTask(_unlink, temp_report_path),
         )
 
     except HTTPException:
@@ -246,15 +301,12 @@ async def export_report(analysis_data: Dict[str, Any]) -> FileResponse:
         )
 
 
-def _get_top_categories(results: List[VariantResult]) -> List[str]:
-    """Extract top categories from analysis results."""
-    categories = {}
-    for result in results:
-        category = result.category if hasattr(result, 'category') else "Unknown"
-        categories[category] = categories.get(category, 0) + 1
-    
-    sorted_cats = sorted(categories.items(), key=lambda x: x[1], reverse=True)
-    return [cat[0] for cat in sorted_cats[:5]]
+def _unlink(path: str) -> None:
+    """Remove the exported report once it has been sent."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
 
 
 def _get_timestamp() -> str:
@@ -265,21 +317,38 @@ def _get_timestamp() -> str:
 
 def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     """Generate HTML report from analysis data."""
-    summary = analysis_data.get("summary", "No summary available")
+    summary = escape(str(analysis_data.get("summary") or "No summary available"))
     results = analysis_data.get("results", [])
-    total_variants = analysis_data.get("total_variants", 0)
-    analyzed_at = analysis_data.get("analyzed_at", "Unknown")
+    total_variants = escape(str(analysis_data.get("total_variants", 0)))
+    analyzed_at = escape(str(analysis_data.get("analyzed_at") or "Unknown"))
 
     # Build results table HTML
     results_html = ""
     for result in results[:100]:  # Limit to first 100 for report
-        rsid = result.get("rsid", "N/A")
-        chrom = result.get("chromosome", "N/A")
-        pos = result.get("position", "N/A")
-        genotype = result.get("genotype", "N/A")
-        category = result.get("category", "N/A")
-        explanation = result.get("explanation", "N/A")
-        
+        # These come from the uploaded file and the model, and the report is
+        # opened in a browser — none of it is trusted markup.
+        def field(name):
+            return escape(str(result.get(name) or "N/A"))
+
+        rsid = field("rsid")
+        chrom = field("chromosome")
+        pos = field("position")
+        genotype = field("genotype")
+        category = field("category")
+        explanation = field("explanation")
+
+        # The safety layer computes these for BRCA1/2, TP53, Lynch and APOE.
+        # A report that omits them is the one place they matter most.
+        # explain_variant folds these into the explanation via
+        # wrap_with_disclaimer — but only on the path where the model answered.
+        # A fallback explanation carries no warning, so test the text itself.
+        explanation_text = str(result.get("explanation") or "")
+        warnings = "".join(
+            f'<p class="warning">{escape(str(w))}</p>'
+            for w in (result.get("warnings") or [])
+            if str(w) not in explanation_text
+        )
+
         results_html += f"""
         <tr>
             <td>{rsid}</td>
@@ -287,7 +356,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
             <td>{pos}</td>
             <td>{genotype}</td>
             <td>{category}</td>
-            <td>{explanation}</td>
+            <td>{explanation}{warnings}</td>
         </tr>
         """
 
@@ -298,6 +367,16 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         <meta charset="UTF-8">
         <title>Allelio Analysis Report</title>
         <style>
+            td {{
+                white-space: pre-wrap;
+            }}
+            .warning {{
+                margin: 0.5em 0 0;
+                padding: 0.5em;
+                border-left: 3px solid #B45309;
+                background: #FEF3C7;
+                color: #78350F;
+            }}
             body {{
                 font-family: Arial, sans-serif;
                 margin: 20px;

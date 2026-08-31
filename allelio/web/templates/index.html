@@ -431,6 +431,7 @@
         .summary-text {
             font-size: 0.95rem;
             line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         /* Result Card */
@@ -466,6 +467,18 @@
 
         .result-card.trait {
             border-left-color: #3B82F6;
+        }
+
+        .result-card.conflicting {
+            border-left-color: #8B5CF6;
+        }
+
+        .result-card.uncertain {
+            border-left-color: #6B7280;
+        }
+
+        .result-card.association {
+            border-left-color: #06B6D4;
         }
 
         .result-card.benign {
@@ -559,6 +572,46 @@
             color: #6EE7B7;
         }
 
+        .badge-trait {
+            background-color: #DBEAFE;
+            color: #1E3A8A;
+        }
+
+        body.dark-mode .badge-trait {
+            background-color: #1E3A8A;
+            color: #93C5FD;
+        }
+
+        .badge-association {
+            background-color: #CFFAFE;
+            color: #155E75;
+        }
+
+        body.dark-mode .badge-association {
+            background-color: #164E63;
+            color: #A5F3FC;
+        }
+
+        .badge-uncertain {
+            background-color: #E5E7EB;
+            color: #374151;
+        }
+
+        body.dark-mode .badge-uncertain {
+            background-color: #374151;
+            color: #D1D5DB;
+        }
+
+        .badge-conflicting {
+            background-color: #EDE9FE;
+            color: #5B21B6;
+        }
+
+        body.dark-mode .badge-conflicting {
+            background-color: #4C1D95;
+            color: #C4B5FD;
+        }
+
         .result-genotype {
             font-family: 'Courier New', monospace;
             font-weight: 600;
@@ -593,10 +646,26 @@
             margin-bottom: 1rem;
             color: var(--gray-700);
             line-height: 1.7;
+            white-space: pre-wrap;
         }
 
         body.dark-mode .result-explanation {
             color: #D1D5DB;
+        }
+
+        .result-warning {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            border-left: 3px solid #B45309;
+            border-radius: 4px;
+            background-color: #FEF3C7;
+            color: #78350F;
+            font-size: 0.875rem;
+        }
+
+        body.dark-mode .result-warning {
+            background-color: #451A03;
+            color: #FCD34D;
         }
 
         .result-sources {
@@ -925,7 +994,7 @@
                 // Update Database Status
                 const dbIndicator = document.getElementById('dbIndicator');
                 const dbStatus = document.getElementById('dbStatus');
-                if (data.database_ready) {
+                if (data.db_ready) {
                     dbIndicator.classList.add('connected');
                     dbStatus.textContent = 'Database Ready';
                 } else {
@@ -936,7 +1005,7 @@
                 // Update Ollama Status
                 const ollamaIndicator = document.getElementById('ollamaIndicator');
                 const ollamaStatus = document.getElementById('ollamaStatus');
-                if (data.ollama_connected) {
+                if (data.ollama_available) {
                     ollamaIndicator.classList.add('connected');
                     ollamaStatus.textContent = 'Ollama Connected';
                 } else {
@@ -959,14 +1028,40 @@
             document.getElementById('progressSection').classList.remove('hidden');
             document.getElementById('resultsSection').classList.add('hidden');
 
-            // Animate progress bar
-            let progress = 0;
+            // Poll the server for real progress. A whole genome takes minutes;
+            // a bar that fakes its way to 90% and stops looks like a hang.
             const progressBar = document.getElementById('progressBar');
-            const progressInterval = setInterval(() => {
-                progress += Math.random() * 30;
-                if (progress > 90) progress = 90;
-                progressBar.style.width = progress + '%';
-            }, 500);
+            const progressText = document.getElementById('progressText');
+            progressBar.style.width = '2%';
+            progressText.textContent = 'Uploading...';
+            const progressInterval = setInterval(async () => {
+                try {
+                    const r = await fetch('/api/progress');
+                    if (!r.ok) return;
+                    const p = await r.json();
+                    if (p.stage === 'idle') return;
+                    progressText.textContent = p.total
+                        ? `${p.stage} — ${p.done} of ${p.total}`
+                        : `${p.stage}...`;
+                    // Only the explanation phase has a count. Without this the
+                    // bar sits at 10% through every other stage, one of which
+                    // can take half an hour.
+                    const stageWidths = {
+                        'Reading your file': 5,
+                        'Summarizing': 92,
+                        'Building your report': 96
+                    };
+                    if (p.total) {
+                        progressBar.style.width = (10 + 80 * p.done / p.total) + '%';
+                    } else if (p.stage in stageWidths) {
+                        progressBar.style.width = stageWidths[p.stage] + '%';
+                    } else if (p.stage.startsWith('Matching')) {
+                        progressBar.style.width = '8%';
+                    }
+                } catch (e) {
+                    // Server busy or restarting — the next tick tries again.
+                }
+            }, 1000);
 
             try {
                 const response = await fetch('/api/analyze', {
@@ -1000,6 +1095,30 @@
         }
 
         // Display Results
+        // Result fields are read out of the uploaded file or written by the
+        // model; neither is trusted markup.
+        function esc(value) {
+            if (value === null || value === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = value;
+            return div.innerHTML;
+        }
+
+        // These land inside a URL, where escaping HTML is not enough. A PubMed
+        // ID is digits; an rsID is rs or i followed by digits.
+        function idFor(value) {
+            return /^\d+$/.test(String(value ?? '')) ? String(value) : '';
+        }
+
+        function rsidFor(value) {
+            return /^(rs|i)\d+$/.test(String(value ?? '')) ? String(value) : '';
+        }
+
+        // "Health Conditions" -> "health_conditions"
+        function slugify(category) {
+            return (category || '').toLowerCase().replace(/ /g, '_');
+        }
+
         function displayResults() {
             if (!analysisResults) return;
 
@@ -1012,13 +1131,15 @@
             }
 
             // Create Category Tabs
-            const categories = ['all', 'health_conditions', 'risk_factors', 'pharmacogenomics', 'traits'];
+            const categories = ['all', 'health_conditions', 'carrier_status', 'risk_factors', 'pharmacogenomics', 'traits', 'unknown'];
             const categoryLabels = {
                 'all': 'All',
                 'health_conditions': 'Health Conditions',
+                'carrier_status': 'Carrier Status',
                 'risk_factors': 'Risk Factors',
                 'pharmacogenomics': 'Pharmacogenomics',
-                'traits': 'Traits'
+                'traits': 'Traits',
+                'unknown': 'Uncategorized'
             };
 
             const tabsContainer = document.getElementById('resultsTabs');
@@ -1027,6 +1148,7 @@
             categories.forEach(cat => {
                 const button = document.createElement('button');
                 button.className = 'tab-button' + (cat === 'all' ? ' active' : '');
+                button.dataset.category = cat;
                 button.textContent = categoryLabels[cat];
                 button.addEventListener('click', () => selectCategory(cat));
                 tabsContainer.appendChild(button);
@@ -1040,9 +1162,11 @@
         function selectCategory(category) {
             currentCategory = category;
 
-            // Update active tab
-            document.querySelectorAll('.tab-button').forEach((btn, idx) => {
-                btn.classList.toggle('active', btn.textContent === document.querySelectorAll('.tab-button')[['all', 'health_conditions', 'risk_factors', 'pharmacogenomics', 'traits'].indexOf(category)].textContent);
+            // Update active tab. This used to look the tab up by position in a
+            // second, hardcoded category list; anything missing from that list
+            // indexed to -1 and threw.
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === category);
             });
 
             renderResultCards();
@@ -1059,7 +1183,9 @@
 
             // Filter by category
             if (currentCategory !== 'all') {
-                results = results.filter(r => r.category === currentCategory);
+                // The tabs are keyed on slugs; the analyser emits labels like
+                // "Health Conditions", so every tab but All matched nothing.
+                results = results.filter(r => slugify(r.category) === currentCategory);
             }
 
             if (results.length === 0) {
@@ -1081,35 +1207,32 @@
             const significance = result.significance || 'benign';
             const significanceBadgeClass = {
                 'pathogenic': 'badge-pathogenic',
+                'conflicting': 'badge-conflicting',
+                'uncertain': 'badge-uncertain',
+                'association': 'badge-association',
                 'risk': 'badge-risk',
                 'benign': 'badge-benign',
-                'trait': 'badge-benign'
+                'trait': 'badge-trait'
             }[significance] || 'badge-benign';
-
-            const categoryBadgeClass = {
-                'health_conditions': 'badge-category',
-                'risk_factors': 'badge-category',
-                'pharmacogenomics': 'badge-category',
-                'traits': 'badge-category'
-            }[result.category] || 'badge-category';
 
             card.innerHTML = `
                 <div class="result-header">
                     <div class="result-title">
-                        <div class="result-rsid">${result.rsid}</div>
-                        <div class="result-gene">${result.gene || 'Gene: Unknown'}</div>
+                        <div class="result-rsid">${esc(result.rsid)}</div>
+                        <div class="result-gene">${esc(result.gene) || 'Gene: Unknown'}</div>
                         <div class="result-meta">
-                            <span class="badge ${categoryBadgeClass}">${result.category.replace('_', ' ')}</span>
-                            <span class="badge ${significanceBadgeClass}">${significance}</span>
+                            <span class="badge badge-category">${esc(result.category).replace('_', ' ')}</span>
+                            <span class="badge ${significanceBadgeClass}">${esc(significance)}</span>
                         </div>
                     </div>
-                    <div class="result-genotype">${result.genotype}</div>
+                    <div class="result-genotype">${esc(result.genotype)}</div>
                 </div>
+                ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                 <div class="result-body">
-                    <div class="result-explanation">${result.explanation || 'No explanation available.'}</div>
+                    <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
                     <div class="result-sources">
-                        ${result.clinvar_id ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/${result.clinvar_id}/" target="_blank" class="source-link">ClinVar</a>` : ''}
-                        ${result.pubmed_id ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${result.pubmed_id}/" target="_blank" class="source-link">PubMed</a>` : ''}
+                        ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" rel="noopener noreferrer" class="source-link">ClinVar</a>` : ''}
+                        ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" rel="noopener noreferrer" class="source-link">PubMed</a>` : ''}
                     </div>
                 </div>
             `;

@@ -20,6 +20,17 @@ from .safety import check_safety, get_variant_warnings, wrap_with_disclaimer
 DEFAULT_MODEL = "llama3.1:8b"
 DEFAULT_HOST = "http://localhost:11434"
 
+# Sixty seconds is not enough for the default 8B model on a warm machine
+# once a few explanations run at once; every other one came back as a
+# timeout fallback.
+REQUEST_TIMEOUT = 300
+
+# Fifty variants, three at a time, at the per-request timeout is over an hour
+# of staring at a progress bar. Cap the batch and keep what finished. Thirty
+# minutes clears a full run of this project's own default model on an M1 Max
+# with room to spare; fifteen did not.
+BATCH_DEADLINE = 1800
+
 
 class AIEngine:
     """
@@ -127,7 +138,7 @@ class AIEngine:
                     ],
                     stream=False
                 ),
-                timeout=60
+                timeout=REQUEST_TIMEOUT
             )
             
             explanation = response['message']['content']
@@ -152,7 +163,8 @@ class AIEngine:
         self,
         results: List,
         max_concurrent: int = 3,
-        progress_callback: Optional[Callable[[int, int], None]] = None
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        deadline: float = BATCH_DEADLINE
     ) -> Dict[str, str]:
         """
         Generate AI explanations for multiple variants with concurrency control.
@@ -174,23 +186,52 @@ class AIEngine:
         async def explain_with_semaphore(result):
             async with semaphore:
                 explanation = await self.explain_variant(result)
-                if progress_callback:
-                    progress_callback(len(explanations), len(results))
                 return result.rsid, explanation
         
-        # Track completions for callback
-        explanations = {}
+        # Seeded, not empty: a variant the deadline cuts off still deserves the
+        # gene, the ClinVar call and the GWAS traits that _fallback_explanation
+        # writes. A finished task overwrites its seed.
+        explanations = {
+            r.rsid: self._fallback_explanation(
+                r, reason="Explanation ran past the time limit"
+            )
+            for r in results
+        }
         
-        # Create all tasks
-        tasks = [explain_with_semaphore(result) for result in results]
-        
-        # Execute with progress tracking
-        for coro in asyncio.as_completed(tasks):
-            rsid, explanation = await coro
-            explanations[rsid] = explanation
-            if progress_callback:
-                progress_callback(len(explanations), len(results))
-        
+        done = 0
+        tasks = [
+            asyncio.ensure_future(explain_with_semaphore(result))
+            for result in results
+        ]
+
+        # Whatever is done when the clock runs out is what the user gets. The
+        # per-request timeout on its own lets 50 variants, three at a time,
+        # hold the upload open for well over an hour on a slow model.
+        try:
+            for coro in asyncio.as_completed(tasks, timeout=deadline):
+                try:
+                    rsid, explanation = await coro
+                except asyncio.TimeoutError:
+                    raise
+                except Exception:
+                    # One variant that fails outside explain_variant's own
+                    # guard used to cost one explanation. It should not cost
+                    # the whole upload, minutes after the analysis is done.
+                    done += 1
+                    if progress_callback:
+                        progress_callback(done, len(results))
+                    continue
+                explanations[rsid] = explanation
+                done += 1
+                if progress_callback:
+                    progress_callback(done, len(results))
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         return explanations
     
     async def generate_summary(self, results: List) -> str:
@@ -220,16 +261,25 @@ class AIEngine:
             
             # Classify based on available data
             if clinvar or (gwas and len(gwas) > 0):
-                has_clinvar_pathogenic = any(
-                    'pathogenic' in str(e.get('clinical_significance', '')).lower()
-                    for e in clinvar
-                )
-                
-                if has_clinvar_pathogenic or (gwas and any(
-                    float(e.get('p_value', '1.0').split('e-')[1]) > 5 
-                    for e in gwas 
-                    if 'e-' in str(e.get('p_value', ''))
-                )):
+                # clinvar/gwas hold ClinVarEntry and GWASEntry objects, not dicts.
+                def _pathogenic(e) -> bool:
+                    # Same test the results list badges on, so the summary and
+                    # the cards cannot disagree about one variant.
+                    sig = str(getattr(e, 'clinical_significance', '')).lower()
+                    if 'conflicting' in sig or 'benign' in sig:
+                        return False
+                    return 'pathogenic' in sig
+
+                has_clinvar_pathogenic = any(_pathogenic(e) for e in clinvar)
+
+                def _strong_gwas(e) -> bool:
+                    p = getattr(e, 'p_value', None)
+                    try:
+                        return p is not None and float(p) < 1e-5
+                    except (TypeError, ValueError):
+                        return False
+
+                if has_clinvar_pathogenic or any(_strong_gwas(e) for e in gwas):
                     high_impact.append(result)
                 elif clinvar or gwas:
                     moderate.append(result)
@@ -249,6 +299,27 @@ class AIEngine:
             summary_parts.append(f"- {len(moderate)} variant(s) with moderate research associations")
         if low:
             summary_parts.append(f"- {len(low)} variant(s) with limited available data")
+
+        # The model was previously handed counts alone and asked to summarise
+        # findings it had never been shown, so it answered by saying so. List them.
+        listed = (high_impact + moderate)[:25]
+        if listed:
+            summary_parts.append("\nThe findings:")
+            for r in listed:
+                gene = ""
+                for e in (r.clinvar_entries or []):
+                    gene = getattr(e, 'gene', '') or gene
+                for e in (r.gwas_entries or []):
+                    gene = gene or getattr(e, 'mapped_gene', '')
+                sig = ""
+                for e in (r.clinvar_entries or []):
+                    sig = getattr(e, 'clinical_significance', '') or sig
+                traits = [getattr(e, 'trait', '') for e in (r.gwas_entries or [])]
+                traits = [t for t in traits if t][:2]
+                bits = [b for b in (gene, sig, "; ".join(traits)) if b]
+                summary_parts.append(
+                    f"- {r.rsid} ({r.genotype}): " + (" — ".join(bits) if bits else "no annotation")
+                )
         
         summary_parts.append(
             "\nPlease provide a brief 2-3 paragraph executive summary of these findings, "
@@ -274,7 +345,7 @@ class AIEngine:
                     ],
                     stream=False
                 ),
-                timeout=60
+                timeout=REQUEST_TIMEOUT
             )
             
             summary = response['message']['content']
