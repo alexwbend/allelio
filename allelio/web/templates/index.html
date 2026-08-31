@@ -801,6 +801,74 @@
             border: 1px solid currentColor;
         }
 
+        /* Save-to-disk consent modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: white;
+            color: var(--gray-900);
+            max-width: 34rem;
+            width: 100%;
+            border-radius: var(--border-radius);
+            padding: 1.75rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        body.dark-mode .modal {
+            background: #1F2937;
+            color: var(--gray-200);
+        }
+
+        .modal h3 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+        }
+
+        .modal p {
+            line-height: 1.6;
+            margin: 0.75rem 0;
+        }
+
+        .modal-note {
+            font-weight: 600;
+        }
+
+        .modal-list {
+            margin: 0.75rem 0;
+            padding-left: 1.25rem;
+            line-height: 1.6;
+        }
+
+        .modal-list li {
+            margin-bottom: 0.5rem;
+        }
+
+        .modal code {
+            font-family: 'Courier New', monospace;
+            background: rgba(13, 148, 136, 0.1);
+            padding: 0.1rem 0.35rem;
+            border-radius: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+            flex-wrap: wrap;
+        }
+
         /* Alert/Toast */
         .alert {
             padding: 1rem 1.5rem;
@@ -914,6 +982,37 @@
     <!-- Disclaimer Banner -->
     <div class="disclaimer-banner">
         ⚠️ For educational purposes only. Not medical advice.
+    </div>
+
+    <!-- Save-to-disk consent. Saving writes the user's genome to a file, so the
+         page lays out what that means before it does it. -->
+    <div class="modal-overlay hidden" id="saveModal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="saveModalTitle">
+            <h3 id="saveModalTitle">Save this analysis on your computer?</h3>
+            <p>This writes your genetic findings to a file on this machine
+               (<code>~/.allelio/last_analysis.json</code>) so you can reopen them
+               later instead of waiting for another run.</p>
+            <p class="modal-note">A few things worth knowing, because this is your genome:</p>
+            <ul class="modal-list">
+                <li><strong>It stays here.</strong> Allelio never sends it anywhere,
+                    and there is no code path that could.</li>
+                <li><strong>The file is locked to your account</strong>, readable only
+                    by you. Anyone who can sign in as you, or read your backups, could
+                    open it too.</li>
+                <li><strong>If this machine is shared or backed up to the cloud</strong>,
+                    consider turning on full-disk encryption first: FileVault on Mac,
+                    BitLocker on Windows, LUKS on Linux. Then even a lost drive or a
+                    synced backup stays unreadable.</li>
+                <li><strong>You can delete it anytime, right here.</strong> Allelio only
+                    says it is gone once the file is really removed.</li>
+            </ul>
+            <p>Save it if it is useful to you. Skip it if you would rather nothing
+               touched the disk.</p>
+            <div class="modal-actions">
+                <button class="export-button secondary" id="cancelSaveButton">Not now</button>
+                <button class="export-button" id="confirmSaveButton">💾 Save on this computer</button>
+            </div>
+        </div>
     </div>
 
     <!-- Main Content -->
@@ -1055,6 +1154,14 @@
             document.getElementById('saveButton').addEventListener('click', saveResults);
             document.getElementById('restoreSavedButton').addEventListener('click', restoreSaved);
             document.getElementById('deleteSavedButton').addEventListener('click', deleteSaved);
+
+            // The consent step in front of a save
+            document.getElementById('confirmSaveButton').addEventListener('click', confirmSaveResults);
+            document.getElementById('cancelSaveButton').addEventListener('click', closeSaveModal);
+            document.getElementById('saveModal').addEventListener('click', (e) => {
+                // A click on the backdrop, outside the dialog, is a Not now.
+                if (e.target.id === 'saveModal') closeSaveModal();
+            });
         }
 
         // Dark Mode Toggle
@@ -1478,7 +1585,19 @@
             }
         }
 
-        async function saveResults() {
+        // Saving writes the user's genome to disk, so it asks first and lays out
+        // what that means. confirmSaveResults below is the write itself.
+        function saveResults() {
+            if (!analysisResults) return;
+            document.getElementById('saveModal').classList.remove('hidden');
+        }
+
+        function closeSaveModal() {
+            document.getElementById('saveModal').classList.add('hidden');
+        }
+
+        async function confirmSaveResults() {
+            closeSaveModal();
             if (!analysisResults) return;
 
             const button = document.getElementById('saveButton');
@@ -1490,7 +1609,7 @@
                     body: JSON.stringify(analysisResults)
                 });
                 if (!response.ok) throw new Error('Save failed');
-                showAlert('Saved on this computer. It will be offered next time you open Allelio.', 'success');
+                showAlert('Saved on this computer. It will be waiting for you next time, and you can delete it whenever you like.', 'success');
                 fetchSavedInfo();
             } catch (error) {
                 console.error('Error saving results:', error);
