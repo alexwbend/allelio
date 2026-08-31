@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "source": "gnomAD",
+  "version": "v4.1.1",
+  "file": "gnomad_v4.1.1_array_freq.tsv.gz",
+  "sha256": null,
+  "urls": [
+    "https://github.com/alexwbend/allelio/releases/download/v0.2.1-data/gnomad_v4.1.1_array_freq.tsv.gz"
+  ],
+  "_notes": {
+    "purpose": "Mutable pointer for Allelio's gnomAD frequency extract. Editing this file is how a data refresh happens without a code change: the downloader fetches it, tries each URL in order, and verifies the checksum.",
+    "publishing": "1) Build the extract with scripts/build_gnomad_freq.py (gnomAD v4.1.1, trimmed to consumer-array rsIDs). 2) Upload it to the permaweb via Permavault and prepend the Arweave/gateway URL to `urls` (content-addressed, never 404s). 3) Mirror it on the GitHub release below. 4) Set `sha256` to the file's hex digest (the build script prints it). Until `sha256` is set, the downloader still works but skips the integrity check with a warning.",
+    "license": "gnomAD is CC0 (public domain) — safe to redistribute permanently on the permaweb."
+  }
+}

@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [Unreleased] — Revival
+
+**Unblocking population frequencies, and hardening the rolling downloads.** The gnomAD frequency feature shipped in 0.2.1 was inert because its data file was never published (the download 404'd). This makes it real and shores up the other data sources against upstream drift.
+
+### Added
+
+- **gnomAD frequency data via a JSON manifest** — the downloader now resolves the compact frequency file through `data/gnomad_manifest.json` (source, version, checksum, and one-or-more URLs) instead of a hardcoded release URL. A version bump or re-host is a data refresh, not a code change. Primary hosting is the permaweb (Arweave via Permavault — content-addressed, never 404s; gnomAD is CC0), with a GitHub release as a mirror.
+- **Checksum verification** — a downloaded frequency file is verified against the manifest's SHA-256; a mismatch is rejected and the next URL is tried. A manifest without a checksum downloads but skips the check with a warning rather than blocking.
+- **Consumer-array trimming in `scripts/build_gnomad_freq.py`** — a new `--array-sites` option trims the extract to the rsIDs a chip actually reports (23andMe / AncestryDNA), dropping the shipped file from hundreds of MB to a few MB. The script now prints the file's SHA-256 and a ready-to-paste manifest.
+- **Staleness banner** — `allelio analyze` and `allelio info` warn when the local ClinVar/GWAS copy is older than 90 days, prompting `allelio update`.
+- **Tests** — new coverage for the GWAS URL, staleness logic, manifest resolution, checksum verification, and the array-site trimming.
+
+### Changed
+
+- **GWAS Catalog download** moved off the retired EBI API v1 endpoint to the versioned FTP path (`releases/latest`), which is release-versioned and stable.
+- **gnomAD version pin** bumped v4.1 → v4.1.1. Provenance (source + version) is now stored from the manifest as database metadata (`gnomad_source`, `gnomad_version`) rather than hardcoded, keeping the frequency layer version-agnostic.
+
+---
+
 ## [0.2.1] — 2026-02-20
 
 **Population frequency integration.** Allelio now uses gnomAD allele frequency data to distinguish rare pathogenic variants from common ones. A variant flagged "pathogenic" that 40% of the population carries is treated very differently from one carried by 0.01%.

@@ -14,7 +14,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from allelio.analysis.lookup import analyze_variants
-from allelio.database import AllelioDB, setup_database
+from allelio.database import AllelioDB, setup_database, staleness_warning
 from allelio.parsers import parse_genotype_file
 from allelio.report import generate_html_report
 
@@ -133,6 +133,12 @@ def analyze(
             )
         )
         raise click.Abort()
+
+    # Nudge if the local ClinVar/GWAS copy has gone stale. Non-fatal — the
+    # analysis still runs against whatever is on disk.
+    stale = staleness_warning(db)
+    if stale:
+        console.print(f"  [bold yellow]⚠[/bold yellow] {escape(stale)}\n")
 
     # Settle the model before anything is read. Construction only parses and
     # resolves the address, and the listing call costs one request — both are
@@ -508,7 +514,19 @@ def info():
             info_table = Table(show_header=False)
             info_table.add_row("Database Status", "[bold green]✓ Initialized[/bold green]")
             info_table.add_row("Database Version", db.version())
-            
+
+            # Freshness: green when recent, yellow with a nudge when stale.
+            age_days = db.days_since_update()
+            if age_days is None:
+                info_table.add_row("Data Freshness", "[dim]Unknown[/dim]")
+            elif staleness_warning(db):
+                info_table.add_row(
+                    "Data Freshness",
+                    f"[bold yellow]⚠ {int(age_days)} days old — run allelio update[/bold yellow]",
+                )
+            else:
+                info_table.add_row("Data Freshness", f"[green]{int(age_days)} days old[/green]")
+
             # Get database stats if available
             try:
                 stats = db.get_stats()

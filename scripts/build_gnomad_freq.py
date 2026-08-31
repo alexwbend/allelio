@@ -2,24 +2,40 @@
 """Build a compact gnomAD frequency file for Allelio distribution.
 
 This is a DEVELOPER tool — run it once on a machine with enough disk/bandwidth
-to download gnomAD VCF files. It produces a small gzipped TSV that end users
+to stream gnomAD VCF files. It produces a small gzipped TSV that end users
 download during `allelio setup`.
 
-The output file contains only variants with rsIDs and their allele frequencies.
-It is typically 500 MB–1.5 GB gzipped, depending on the gnomAD version.
+The output contains only variants with rsIDs and their allele frequencies. To
+keep the shipped file to a few MB (rather than hundreds), pass --array-sites
+with a consumer-array rsID list (or a 23andMe / AncestryDNA raw file) so the
+extract is trimmed to the ~1–2 M sites those chips actually report.
 
 Usage:
-    # Download gnomAD v4.1 genome VCFs and build the frequency file
-    python scripts/build_gnomad_freq.py --output gnomad_v4.1_freq.tsv.gz
+    # Trim to a consumer-array rsID list (recommended — output is a few MB).
+    # The rsID file may be a plain list, or a raw 23andMe / AncestryDNA export
+    # (rsID is taken from the first column; comment lines are ignored).
+    python scripts/build_gnomad_freq.py \\
+        --array-sites arrays/23andme_v5.txt \\
+        --output gnomad_v4.1.1_array_freq.tsv.gz
 
     # Use local VCF files you already downloaded
-    python scripts/build_gnomad_freq.py --vcf-dir /path/to/vcfs --output gnomad_v4.1_freq.tsv.gz
+    python scripts/build_gnomad_freq.py --vcf-dir /path/to/vcfs \\
+        --array-sites arrays/23andme_v5.txt --output gnomad_v4.1.1_array_freq.tsv.gz
 
     # Only process a few chromosomes (for testing)
     python scripts/build_gnomad_freq.py --chromosomes 21,22 --output gnomad_test_freq.tsv.gz
 
-Once generated, upload the output file to a GitHub Release:
-    gh release create v0.2.1-data gnomad_v4.1_freq.tsv.gz --title "gnomAD v4.1 frequency data"
+Publishing (see data/gnomad_manifest.json):
+    1. Upload the output to the permaweb via Permavault (Arweave). gnomAD is
+       CC0, so permanent redistribution is fine. The content-addressed URL
+       never 404s — the failure that left this feature inert in v0.2.1.
+    2. Mirror it on a GitHub Release as a fallback:
+         gh release create v0.2.1-data gnomad_v4.1.1_array_freq.tsv.gz \\
+             --title "gnomAD v4.1.1 array-site frequency data"
+    3. Edit data/gnomad_manifest.json: set `version`, prepend the permaweb URL
+       to `urls`, and set `sha256` to the digest this script prints. That
+       manifest is the mutable pointer — bumping it is a data refresh, not a
+       code change.
 
 Requirements:
     pip install httpx
@@ -27,6 +43,8 @@ Requirements:
 
 import argparse
 import gzip
+import hashlib
+import json
 import os
 import sys
 import time
@@ -38,7 +56,8 @@ except ImportError:
     httpx = None
 
 
-# gnomAD v4.1 genome sites VCF URL pattern (per chromosome)
+# gnomAD genome sites VCF URL pattern (per chromosome). Both release/4.1/ and
+# release/4.1.1/ exist on the public bucket; 4.1.1 is the current pin.
 GNOMAD_VCF_TEMPLATE = (
     "https://storage.googleapis.com/gcp-public-data--gnomad"
     "/release/{version}/vcf/genomes/"
@@ -81,13 +100,40 @@ def parse_info_field(info_str: str) -> dict:
     return result
 
 
-def process_vcf(vcf_path: str, output_file, count_so_far: int) -> int:
+def load_array_sites(path: str) -> set:
+    """Load a set of consumer-array rsIDs to trim the extract to.
+
+    Accepts either a plain rsID list (one per line) or a raw 23andMe /
+    AncestryDNA export — the rsID is taken from the first whitespace/comma
+    delimited column, and comment/header lines (starting with '#') are ignored.
+
+    Args:
+        path: Path to the rsID list or genotype file.
+
+    Returns:
+        A set of rsID strings (e.g. {"rs1234", "rs7412"}).
+    """
+    sites = set()
+    with open(path, "rt", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            token = line.replace(",", "\t").split("\t", 1)[0].strip()
+            if token.startswith("rs"):
+                sites.add(token)
+    return sites
+
+
+def process_vcf(vcf_path: str, output_file, count_so_far: int, array_sites: set = None) -> int:
     """Stream-parse a gnomAD VCF and write frequency records to output.
 
     Args:
         vcf_path: Path to bgzipped VCF file
         output_file: Open gzip file handle to write TSV lines to
         count_so_far: Running variant count for progress reporting
+        array_sites: If given, only write variants whose rsID is in this set
+            (consumer-array trim). If None, write every variant with an rsID.
 
     Returns:
         Updated variant count
@@ -108,29 +154,38 @@ def process_vcf(vcf_path: str, output_file, count_so_far: int) -> int:
             if len(fields) < 8:
                 continue
 
-            # fields[2] = ID (rsID)
-            rsid = fields[2]
-            if not rsid.startswith("rs"):
+            # fields[2] = ID. gnomAD may pack several rsIDs here ("rs1;rs2"),
+            # so match each against the array set rather than trusting one.
+            id_field = fields[2]
+            rsids = [r for r in id_field.split(";") if r.startswith("rs")]
+            if not rsids:
                 skipped += 1
                 continue
+
+            if array_sites is not None:
+                rsids = [r for r in rsids if r in array_sites]
+                if not rsids:
+                    skipped += 1
+                    continue
 
             # fields[7] = INFO
             info = parse_info_field(fields[7])
 
-            # Build output line
-            values = [rsid]
-            for col in OUTPUT_COLUMNS[1:]:  # skip rsid, already added
-                # Map output column name to INFO field name
+            # Build the frequency values once; emit a row per matched rsID so a
+            # multi-rsID site still lands under whichever ID the array reports.
+            freq_values = []
+            for col in OUTPUT_COLUMNS[1:]:  # skip rsid, already handled
                 val = info.get(col, ".")
-                values.append(val if val else ".")
+                freq_values.append(val if val else ".")
 
-            output_file.write("\t".join(values) + "\n")
-            count += 1
+            for rsid in rsids:
+                output_file.write("\t".join([rsid] + freq_values) + "\n")
+                count += 1
 
             if count % 1_000_000 == 0:
-                print(f"  ... {count:,} variants extracted (skipped {skipped:,} without rsID)")
+                print(f"  ... {count:,} variants extracted (skipped {skipped:,})")
 
-    print(f"  Chromosome done: {count - count_so_far:,} variants with rsID, {skipped:,} skipped")
+    print(f"  Chromosome done: {count - count_so_far:,} variants written, {skipped:,} skipped")
     return count
 
 
@@ -178,7 +233,7 @@ def main():
     parser.add_argument(
         "--output", "-o",
         required=True,
-        help="Output file path (e.g. gnomad_v4.1_freq.tsv.gz)",
+        help="Output file path (e.g. gnomad_v4.1.1_array_freq.tsv.gz)",
     )
     parser.add_argument(
         "--vcf-dir",
@@ -187,8 +242,15 @@ def main():
     )
     parser.add_argument(
         "--version",
-        default="4.1",
-        help="gnomAD version (default: 4.1)",
+        default="4.1.1",
+        help="gnomAD version (default: 4.1.1). Also used as the release "
+             "directory and VCF filename version on the public bucket.",
+    )
+    parser.add_argument(
+        "--array-sites",
+        help="Path to a consumer-array rsID list (or a raw 23andMe / "
+             "AncestryDNA file) to trim the extract to. Strongly recommended — "
+             "keeps the shipped file to a few MB instead of hundreds.",
     )
     parser.add_argument(
         "--chromosomes",
@@ -201,6 +263,18 @@ def main():
         help="Don't delete downloaded VCFs after processing each chromosome.",
     )
     args = parser.parse_args()
+
+    # Load the consumer-array trim set, if given.
+    array_sites = None
+    if args.array_sites:
+        if not Path(args.array_sites).exists():
+            print(f"ERROR: array-sites file not found: {args.array_sites}")
+            sys.exit(1)
+        array_sites = load_array_sites(args.array_sites)
+        if not array_sites:
+            print(f"ERROR: no rsIDs found in {args.array_sites}")
+            sys.exit(1)
+        print(f"Trimming to {len(array_sites):,} consumer-array rsIDs from {args.array_sites}")
 
     # Determine chromosomes to process
     if args.chromosomes:
@@ -237,6 +311,8 @@ def main():
         # Write header
         out.write("## Allelio gnomAD frequency file\n")
         out.write(f"## Source: gnomAD v{args.version} genome sites VCFs\n")
+        trim_note = f"{len(array_sites):,} array sites" if array_sites else "all rsIDs"
+        out.write(f"## Trim: {trim_note}\n")
         out.write(f"## Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         out.write("\t".join(OUTPUT_COLUMNS) + "\n")
 
@@ -257,7 +333,7 @@ def main():
                     continue
 
             # Process VCF
-            total_variants = process_vcf(str(vcf_path), out, total_variants)
+            total_variants = process_vcf(str(vcf_path), out, total_variants, array_sites)
 
             # Clean up downloaded VCF (unless --keep-vcfs)
             if not args.keep_vcfs and not args.vcf_dir:
@@ -271,16 +347,46 @@ def main():
     elapsed = time.time() - start_time
     output_size_mb = output_path.stat().st_size / (1024**2)
 
+    # Checksum — this is the integrity value the downloader verifies against,
+    # and (on the permaweb) the content that makes the URL address itself.
+    print("Computing SHA-256 checksum...")
+    digest = hashlib.sha256()
+    with open(output_path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    sha256 = digest.hexdigest()
+
     print("=" * 60)
     print(f"Done! Generated {output_path}")
     print(f"  Total variants: {total_variants:,}")
-    print(f"  File size: {output_size_mb:.0f} MB")
+    print(f"  File size: {output_size_mb:.1f} MB")
+    print(f"  SHA-256: {sha256}")
     print(f"  Time: {elapsed / 60:.1f} minutes")
     print()
-    print("Next step — upload to GitHub Releases:")
-    print(f"  gh release create v0.2.1-data {output_path} \\")
-    print(f'    --title "gnomAD v{args.version} frequency data for Allelio" \\')
-    print(f'    --notes "Pre-processed gnomAD allele frequencies ({total_variants:,} variants, {output_size_mb:.0f} MB)"')
+    print("Next steps:")
+    print("  1. Upload to the permaweb via Permavault (gnomAD is CC0). Copy the")
+    print("     resulting Arweave/gateway URL.")
+    print("  2. Mirror on a GitHub Release as a fallback:")
+    print(f"       gh release create v0.2.1-data {output_path} \\")
+    print(f'         --title "gnomAD v{args.version} array-site frequency data" \\')
+    print(f'         --notes "gnomAD v{args.version} allele frequencies, '
+          f'{total_variants:,} array rows, {output_size_mb:.1f} MB"')
+    print("  3. Update data/gnomad_manifest.json to point at the new file:")
+    print()
+    manifest = {
+        "schema": 1,
+        "source": "gnomAD",
+        "version": f"v{args.version}",
+        "file": output_path.name,
+        "sha256": sha256,
+        "urls": [
+            "<PERMAWEB_URL_HERE>",
+            f"https://github.com/alexwbend/allelio/releases/download/"
+            f"v0.2.1-data/{output_path.name}",
+        ],
+    }
+    for line in json.dumps(manifest, indent=2).splitlines():
+        print(f"     {line}")
 
 
 if __name__ == "__main__":

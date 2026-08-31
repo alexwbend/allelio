@@ -73,6 +73,20 @@ This downloads the ClinVar and GWAS reference databases (~500 MB total). You onl
 allelio setup
 ```
 
+> **Note on population frequencies (gnomAD).** Setup also fetches a small gnomAD
+> allele-frequency file, used to downgrade common variants so genuinely rare
+> findings stand out. This file is being published — until it is live, setup
+> still completes and analysis still runs; it just skips the frequency
+> adjustment and prints a short warning. Everything else works normally.
+>
+> **Maintainer TODO — publish the frequency extract:** build it with
+> `scripts/build_gnomad_freq.py` against a 23andMe/AncestryDNA array manifest,
+> upload it to the permaweb via Permavault (gnomAD is CC0), then fill in
+> `data/gnomad_manifest.json` with the permaweb URL and SHA-256 (plus the
+> GitHub-release mirror). Once the manifest points at a real file, the
+> download verifies its checksum and the adjustment runs. See the manifest's
+> own `_notes` for the exact steps.
+
 ### Launch the web interface
 
 ```bash

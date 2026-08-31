@@ -350,6 +350,27 @@ class AllelioDB:
         last_update = self.get_metadata("last_update") if self.get_metadata("last_update") else "unknown"
         return f"Updated: {last_update}"
 
+    def days_since_update(self) -> Optional[float]:
+        """Return the number of days since the last database update.
+
+        Reads the ``last_update`` metadata timestamp (an ISO-8601 string set by
+        ``setup_database``) and returns how many days ago that was. Returns None
+        if the timestamp is missing or unparseable, so callers can distinguish
+        "unknown" from "fresh".
+
+        Returns:
+            Age of the local data in days, or None if unknown.
+        """
+        last_update = self.get_metadata("last_update")
+        if not last_update:
+            return None
+        try:
+            updated_at = datetime.fromisoformat(last_update)
+        except (ValueError, TypeError):
+            return None
+        delta = datetime.now() - updated_at
+        return delta.total_seconds() / 86400.0
+
     def close(self) -> None:
         """Close database connection."""
         if self.conn:
