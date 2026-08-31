@@ -16,22 +16,29 @@ async def generate_explanation(variant_result, model: Optional[str] = None) -> s
 
     Args:
         variant_result: A VariantResult object from allelio.analysis.lookup
-        model: Ollama model name (e.g. 'llama3.1:8b')
+        model: Model name (e.g. 'llama3.1:8b'); defaults to $ALLELIO_MODEL
 
     Returns:
-        Explanation string with disclaimers applied, or raises if Ollama unavailable.
+        Explanation string with disclaimers applied, or raises if no model answers.
     """
     engine = AIEngine(model=model)
 
-    connected = await engine.check_connection()
-    if not connected:
-        raise RuntimeError("Cannot connect to Ollama. Is it running? (ollama serve)")
+    await engine.check_connection()
+    # One gate, the same one the CLI and the upload use, and the engine's own
+    # sentence for why. A server that will not enumerate its models is not a
+    # server that is missing this one, and this used to say it was.
+    if not engine.will_explain():
+        raise RuntimeError(engine.reason())
 
-    model_ok = await engine.check_model_available()
-    if not model_ok:
+    written = await engine.explain(variant_result)
+    # "or raises if no model answers" is the documented contract, and until now
+    # a failed call returned the variant's own data instead — text that reads
+    # like an explanation to a caller that was promised an exception. The
+    # record answers it for this call, not for the run: a caller asking about
+    # one variant is told about that variant.
+    if written.model is None:
         raise RuntimeError(
-            f"Model '{engine.model}' not found in Ollama. "
-            f"Pull it with: ollama pull {engine.model}"
+            written.error
+            or f"{engine.provider} at {engine.host} did not answer for '{engine.model}'."
         )
-
-    return await engine.explain_variant(variant_result)
+    return written.text
