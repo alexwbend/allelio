@@ -241,3 +241,36 @@ class TestProcessVcfTrim:
             n = build_script.process_vcf(str(vcf), out_f, 0, None)
         # rs111, rs222, and both rs_a + rs_b (multi-rsID expands); no-rsID skipped
         assert n == 4
+
+
+class TestStreamingDecode:
+    """The streaming path decodes gzip/bgzip chunks without touching disk."""
+
+    def _vcf_bytes(self):
+        text = (
+            "##fileformat=VCFv4.2\n"
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+            "21\t100\trs111\tA\tG\t.\tPASS\tAF=0.25;AC=5;AN=20\n"
+            "21\t200\trs222\tC\tT\t.\tPASS\tAF=0.10;AC=2;AN=20\n"
+        )
+        return gzip.compress(text.encode("utf-8"))
+
+    def _chunked(self, data, size):
+        for i in range(0, len(data), size):
+            yield data[i:i + size]
+
+    def test_iter_gzip_lines_reassembles_across_tiny_chunks(self, build_script):
+        # Feed the gzip stream 7 bytes at a time — lines must still reassemble.
+        lines = list(build_script.iter_gzip_lines(self._chunked(self._vcf_bytes(), 7)))
+        assert any(line.startswith("21\t100\trs111") for line in lines)
+        assert any(line.startswith("21\t200\trs222") for line in lines)
+
+    def test_streaming_parse_matches_disk_parse(self, tmp_dir, build_script):
+        out = Path(tmp_dir) / "out.tsv.gz"
+        with gzip.open(str(out), "wt") as out_f:
+            out_f.write("\t".join(build_script.OUTPUT_COLUMNS) + "\n")
+            lines = build_script.iter_gzip_lines(self._chunked(self._vcf_bytes(), 8))
+            n = build_script.emit_records(lines, out_f, 0, {"rs111"})
+        assert n == 1  # trimmed to rs111
+        rows = gzip.open(str(out), "rt").read().splitlines()
+        assert rows[-1].split("\t")[0] == "rs111"
