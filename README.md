@@ -152,6 +152,10 @@ request goes to `127.0.0.1:11434` and the Ollama daemon forwards it to
 ollama.com. Allelio refuses those by name. Anything you have pulled locally is
 fine.
 
+New to running a model locally? The [Running a local model well](docs/local-models.md)
+guide covers how to be sure your data stayed on your machine, which model to
+pick for your RAM, and what a good setup feels like.
+
 ---
 
 ## Supported file formats
