@@ -1,5 +1,7 @@
 """Download and parse reference databases."""
 
+import hashlib
+import json
 import os
 import zipfile
 from pathlib import Path
@@ -19,17 +21,182 @@ from .gnomad import parse_gnomad
 
 CLINVAR_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz"
 
-# gnomAD allele frequency data — pre-processed compact TSV hosted on GitHub Releases.
-# This file is built from gnomAD VCFs using scripts/build_gnomad_freq.py and contains
-# only rsID + allele frequencies (~500 MB–1.5 GB gzipped).
-# To generate and host this file, see scripts/build_gnomad_freq.py for instructions.
-GNOMAD_URL = "https://github.com/alexwbend/allelio/releases/download/v0.2.1-data/gnomad_v4.1_freq.tsv.gz"
+# gnomAD allele frequency data — a compact TSV of consumer-array rsIDs plus
+# allele frequencies, built from gnomAD v4.1.1 (CC0) with
+# scripts/build_gnomad_freq.py (a few MB gzipped).
+#
+# Resolution goes through a JSON manifest rather than a hardcoded URL so that a
+# version bump (gnomAD v5, a rebuild, a re-host) is a data refresh, not a code
+# change. The manifest names the current file's source, version, sha256
+# checksum, and one-or-more download URLs (permaweb primary, GitHub mirror).
+# The permaweb copy (Arweave via Permavault) is content-addressed and never
+# 404s — the exact failure that left this feature inert in v0.2.1.
+GNOMAD_MANIFEST_URL = (
+    "https://raw.githubusercontent.com/alexwbend/allelio/main/data/gnomad_manifest.json"
+)
 
-# GWAS URL — verified from https://www.ebi.ac.uk/gwas/docs/file-downloads (Feb 2026)
-# This returns a zip file containing the associations TSV
-GWAS_URL = "https://www.ebi.ac.uk/gwas/api/search/downloads/associations/v1.0?split=false"
+# Last-resort fallback used only if the manifest can't be fetched or parsed.
+# Mirrors data/gnomad_manifest.json in the repo. `sha256` stays null until the
+# extract is published; when null, the integrity check is skipped with a
+# warning rather than blocking setup.
+DEFAULT_GNOMAD_MANIFEST = {
+    "schema": 1,
+    "source": "gnomAD",
+    "version": "v4.1.1",
+    "file": "gnomad_v4.1.1_array_freq.tsv.gz",
+    "sha256": None,
+    "urls": [
+        # Permaweb (Arweave via Permavault) — filled in once published.
+        # "https://arweave.net/<tx-id>",
+        # GitHub release mirror (fallback during transition).
+        "https://github.com/alexwbend/allelio/releases/download/"
+        "v0.2.1-data/gnomad_v4.1.1_array_freq.tsv.gz",
+    ],
+}
+
+# GWAS URL — the versioned FTP `releases/latest` path (verified 2026-08-31).
+# EBI retired the GWAS Catalog API v1 in May 2026, so the old
+# `www.ebi.ac.uk/gwas/api/search/downloads/associations/v1.0` endpoint is gone.
+# This path is release-versioned and stable, and returns a zip containing the
+# ontology-annotated associations TSV — extracted the same way as before.
+GWAS_URL = "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip"
+
+# How old the local ClinVar/GWAS copy may get before `info`/`analyze` nudge the
+# user to run `allelio update`. ClinVar refreshes weekly and GWAS periodically,
+# so a few months is comfortably stale without being naggy.
+STALENESS_THRESHOLD_DAYS = 90
 
 BATCH_SIZE = 10000
+
+
+def staleness_warning(db: AllelioDB, threshold_days: int = STALENESS_THRESHOLD_DAYS) -> Optional[str]:
+    """Return a warning string if the local databases are older than the threshold.
+
+    ClinVar and GWAS are rolling releases; a local copy that predates recent
+    curation can miss or mis-rank variants. When the last update is older than
+    ``threshold_days``, this returns a short message prompting `allelio update`.
+
+    Args:
+        db: AllelioDB instance to inspect.
+        threshold_days: Age in days beyond which the data is considered stale.
+
+    Returns:
+        A warning message, or None if the data is fresh or its age is unknown.
+    """
+    # Advisory only — a freshness nudge must never break analysis, so any DB
+    # that can't report its age (older schema, a test double) is treated as
+    # "unknown" rather than raising.
+    try:
+        age_days = db.days_since_update()
+    except Exception:
+        return None
+    if age_days is None or age_days < threshold_days:
+        return None
+    return (
+        f"Local ClinVar/GWAS data is {int(age_days)} days old "
+        f"(older than {threshold_days} days). "
+        "Run `allelio update` to refresh to the latest release."
+    )
+
+
+def sha256_file(path: str) -> str:
+    """Return the hex SHA-256 digest of a file, read in 1 MB chunks."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def fetch_gnomad_manifest(
+    url: str = GNOMAD_MANIFEST_URL, log: Optional[Callable] = None
+) -> dict:
+    """Fetch and parse the gnomAD data manifest.
+
+    The manifest is the mutable pointer: editing it (new version, new checksum,
+    new URLs) is how a data refresh happens without a code change. If it can't
+    be fetched or is malformed, the built-in ``DEFAULT_GNOMAD_MANIFEST`` is
+    returned so setup can still proceed.
+
+    Args:
+        url: Manifest URL (defaults to the repo-hosted manifest).
+        log: Optional status logger.
+
+    Returns:
+        A manifest dict with at least ``urls``; always non-empty.
+    """
+    def _log(msg):
+        if log:
+            log(msg)
+
+    if httpx is None:
+        return dict(DEFAULT_GNOMAD_MANIFEST)
+
+    try:
+        resp = httpx.get(url, follow_redirects=True, timeout=30.0)
+        resp.raise_for_status()
+        manifest = resp.json()
+        if not isinstance(manifest, dict) or not manifest.get("urls"):
+            raise ValueError("manifest missing 'urls'")
+        return manifest
+    except Exception as e:
+        _log(f"       Could not fetch gnomAD manifest ({e}); using built-in defaults.")
+        return dict(DEFAULT_GNOMAD_MANIFEST)
+
+
+def download_gnomad_from_manifest(
+    manifest: dict,
+    dest_path: str,
+    progress_callback: Optional[Callable] = None,
+    log: Optional[Callable] = None,
+) -> bool:
+    """Download the gnomAD extract named by a manifest, verifying its checksum.
+
+    Tries each URL in the manifest in order until one downloads. If the
+    manifest carries a ``sha256``, the downloaded file must match it or it is
+    rejected and the next URL is tried. A manifest without a checksum downloads
+    but skips verification (with a warning) rather than blocking.
+
+    Args:
+        manifest: Manifest dict (see ``fetch_gnomad_manifest``).
+        dest_path: Where to save the downloaded file.
+        progress_callback: Optional progress callback.
+        log: Optional status logger.
+
+    Returns:
+        True if a file was downloaded (and verified, when a checksum was given).
+    """
+    def _log(msg):
+        if log:
+            log(msg)
+
+    dest_path = Path(dest_path)
+    urls = manifest.get("urls") or []
+    expected = manifest.get("sha256")
+
+    for url in urls:
+        try:
+            download_file(url, str(dest_path), progress_callback, log=log)
+        except Exception as e:
+            _log(f"       Source failed ({url}): {e}")
+            continue
+
+        if expected:
+            actual = sha256_file(str(dest_path))
+            if actual.lower() != str(expected).lower():
+                _log(
+                    f"       Checksum mismatch (expected {str(expected)[:12]}…, "
+                    f"got {actual[:12]}…); rejecting this copy."
+                )
+                dest_path.unlink(missing_ok=True)
+                continue
+            _log("       Checksum verified.")
+        else:
+            _log("       No checksum in manifest — skipping integrity check.")
+
+        return True
+
+    return False
 
 
 def download_file(url: str, dest_path: str, progress_callback: Optional[Callable] = None, log: Optional[Callable] = None, max_retries: int = 3) -> None:
@@ -218,24 +385,37 @@ def setup_database(
         _log(f"[5/{total_steps}] Skipping GWAS parsing — ClinVar data is still available.")
         _log("       You can retry later with: allelio update")
 
-    # Download and parse gnomAD population frequencies (optional)
-    # The file is a pre-processed gzipped TSV from GitHub Releases, built with
-    # scripts/build_gnomad_freq.py — the parser reads .gz files directly.
+    # Download and parse gnomAD population frequencies (optional).
+    # The file is a compact gzipped TSV of consumer-array rsIDs, built with
+    # scripts/build_gnomad_freq.py. Its location, version, and checksum are
+    # resolved from a JSON manifest so a data refresh needs no code change.
     gnomad_count = 0
     gnomad_downloaded = False
+    gnomad_manifest = {}
     if include_gnomad:
         gnomad_path = data_dir / "gnomad_freq.tsv.gz"
+        gnomad_manifest = fetch_gnomad_manifest(log=log)
 
         if gnomad_path.exists() and gnomad_path.stat().st_size > 1_000_000:
             gnomad_mb = gnomad_path.stat().st_size / (1024 * 1024)
             _log(f"[6/{total_steps}] gnomAD already downloaded ({gnomad_mb:.0f} MB) — skipping download.")
             gnomad_downloaded = True
         else:
-            _log(f"[6/{total_steps}] Downloading gnomAD population frequencies (~500 MB–1.5 GB)...")
+            gnomad_ver = gnomad_manifest.get("version", "")
+            _log(
+                f"[6/{total_steps}] Downloading gnomAD {gnomad_ver} population "
+                "frequencies (compact array-site extract, a few MB)..."
+            )
             try:
-                download_file(GNOMAD_URL, str(gnomad_path), progress_callback, log=log)
-                gnomad_downloaded = True
-                _log(f"[6/{total_steps}] gnomAD download complete.")
+                gnomad_downloaded = download_gnomad_from_manifest(
+                    gnomad_manifest, str(gnomad_path), progress_callback, log=log
+                )
+                if gnomad_downloaded:
+                    _log(f"[6/{total_steps}] gnomAD download complete.")
+                else:
+                    _log("       gnomAD download failed from all sources in the manifest.")
+                    _log("       Population frequency data will not be available.")
+                    _log("       You can retry later with: allelio update")
             except Exception as e:
                 _log(f"       gnomAD download failed: {e}")
                 _log("       Population frequency data will not be available.")
@@ -268,8 +448,11 @@ def setup_database(
         db.set_metadata("gwas_version", "latest")
     else:
         db.set_metadata("gwas_version", "unavailable")
+    # Provenance from the manifest, not hardcoded — so the frequency layer is
+    # version-agnostic and a source/version change is a data refresh.
     if include_gnomad and gnomad_downloaded:
-        db.set_metadata("gnomad_version", "v4.1")
+        db.set_metadata("gnomad_source", str(gnomad_manifest.get("source", "gnomAD")))
+        db.set_metadata("gnomad_version", str(gnomad_manifest.get("version", "unknown")))
     elif include_gnomad:
         db.set_metadata("gnomad_version", "unavailable")
 
