@@ -58,6 +58,7 @@ SIGNIFICANCE_RANKS = {
     "protective": 5,
     "conflicting data": 6,
     "conflicting interpretations": 6,
+    "conflicting classifications of pathogenicity": 6,
     "uncertain significance": 7,
     "likely benign": 8,
     "benign": 10,
@@ -132,6 +133,13 @@ def _determine_category(clinvar_entry: Optional[ClinVarEntry], gwas_entries: Lis
     if clinvar_entry:
         sig = (clinvar_entry.clinical_significance or "").lower()
 
+        # "Conflicting classifications of pathogenicity" contains "pathogenic"
+        # but is not a pathogenic call, so keep it out of health conditions. It
+        # has no category of its own, so it falls through to uncategorized, the
+        # same place an uncertain-significance variant already lands.
+        if "conflicting" in sig:
+            return VariantCategory.UNKNOWN.value
+
         # Check for health conditions (pathogenic/likely pathogenic)
         if any(x in sig for x in ["pathogenic", "likely pathogenic"]):
             return VariantCategory.HEALTH_CONDITIONS.value
@@ -179,12 +187,19 @@ def _get_significance_rank(clinical_significance: Optional[str]) -> int:
     for key, rank in SIGNIFICANCE_RANKS.items():
         if sig_lower == key:
             return rank
-    
+
+    # "Conflicting classifications of pathogenicity" is the wording the current
+    # ClinVar dump uses, and it contains the substring "pathogenic", so the
+    # generic substring pass below would rank it as a pathogenic call. It is not
+    # one, so catch it first.
+    if "conflicting" in sig_lower:
+        return SIGNIFICANCE_RANKS["conflicting interpretations"]
+
     # Substring matches
     for key, rank in SIGNIFICANCE_RANKS.items():
         if key in sig_lower:
             return rank
-    
+
     return 999
 
 
