@@ -7,6 +7,8 @@ points survive a round trip against a stubbed client.
 """
 
 import asyncio
+import os
+from unittest import mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,7 +20,7 @@ from allelio.web.app import app
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    return TestClient(app, base_url="http://127.0.0.1")
 
 
 class StubClient:
@@ -261,7 +263,7 @@ def test_export_does_not_leave_the_report_in_the_temp_directory() -> None:
     temp_dir = Path(tempfile.gettempdir())
     before = set(temp_dir.glob("allelio_report_*"))
 
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1")
     response = client.post("/api/export", json={"results": [{"rsid": "rs1"}]})
 
     assert response.status_code == 200
@@ -280,7 +282,7 @@ def test_upload_cannot_choose_where_it_lands() -> None:
     victim = victim_dir / "victim.txt"
     victim.write_text("do not touch")
 
-    client = TestClient(app)
+    client = TestClient(app, base_url="http://127.0.0.1")
     client.post(
         "/api/analyze",
         files={
@@ -391,3 +393,272 @@ def test_a_fallback_explanation_still_gets_its_warning() -> None:
     )
     assert wrapped.count(warning) == 1
     assert fallback.count(warning) == 1
+
+
+@pytest.fixture
+def saved_path(tmp_path, monkeypatch):
+    """Point the saved-analysis file at a temp directory, not the real one."""
+    path = tmp_path / "allelio" / "last_analysis.json"
+    monkeypatch.setattr("allelio.web.routes.SAVED_ANALYSIS_PATH", str(path))
+    return path
+
+
+def test_saving_is_opt_in(client: TestClient, saved_path) -> None:
+    """Nothing reaches the disk until the user asks for it. An analysis is the
+    user's genome, and a run that writes it by default is a decision made for
+    them."""
+    assert client.get("/api/saved").json() == {"saved": False, "saved_at": None}
+    assert client.get("/api/saved/data").status_code == 404
+
+    # The route that produces an analysis is not the route that saves one. Its
+    # own outcome does not matter here; that it wrote nothing does.
+    client.post("/api/analyze", files={"file": ("g.txt", b"rs1\t1\t1\tAA\n")})
+
+    assert not saved_path.exists()
+    assert client.get("/api/saved").json()["saved"] is False
+
+
+def test_a_saved_analysis_comes_back_and_can_be_forgotten(
+    client: TestClient, saved_path
+) -> None:
+    analysis = {"summary": "s", "results": [{"rsid": "rs429358"}], "total_variants": 1}
+
+    assert client.post("/api/saved", json=analysis).status_code == 200
+    assert client.get("/api/saved").json()["saved"] is True
+    assert client.get("/api/saved/data").json() == analysis
+
+    assert client.delete("/api/saved").status_code == 200
+    assert not saved_path.exists()
+    assert client.get("/api/saved").json()["saved"] is False
+    assert client.get("/api/saved/data").status_code == 404
+
+    # Deleting what is already gone is what the user asked for, not an error.
+    assert client.delete("/api/saved").status_code == 200
+
+
+def test_an_empty_body_is_not_a_saved_analysis(client: TestClient, saved_path) -> None:
+    assert client.post("/api/saved", json={}).status_code == 400
+    assert not saved_path.exists()
+
+
+def test_an_existing_data_directory_is_left_as_it_was(
+    client: TestClient, saved_path
+) -> None:
+    """~/.allelio normally exists already, holding the database. Silently
+    re-permissioning a directory this feature does not own is not its call —
+    but the file it writes there is private either way."""
+    import stat
+
+    saved_path.parent.mkdir(parents=True)
+    os.chmod(saved_path.parent, 0o755)
+
+    client.post("/api/saved", json={"results": [{"rsid": "rs1"}]})
+
+    assert stat.S_IMODE(saved_path.parent.stat().st_mode) == 0o755
+    assert stat.S_IMODE(saved_path.stat().st_mode) == 0o600
+
+
+def test_the_saved_analysis_is_readable_only_by_its_owner(
+    client: TestClient, saved_path
+) -> None:
+    """It holds the user's genotypes. The home directory is not private on a
+    shared machine; the file has to be."""
+    import stat
+
+    client.post("/api/saved", json={"results": [{"rsid": "rs1", "genotype": "AA"}]})
+
+    assert stat.S_IMODE(saved_path.stat().st_mode) == 0o600
+    # Nothing existed under tmp_path, so this save is what created the directory
+    # and the 0700 applies. On a real install `setup` gets there first and
+    # leaves it 0755 — the test above is the one that covers that.
+    assert stat.S_IMODE(saved_path.parent.stat().st_mode) == 0o700
+
+
+def test_a_truncated_save_does_not_wedge_the_page(
+    client: TestClient, saved_path
+) -> None:
+    """A crash mid-write leaves half a file. Restoring should offer nothing,
+    not answer 500 forever."""
+    saved_path.parent.mkdir(parents=True, exist_ok=True)
+    saved_path.write_text('{"results": [{"rsid":')
+
+    assert client.get("/api/saved/data").status_code == 404
+
+
+@pytest.mark.parametrize("contents", ["[1, 2, 3]", '"hello"', "123", "null"])
+def test_json_that_is_not_an_analysis_is_a_404_not_a_500(
+    saved_path, contents: str
+) -> None:
+    """These parse, so the guarded read waves them through and they die in
+    response serialisation instead — a 500 the page has no answer for."""
+    saved_path.parent.mkdir(parents=True, exist_ok=True)
+    saved_path.write_text(contents)
+
+    client = TestClient(app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+    assert client.get("/api/saved/data").status_code == 404
+
+
+def test_delete_does_not_claim_a_file_it_could_not_remove(
+    saved_path, monkeypatch
+) -> None:
+    """The page says "deleted" on any 200. Over a file holding the user's
+    genotypes, that is the one lie this feature cannot afford."""
+    client = TestClient(app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+    client.post("/api/saved", json={"results": [{"rsid": "rs1"}]})
+
+    def denied(path):
+        raise PermissionError(13, "Permission denied", path)
+
+    monkeypatch.setattr("allelio.web.routes.os.unlink", denied)
+
+    assert client.delete("/api/saved").status_code == 500
+    assert saved_path.exists(), "the test itself failed to keep the file"
+
+
+def test_a_failed_save_keeps_the_previous_one(saved_path, monkeypatch) -> None:
+    """The write is a temp file plus a rename for this reason: the user pays
+    half an hour for each analysis, so a bad save must not eat the good one."""
+    client = TestClient(app, base_url="http://127.0.0.1", raise_server_exceptions=False)
+    good = {"summary": "the one that finished", "results": []}
+    assert client.post("/api/saved", json=good).status_code == 200
+
+    # Out of disk part-way through the dump — the case the rename exists for,
+    # and the one where the temp file already has bytes in it.
+    import json as json_module
+
+    real_dump = json_module.dump
+
+    def full_disk(obj, fp):
+        fp.write("{" * 100)
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr("allelio.web.routes.json.dump", full_disk)
+
+    assert client.post("/api/saved", json={"summary": "the one that ran out"}).status_code == 500
+
+    # Put json.dump back and nothing else: monkeypatch.undo() would also drop
+    # the saved_path fixture's patch and send the read at the real home
+    # directory.
+    monkeypatch.setattr("allelio.web.routes.json.dump", real_dump)
+    assert client.get("/api/saved/data").json() == good
+    assert list(saved_path.parent.glob(".last_analysis_*")) == []
+
+
+def test_a_rebound_domain_cannot_read_the_saved_genome(saved_path) -> None:
+    """Binding to 127.0.0.1 is not a boundary. A page on a domain whose DNS
+    re-resolves to 127.0.0.1 is same-origin to the browser, so CORS never
+    applies; the Host header is the only thing that tells the two apart."""
+    client = TestClient(app, base_url="http://attacker.example")
+
+    assert client.get("/api/saved").status_code == 400
+    assert client.get("/api/saved/data").status_code == 400
+    assert client.post("/api/saved", json={"results": []}).status_code == 400
+    assert client.delete("/api/saved").status_code == 400
+
+    # Starlette strips the port before matching, so a port on the URL changes
+    # nothing — which is exactly why no allow-list entry carries one.
+    assert TestClient(app, base_url="http://127.0.0.1:8080").get("/api/saved").status_code == 200
+    assert TestClient(app, base_url="http://localhost").get("/api/saved").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "host,expected",
+    [
+        # A bind address is never a Host header anyone types, and starlette
+        # strips the port by splitting on ":", so no IPv6 literal can match.
+        # None of these belong on the list; localhost is how you reach them.
+        ("0.0.0.0", ["localhost", "127.0.0.1"]),
+        ("::", ["localhost", "127.0.0.1"]),
+        ("::1", ["localhost", "127.0.0.1"]),
+        # inet_aton takes all of these as "every interface", and so does the
+        # bind — comparing against the dotted quad alone would let them past.
+        ("0", ["localhost", "127.0.0.1"]),
+        ("0.0", ["localhost", "127.0.0.1"]),
+        ("0x0", ["localhost", "127.0.0.1"]),
+        # asyncio turns an empty host into a passive getaddrinfo, which binds
+        # every interface as surely as 0.0.0.0 does.
+        ("", ["localhost", "127.0.0.1"]),
+        ("127.0.0.1", ["localhost", "127.0.0.1"]),
+        # A real name the operator can browse to does belong on it — lowercased,
+        # because that is how the browser will send it.
+        ("192.168.1.50", ["localhost", "127.0.0.1", "192.168.1.50"]),
+        ("MyBox.local", ["localhost", "127.0.0.1", "mybox.local"]),
+    ],
+)
+def test_only_hosts_a_browser_can_actually_send_go_on_the_allow_list(host, expected) -> None:
+    from click.testing import CliRunner
+
+    from allelio.cli import allelio
+
+    with mock.patch.dict(os.environ, {}, clear=False):
+        # An empty value has to count as unset: app.py drops empties and falls
+        # back, so leaving it would 400 every request with no warning printed.
+        os.environ["ALLELIO_ALLOWED_HOSTS"] = ""
+        with mock.patch("uvicorn.run") as run:
+            result = CliRunner().invoke(allelio, ["serve", "--host", host, "--port", "9999"])
+        assert run.called
+        assert os.environ["ALLELIO_ALLOWED_HOSTS"].split(",") == expected
+        # Rich wraps to the terminal width, so match on collapsed whitespace.
+        # A host that could not go on the list gets told where to browse
+        # instead; one that did needs no warning it would learn to ignore.
+        printed = " ".join(result.output.split())
+        browsable = host in ("127.0.0.1", "192.168.1.50", "MyBox.local")
+        assert ("browse to localhost" in printed) != browsable
+        # And the URL it tells them to open is one that will actually answer.
+        assert (f"http://{host}:9999" in printed) == browsable
+
+
+def test_a_users_own_host_list_is_left_alone() -> None:
+    from click.testing import CliRunner
+
+    from allelio.cli import allelio
+
+    with mock.patch.dict(os.environ, {"ALLELIO_ALLOWED_HOSTS": "Allelio.Local"}, clear=False):
+        with mock.patch("uvicorn.run"):
+            CliRunner().invoke(allelio, ["serve", "--host", "0.0.0.0", "--port", "9999"])
+        assert os.environ["ALLELIO_ALLOWED_HOSTS"] == "Allelio.Local"
+
+    import importlib
+
+    import allelio.web.app as app_module
+
+    with mock.patch.dict(os.environ, {"ALLELIO_ALLOWED_HOSTS": "Allelio.Local"}, clear=False):
+        try:
+            hosts = importlib.reload(app_module).ALLOWED_HOSTS
+        finally:
+            os.environ.pop("ALLELIO_ALLOWED_HOSTS", None)
+            importlib.reload(app_module)
+
+    # Lowercased, because a browser sends the host lowercased and starlette
+    # compares it exactly. Loopback stays on: naming a LAN address should not
+    # lock the operator out of the machine the server is running on.
+    assert hosts == ["localhost", "127.0.0.1", "allelio.local"]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        # A "*" anywhere past the first character.
+        "192.168.*.5",
+        # And a leading one that is not the "*." of a subdomain wildcard: a
+        # forgotten dot, which starlette rejects on its own second assert.
+        "*example.com",
+    ],
+)
+def test_a_typo_in_the_host_list_fails_at_startup_not_mid_run(monkeypatch, bad) -> None:
+    """Starlette only checks its patterns when the stack is first built, which is
+    on the first request — long after the URL has been printed and opened — and
+    it checks with an assert, which -O removes. Hence our own check at import."""
+    import importlib
+
+    import allelio.web.app as app_module
+
+    monkeypatch.setenv("ALLELIO_ALLOWED_HOSTS", bad)
+    try:
+        with pytest.raises(ValueError, match="wildcard host"):
+            importlib.reload(app_module)
+    finally:
+        # Put the module back whether or not the check fired: a failure here
+        # would otherwise hand every later test an app built from the bad list.
+        monkeypatch.delenv("ALLELIO_ALLOWED_HOSTS")
+        importlib.reload(app_module)

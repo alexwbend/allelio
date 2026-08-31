@@ -738,6 +738,59 @@
             transform: none;
         }
 
+        .export-button.secondary {
+            background-color: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            margin-left: 0.75rem;
+        }
+
+        .export-button.secondary:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        /* Saved analysis banner */
+        .saved-banner {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding: 1rem 1.25rem;
+            border-radius: var(--border-radius);
+            border-left: 3px solid var(--primary);
+            background-color: #CCFBF1;
+            color: #134E4A;
+        }
+
+        body.dark-mode .saved-banner {
+            background-color: #134E4A;
+            color: #CCFBF1;
+        }
+
+        .saved-banner-text {
+            flex: 1;
+            min-width: 12rem;
+        }
+
+        .saved-banner button {
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .saved-banner button.ghost {
+            background-color: transparent;
+            color: inherit;
+            border: 1px solid currentColor;
+        }
+
         /* Alert/Toast */
         .alert {
             padding: 1rem 1.5rem;
@@ -878,6 +931,11 @@
 
         <!-- Upload Section -->
         <div id="uploadSection" class="section">
+            <div class="saved-banner hidden" id="savedBanner">
+                <div class="saved-banner-text" id="savedBannerText"></div>
+                <button id="restoreSavedButton">Open it</button>
+                <button class="ghost" id="deleteSavedButton">Delete</button>
+            </div>
             <div class="card">
                 <div class="upload-zone" id="uploadZone">
                     <div class="upload-icon">📤</div>
@@ -922,6 +980,7 @@
             <!-- Export -->
             <div class="export-container">
                 <button class="export-button" id="exportButton">📥 Export Report</button>
+                <button class="export-button secondary" id="saveButton">💾 Save results on this computer</button>
             </div>
         </div>
     </div>
@@ -936,6 +995,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             setupEventListeners();
             fetchStatus();
+            fetchSavedInfo();
         });
 
         // Setup Event Listeners
@@ -976,6 +1036,11 @@
 
             // Export Button
             document.getElementById('exportButton').addEventListener('click', exportReport);
+
+            // Saving results on this machine — opt-in, and reversible
+            document.getElementById('saveButton').addEventListener('click', saveResults);
+            document.getElementById('restoreSavedButton').addEventListener('click', restoreSaved);
+            document.getElementById('deleteSavedButton').addEventListener('click', deleteSaved);
         }
 
         // Dark Mode Toggle
@@ -1121,6 +1186,12 @@
 
         function displayResults() {
             if (!analysisResults) return;
+
+            // The tab bar below is rebuilt with All marked active, but the
+            // filter renderResultCards applies is this module-level variable.
+            // Leave it on the last tab clicked and a fresh set of results comes
+            // up reading "All" while showing only pharmacogenomics.
+            currentCategory = 'all';
 
             // Executive Summary
             const executiveSummary = document.getElementById('executiveSummary');
@@ -1281,6 +1352,96 @@
                 showAlert('Error exporting report: ' + error.message, 'error');
                 document.getElementById('exportButton').disabled = false;
             }
+        }
+
+        // Saved analysis
+        // A run is half an hour and the results only live in this tab. Saving
+        // writes them to a file on this computer, and only when asked.
+        async function fetchSavedInfo() {
+            const banner = document.getElementById('savedBanner');
+            try {
+                const response = await fetch('/api/saved');
+                if (!response.ok) return;
+                const info = await response.json();
+                if (!info.saved) {
+                    banner.classList.add('hidden');
+                    return;
+                }
+                document.getElementById('savedBannerText').textContent =
+                    `You saved an analysis on this computer (${info.saved_at.replace('T', ' ')}).`;
+                banner.classList.remove('hidden');
+            } catch (error) {
+                // No banner is the right failure here — the upload path works
+                // without it.
+            }
+        }
+
+        async function saveResults() {
+            if (!analysisResults) return;
+
+            const button = document.getElementById('saveButton');
+            button.disabled = true;
+            try {
+                const response = await fetch('/api/saved', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(analysisResults)
+                });
+                if (!response.ok) throw new Error('Save failed');
+                showAlert('Saved on this computer. It will be offered next time you open Allelio.', 'success');
+                fetchSavedInfo();
+            } catch (error) {
+                console.error('Error saving results:', error);
+                showAlert('Error saving results: ' + error.message, 'error');
+            }
+            button.disabled = false;
+        }
+
+        async function restoreSaved() {
+            const button = document.getElementById('restoreSavedButton');
+            button.disabled = true;
+            try {
+                const response = await fetch('/api/saved/data');
+                // The banner is offered on the file existing, not on it
+                // parsing — reading 15 MB to draw a banner is not worth it. A
+                // save cut short by a crash lands here. Say so and leave Delete
+                // reachable; the file really is still there, so hiding the
+                // banner would only mean claiming otherwise.
+                if (response.status === 404) {
+                    document.getElementById('savedBannerText').textContent =
+                        'The saved analysis cannot be opened — it was removed, or cut short by a crash. Delete it and run your file again.';
+                    button.disabled = true;
+                    return;
+                }
+                if (!response.ok) throw new Error('Could not open the saved analysis');
+                analysisResults = await response.json();
+                displayResults();
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error opening saved analysis:', error);
+                showAlert('Error opening saved analysis: ' + error.message, 'error');
+            }
+            button.disabled = false;
+        }
+
+        async function deleteSaved() {
+            // Irreversible, sits next to "Open it", and re-earning it costs
+            // half an hour.
+            if (!confirm('Delete the saved analysis? Running the file again takes about half an hour.')) return;
+
+            const button = document.getElementById('deleteSavedButton');
+            button.disabled = true;
+            try {
+                const response = await fetch('/api/saved', { method: 'DELETE' });
+                if (!response.ok) throw new Error('the file is still on the disk');
+                document.getElementById('savedBanner').classList.add('hidden');
+                showAlert('Saved analysis deleted.', 'success');
+            } catch (error) {
+                console.error('Error deleting saved analysis:', error);
+                showAlert('Could not delete the saved analysis — ' + error.message, 'error');
+            }
+            button.disabled = false;
         }
 
         // Show Alert

@@ -1,8 +1,10 @@
 """API routes for Allelio web interface."""
 
 import asyncio
+import json
 import os
 import tempfile
+from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -302,16 +304,141 @@ async def export_report(analysis_data: Dict[str, Any]) -> FileResponse:
 
 
 def _unlink(path: str) -> None:
-    """Remove the exported report once it has been sent."""
+    """Delete a file we are done with, where failing to is not worth reporting."""
     try:
         os.unlink(path)
     except OSError:
         pass
 
 
+# A whole-genome run is half an hour, and the results only live in the tab that
+# ran it — a reload throws them away. Saving is opt-in and stays on this
+# machine: the file is the user's genome and never leaves it.
+SAVED_ANALYSIS_PATH = os.path.expanduser("~/.allelio/last_analysis.json")
+
+
+# No lock around any of this, and none needed: every writer gets its own mkstemp
+# temp file, os.replace is atomic, and the delete treats "already gone" as
+# success. Concurrent saves and deletes can only order differently, never tear.
+def _write_saved_analysis(analysis_data: Dict[str, Any]) -> None:
+    """Write the saved analysis atomically, readable only by its owner."""
+    directory = os.path.dirname(SAVED_ANALYSIS_PATH)
+    # 0700 only bites when this creates the directory; ~/.allelio usually
+    # already exists for the database, and silently tightening a directory
+    # this module does not own is not this feature's call to make.
+    os.makedirs(directory, mode=0o700, exist_ok=True)
+
+    # Same directory so os.replace stays on one filesystem, and mkstemp so a
+    # crash mid-write leaves the previous save intact rather than a half file.
+    fd, temp_path = tempfile.mkstemp(prefix=".last_analysis_", dir=directory)
+    try:
+        # os.fdopen owns the descriptor once it succeeds; if it raises, nothing
+        # else is going to close it.
+        try:
+            handle = os.fdopen(fd, "w", encoding="utf-8")
+        except BaseException:
+            os.close(fd)
+            raise
+        with handle as f:
+            json.dump(analysis_data, f)
+            # os.replace orders this rename against other renames, not against
+            # the data blocks. Without the fsync a power cut can land the
+            # rename and lose the contents — the truncated file this whole
+            # dance exists to prevent.
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, SAVED_ANALYSIS_PATH)
+    except BaseException:
+        # BaseException on purpose: a KeyboardInterrupt here would otherwise
+        # strand 15 MB of genotypes under a dotfile name nothing cleans up.
+        _unlink(temp_path)
+        raise
+
+
+def _read_saved_analysis() -> Optional[Dict[str, Any]]:
+    """Return the saved analysis, or None if there isn't a usable one."""
+    try:
+        with open(SAVED_ANALYSIS_PATH, encoding="utf-8") as f:
+            analysis_data = json.load(f)
+    except (OSError, ValueError):
+        # Missing, unreadable, or truncated by a crash mid-write. Any of those
+        # means "nothing to restore" — none of them should wedge the page.
+        return None
+    # A file holding a valid JSON list, string or number parses fine and then
+    # fails serialisation on the way out as a 500. It is not a saved analysis.
+    return analysis_data if isinstance(analysis_data, dict) else None
+
+
+@router.get("/api/saved")
+async def get_saved_analysis_info() -> Dict[str, Any]:
+    """Whether there is a saved analysis worth offering to restore."""
+    try:
+        saved_at = os.path.getmtime(SAVED_ANALYSIS_PATH)
+    except OSError:
+        return {"saved": False, "saved_at": None}
+    # Reading it to answer costs a parse of 15 MB on every page load, so the
+    # banner is offered on the strength of the file existing. /api/saved/data
+    # is the one that can still say no; the page handles that.
+    return {
+        "saved": True,
+        "saved_at": datetime.fromtimestamp(saved_at).isoformat(timespec="seconds"),
+    }
+
+
+@router.get("/api/saved/data")
+async def get_saved_analysis() -> Dict[str, Any]:
+    """The saved analysis itself, for restoring the results view."""
+    analysis_data = await asyncio.to_thread(_read_saved_analysis)
+    if analysis_data is None:
+        raise HTTPException(status_code=404, detail="No saved analysis")
+    return analysis_data
+
+
+@router.post("/api/saved")
+async def save_analysis(analysis_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Save the current analysis to this machine, at the user's request."""
+    if not analysis_data:
+        raise HTTPException(status_code=400, detail="No analysis data provided")
+
+    try:
+        # A whole genome is 15 MB of JSON and encoding it takes a quarter of a
+        # second, which on the event loop is a quarter of a second nothing else
+        # is served. FastAPI has already spent its own on decoding the body;
+        # this is the half we get to move off.
+        await asyncio.to_thread(_write_saved_analysis, analysis_data)
+    except (OSError, TypeError, ValueError):
+        # The path is under the user's home directory — saying which home is
+        # not the browser's business.
+        raise HTTPException(status_code=500, detail="Could not save the analysis")
+
+    return {"saved": True}
+
+
+def _delete_saved_analysis() -> None:
+    """Remove the saved analysis. Absent already is success, not an error."""
+    try:
+        os.unlink(SAVED_ANALYSIS_PATH)
+    except FileNotFoundError:
+        pass
+
+
+@router.delete("/api/saved")
+async def delete_saved_analysis() -> Dict[str, Any]:
+    """Forget the saved analysis, and only say so if it is really gone."""
+    try:
+        await asyncio.to_thread(_delete_saved_analysis)
+    except OSError:
+        # The page says "deleted" on any 200. Reporting success over a genome
+        # file still sitting on the disk is the one lie this feature cannot
+        # afford.
+        raise HTTPException(
+            status_code=500, detail="Could not delete the saved analysis"
+        )
+    return {"saved": False}
+
+
 def _get_timestamp() -> str:
     """Get current timestamp in ISO format."""
-    from datetime import datetime
     return datetime.now().isoformat().replace(":", "-").split(".")[0]
 
 
