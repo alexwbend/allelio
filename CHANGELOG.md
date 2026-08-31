@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.1] — 2026-02-20
+
+**Population frequency integration.** Allelio now uses gnomAD allele frequency data to distinguish rare pathogenic variants from common ones. A variant flagged "pathogenic" that 40% of the population carries is treated very differently from one carried by 0.01%.
+
+### Added
+
+- **gnomAD population frequency integration** — allele frequencies from the Genome Aggregation Database (gnomAD v4.1) are downloaded during setup and stored locally for offline use
+- **Frequency-adjusted significance ranking** — variant significance ranks are now adjusted based on population frequency: common variants (>5% AF) are downgraded significantly, uncommon variants (0.1–1%) receive a small adjustment, and rare variants (<0.1%) retain their original ranking
+- **Population frequency display in HTML reports** — variant cards show allele frequency with color-coded labels (Common, Moderate, Uncommon, Rare) plus highest population frequency when different from global
+- **Population frequency in AI prompts** — the local LLM now receives gnomAD frequency context alongside clinical data
+- **`gnomad` table in SQLite database** — stores rsID, global allele frequency, population-max frequency, allele counts, and population-specific frequencies (AFR, EAS, FIN, NFE, SAS)
+- **`GnomADEntry` dataclass** — programmatic access to frequency data on each `VariantResult`
+- **`--no-gnomad` flag** for `allelio setup` — skip gnomAD download to save bandwidth
+- **Backward compatibility** — existing databases without the gnomad table continue to work
+- **29 new tests** covering parser, database, frequency adjustment, analysis integration, and AI prompts
+
+### Changed
+
+- `VariantResult` now includes an optional `gnomad_entry` field
+- `AllelioDB.lookup_rsid()` and `lookup_rsids_batch()` now return gnomAD data alongside ClinVar and GWAS
+- `AllelioDB.get_stats()` now includes `gnomad_entries` count
+- `setup_database()` accepts `include_gnomad` parameter (default: True)
+- AI prompt template now includes a "Population Frequency (gnomAD)" section
+- Report footer lists gnomAD as a data source
+
+---
+
 ## [0.2.0] — 2026-02-19
 
 **Smarter ranking & redesigned reports.** Allelio now uses ClinVar's review star ratings (0–4 stars) to weight variant significance scores, and HTML reports have been reorganized with section reordering and tab navigation.

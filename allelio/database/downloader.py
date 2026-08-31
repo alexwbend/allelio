@@ -14,9 +14,16 @@ except ImportError:
 from .store import AllelioDB
 from .clinvar import parse_clinvar
 from .gwas import parse_gwas
+from .gnomad import parse_gnomad
 
 
 CLINVAR_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz"
+
+# gnomAD allele frequency data — pre-processed compact TSV hosted on GitHub Releases.
+# This file is built from gnomAD VCFs using scripts/build_gnomad_freq.py and contains
+# only rsID + allele frequencies (~500 MB–1.5 GB gzipped).
+# To generate and host this file, see scripts/build_gnomad_freq.py for instructions.
+GNOMAD_URL = "https://github.com/alexwbend/allelio/releases/download/v0.2.1-data/gnomad_v4.1_freq.tsv.gz"
 
 # GWAS URL — verified from https://www.ebi.ac.uk/gwas/docs/file-downloads (Feb 2026)
 # This returns a zip file containing the associations TSV
@@ -96,7 +103,8 @@ def setup_database(
     db: AllelioDB,
     data_dir: Optional[str] = None,
     progress_callback: Optional[Callable] = None,
-    log: Optional[Callable] = None
+    log: Optional[Callable] = None,
+    include_gnomad: bool = True,
 ) -> None:
     """Orchestrate full download, parse, and index of reference databases.
 
@@ -105,6 +113,7 @@ def setup_database(
         data_dir: Directory to store downloaded files. Defaults to ~/.allelio/data/
         progress_callback: Optional callback function for progress updates
         log: Optional function to print status messages (e.g. print or console.print)
+        include_gnomad: If True, download gnomAD population frequency data (~1-2 GB)
 
     Raises:
         ImportError: If httpx is not installed
@@ -120,22 +129,24 @@ def setup_database(
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
+    total_steps = 8 if include_gnomad else 6
+
     # Initialize database tables
-    _log("[1/6] Creating database tables...")
+    _log(f"[1/{total_steps}] Creating database tables...")
     db.initialize()
 
     # Download ClinVar (skip if already downloaded and >100MB)
     clinvar_path = data_dir / "variant_summary.txt.gz"
     if clinvar_path.exists() and clinvar_path.stat().st_size > 100_000_000:
         clinvar_mb = clinvar_path.stat().st_size / (1024 * 1024)
-        _log(f"[2/6] ClinVar already downloaded ({clinvar_mb:.0f} MB) — skipping download.")
+        _log(f"[2/{total_steps}] ClinVar already downloaded ({clinvar_mb:.0f} MB) — skipping download.")
     else:
-        _log("[2/6] Downloading ClinVar from NIH (~400 MB)... this may take a few minutes")
+        _log(f"[2/{total_steps}] Downloading ClinVar from NIH (~400 MB)... this may take a few minutes")
         download_file(CLINVAR_URL, str(clinvar_path), progress_callback, log=log)
-        _log("[2/6] ClinVar download complete.")
+        _log(f"[2/{total_steps}] ClinVar download complete.")
 
     # Parse ClinVar
-    _log("[3/6] Parsing ClinVar variants... (this takes 1-2 minutes)")
+    _log(f"[3/{total_steps}] Parsing ClinVar variants... (this takes 1-2 minutes)")
     clinvar_count = 0
     clinvar_records = []
     for record in parse_clinvar(str(clinvar_path)):
@@ -149,7 +160,7 @@ def setup_database(
 
     if clinvar_records:
         db.insert_clinvar_batch(clinvar_records)
-    _log(f"[3/6] ClinVar complete: {clinvar_count:,} records loaded.")
+    _log(f"[3/{total_steps}] ClinVar complete: {clinvar_count:,} records loaded.")
 
     # Download GWAS (skip if already downloaded and >10MB, otherwise try multiple URLs)
     gwas_path = data_dir / "gwas_associations.tsv"
@@ -157,10 +168,10 @@ def setup_database(
     gwas_downloaded = False
     if gwas_path.exists() and gwas_path.stat().st_size > 10_000_000:
         gwas_mb = gwas_path.stat().st_size / (1024 * 1024)
-        _log(f"[4/6] GWAS Catalog already downloaded ({gwas_mb:.0f} MB) — skipping download.")
+        _log(f"[4/{total_steps}] GWAS Catalog already downloaded ({gwas_mb:.0f} MB) — skipping download.")
         gwas_downloaded = True
     else:
-        _log("[4/6] Downloading GWAS Catalog from EBI... this may take a few minutes")
+        _log(f"[4/{total_steps}] Downloading GWAS Catalog from EBI... this may take a few minutes")
         try:
             download_file(GWAS_URL, str(gwas_zip_path), progress_callback, log=log)
             # The download is a zip file — extract the TSV from it
@@ -180,7 +191,7 @@ def setup_database(
             # Clean up zip
             gwas_zip_path.unlink(missing_ok=True)
             gwas_downloaded = True
-            _log("[4/6] GWAS Catalog download complete.")
+            _log(f"[4/{total_steps}] GWAS Catalog download complete.")
         except Exception as e:
             _log(f"       GWAS download failed: {e}")
             gwas_zip_path.unlink(missing_ok=True)
@@ -188,7 +199,7 @@ def setup_database(
     # Parse GWAS (if downloaded)
     gwas_count = 0
     if gwas_downloaded:
-        _log("[5/6] Parsing GWAS associations...")
+        _log(f"[5/{total_steps}] Parsing GWAS associations...")
         gwas_records = []
         for record in parse_gwas(str(gwas_path)):
             gwas_records.append(record)
@@ -201,23 +212,70 @@ def setup_database(
 
         if gwas_records:
             db.insert_gwas_batch(gwas_records)
-        _log(f"[5/6] GWAS complete: {gwas_count:,} records loaded.")
+        _log(f"[5/{total_steps}] GWAS complete: {gwas_count:,} records loaded.")
     else:
-        _log("[4/6] ⚠ GWAS Catalog download failed from all sources.")
-        _log("[5/6] Skipping GWAS parsing — ClinVar data is still available.")
+        _log(f"[4/{total_steps}] GWAS Catalog download failed from all sources.")
+        _log(f"[5/{total_steps}] Skipping GWAS parsing — ClinVar data is still available.")
         _log("       You can retry later with: allelio update")
 
+    # Download and parse gnomAD population frequencies (optional)
+    # The file is a pre-processed gzipped TSV from GitHub Releases, built with
+    # scripts/build_gnomad_freq.py — the parser reads .gz files directly.
+    gnomad_count = 0
+    gnomad_downloaded = False
+    if include_gnomad:
+        gnomad_path = data_dir / "gnomad_freq.tsv.gz"
+
+        if gnomad_path.exists() and gnomad_path.stat().st_size > 1_000_000:
+            gnomad_mb = gnomad_path.stat().st_size / (1024 * 1024)
+            _log(f"[6/{total_steps}] gnomAD already downloaded ({gnomad_mb:.0f} MB) — skipping download.")
+            gnomad_downloaded = True
+        else:
+            _log(f"[6/{total_steps}] Downloading gnomAD population frequencies (~500 MB–1.5 GB)...")
+            try:
+                download_file(GNOMAD_URL, str(gnomad_path), progress_callback, log=log)
+                gnomad_downloaded = True
+                _log(f"[6/{total_steps}] gnomAD download complete.")
+            except Exception as e:
+                _log(f"       gnomAD download failed: {e}")
+                _log("       Population frequency data will not be available.")
+                _log("       You can retry later with: allelio update")
+                gnomad_path.unlink(missing_ok=True)
+
+        if gnomad_downloaded:
+            _log(f"[7/{total_steps}] Parsing gnomAD frequencies...")
+            gnomad_records = []
+            for record in parse_gnomad(str(gnomad_path)):
+                gnomad_records.append(record)
+                gnomad_count += 1
+                if len(gnomad_records) >= BATCH_SIZE:
+                    db.insert_gnomad_batch(gnomad_records)
+                    if gnomad_count % 500000 == 0:
+                        _log(f"       ... {gnomad_count:,} gnomAD records processed")
+                    gnomad_records = []
+
+            if gnomad_records:
+                db.insert_gnomad_batch(gnomad_records)
+            _log(f"[7/{total_steps}] gnomAD complete: {gnomad_count:,} variants with frequency data.")
+        else:
+            _log(f"[7/{total_steps}] Skipping gnomAD parsing — frequency data not available.")
+
     # Set metadata
-    _log("[6/6] Finalizing database...")
+    _log(f"[{total_steps}/{total_steps}] Finalizing database...")
     db.set_metadata("last_update", datetime.now().isoformat())
     db.set_metadata("clinvar_version", "latest")
     if gwas_downloaded:
         db.set_metadata("gwas_version", "latest")
     else:
         db.set_metadata("gwas_version", "unavailable")
+    if include_gnomad and gnomad_downloaded:
+        db.set_metadata("gnomad_version", "v4.1")
+    elif include_gnomad:
+        db.set_metadata("gnomad_version", "unavailable")
 
+    parts = [f"{clinvar_count:,} ClinVar"]
     if gwas_count > 0:
-        _log(f"Done! Database ready with {clinvar_count:,} ClinVar + {gwas_count:,} GWAS records.")
-    else:
-        _log(f"Done! Database ready with {clinvar_count:,} ClinVar records.")
-        _log("       GWAS data can be added later with: allelio update")
+        parts.append(f"{gwas_count:,} GWAS")
+    if gnomad_count > 0:
+        parts.append(f"{gnomad_count:,} gnomAD")
+    _log(f"Done! Database ready with {' + '.join(parts)} records.")

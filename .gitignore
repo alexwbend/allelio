@@ -43,6 +43,14 @@ htmlcov/
 *23andme*.txt
 *ancestry*.csv
 
+# Large local reference-data build artifacts (never commit reference data)
+*.tsv.gz
+*.bgz
+gnomad_*.tsv*
+
+# Generated analysis reports (root)
+allelio_report*.html
+
 # Environment variables
 .env
 .env.local
@@ -56,6 +64,7 @@ docs/*.html
 docs/*.txt
 ROADMAP.md
 LANDING_PAGE.md
+REVIVAL_PLAN.md
 paper_outline.md
 paper.md
 paper.bib

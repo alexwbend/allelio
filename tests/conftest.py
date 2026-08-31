@@ -287,5 +287,78 @@ def sample_db(tmp_dir) -> AllelioDB:
     ]
     
     db.insert_gwas_batch(gwas_records)
-    
+
     return db
+
+
+@pytest.fixture
+def sample_db_with_gnomad(sample_db) -> AllelioDB:
+    """Extend sample_db with gnomAD population frequency data.
+
+    Adds gnomAD frequency records for a subset of the test variants
+    to enable frequency-adjusted ranking tests.
+
+    Args:
+        sample_db: Base AllelioDB fixture with ClinVar and GWAS data
+
+    Returns:
+        AllelioDB instance with ClinVar, GWAS, and gnomAD data
+    """
+    gnomad_records = [
+        {
+            "rsid": "rs429358",
+            "allele_frequency": 0.0523,
+            "af_popmax": 0.0789,
+            "ac": 98765,
+            "an": 1890000,
+            "nhomalt": 12345,
+            "af_afr": 0.03,
+            "af_eas": 0.01,
+            "af_fin": 0.06,
+            "af_nfe": 0.07,
+            "af_sas": 0.04,
+        },
+        {
+            "rsid": "rs7412",
+            "allele_frequency": 0.0742,
+            "af_popmax": 0.1200,
+            "ac": 140000,
+            "an": 1890000,
+            "nhomalt": 18900,
+            "af_afr": 0.05,
+            "af_eas": 0.02,
+            "af_fin": 0.08,
+            "af_nfe": 0.09,
+            "af_sas": 0.06,
+        },
+        {
+            "rsid": "rs4988235",
+            "allele_frequency": 0.35,
+            "af_popmax": 0.85,
+            "ac": 662250,
+            "an": 1890000,
+            "nhomalt": 110000,
+            "af_afr": 0.05,
+            "af_eas": 0.01,
+            "af_fin": 0.80,
+            "af_nfe": 0.75,
+            "af_sas": 0.10,
+        },
+        {
+            "rsid": "rs762551",
+            "allele_frequency": 0.0001,
+            "af_popmax": 0.0003,
+            "ac": 189,
+            "an": 1890000,
+            "nhomalt": 0,
+            "af_afr": 0.0001,
+            "af_eas": 0.0003,
+            "af_fin": None,
+            "af_nfe": 0.0001,
+            "af_sas": None,
+        },
+    ]
+
+    sample_db.insert_gnomad_batch(gnomad_records)
+
+    return sample_db

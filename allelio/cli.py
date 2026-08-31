@@ -33,20 +33,31 @@ def allelio():
 
 
 @allelio.command()
-def setup():
-    """Download and index ClinVar and GWAS databases.
-    
+@click.option(
+    "--no-gnomad",
+    is_flag=True,
+    default=False,
+    help="Skip gnomAD population frequency download (saves ~1-2 GB)",
+)
+def setup(no_gnomad: bool):
+    """Download and index ClinVar, GWAS, and gnomAD databases.
+
     This command initializes the Allelio database by downloading
-    variant annotations from ClinVar and GWAS catalogs.
+    variant annotations from ClinVar, GWAS, and gnomAD catalogs.
+    Use --no-gnomad to skip population frequency data.
     """
     console.print("\n[bold cyan]Allelio Database Setup[/bold cyan]\n")
-    
+
     try:
         db_path = os.path.expanduser("~/.allelio/data/allelio.db")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         db = AllelioDB(db_path)
 
-        setup_database(db, log=lambda msg: console.print(f"  {msg}"))
+        setup_database(
+            db,
+            log=lambda msg: console.print(f"  {msg}"),
+            include_gnomad=not no_gnomad,
+        )
 
         console.print("\n[bold green]✓[/bold green] Database initialized successfully\n")
     except Exception as e:
@@ -503,6 +514,11 @@ def info():
                 stats = db.get_stats()
                 info_table.add_row("Variants Indexed", f"{stats.get('variant_count', 'Unknown'):,}")
                 info_table.add_row("Genes Covered", f"{stats.get('gene_count', 'Unknown'):,}")
+                gnomad_count = stats.get('gnomad_entries', 0)
+                if gnomad_count > 0:
+                    info_table.add_row("gnomAD Frequencies", f"{gnomad_count:,}")
+                else:
+                    info_table.add_row("gnomAD Frequencies", "[dim]Not available[/dim]")
             except Exception:
                 pass
         else:

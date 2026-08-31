@@ -108,6 +108,17 @@ class GWASEntry:
 
 
 @dataclass
+class GnomADEntry:
+    """gnomAD population frequency entry."""
+    rsid: str
+    allele_frequency: Optional[float] = None
+    af_popmax: Optional[float] = None
+    ac: Optional[int] = None
+    an: Optional[int] = None
+    nhomalt: Optional[int] = None
+
+
+@dataclass
 class VariantResult:
     """Result of variant analysis."""
     rsid: str
@@ -116,6 +127,7 @@ class VariantResult:
     genotype: Optional[str] = None
     clinvar_entries: List[ClinVarEntry] = field(default_factory=list)
     gwas_entries: List[GWASEntry] = field(default_factory=list)
+    gnomad_entry: Optional[GnomADEntry] = None
     category: str = VariantCategory.UNKNOWN.value
     significance_rank: float = 999
 
@@ -203,6 +215,55 @@ def _get_significance_rank(clinical_significance: Optional[str]) -> int:
     return 999
 
 
+def _calculate_frequency_adjustment(
+    base_rank: float,
+    gnomad_entry: Optional[GnomADEntry],
+    genotype: Optional[str] = None,
+) -> float:
+    """Adjust significance rank based on gnomAD allele frequency.
+
+    Common variants are less likely to be truly pathogenic, so we increase
+    their rank (making them less significant). Rare variants keep their
+    original rank.
+
+    The adjustment is bounded so it never crosses major tier boundaries
+    completely — a pathogenic variant with high AF will be downgraded but
+    still noted as unusual.
+
+    Args:
+        base_rank: The original significance rank (lower = more significant)
+        gnomad_entry: gnomAD frequency data, or None
+        genotype: User's genotype string (e.g., "AA", "CT")
+
+    Returns:
+        Adjusted rank as float (higher = less significant)
+    """
+    if gnomad_entry is None or gnomad_entry.allele_frequency is None:
+        return base_rank
+
+    af = gnomad_entry.allele_frequency
+
+    # Determine adjustment based on frequency tiers
+    if af > 0.05:
+        # Common variant (>5%) — large downgrade
+        adjustment = 3.0
+    elif af > 0.01:
+        # Moderately common (1-5%) — moderate downgrade
+        adjustment = 1.5
+    elif af > 0.001:
+        # Uncommon (0.1-1%) — small downgrade
+        adjustment = 0.5
+    else:
+        # Rare (<0.1%) — no adjustment needed
+        return base_rank
+
+    # Cap adjusted rank so it doesn't exceed 9.9
+    # (keeps it below the "benign" tier boundary at 10)
+    adjusted = min(base_rank + adjustment, 9.9)
+
+    return adjusted
+
+
 def analyze_variants(
     variants: List[Any],
     db: AllelioDB,
@@ -284,16 +345,32 @@ def analyze_variants(
             # For GWAS-only variants, use a default rank
             sig_rank = float(SIGNIFICANCE_RANKS.get("association", 4))
         
-        # Skip benign variants unless requested
-        if not include_benign and sig_rank >= 8:
-            continue
-        
         # Get variant metadata
         original_variant = rsid_to_variant.get(rsid)
         chromosome = getattr(original_variant, 'chromosome', None)
         position = getattr(original_variant, 'position', None)
         genotype = getattr(original_variant, 'genotype', None)
-        
+
+        # Create gnomAD entry if data available
+        gnomad_entry = None
+        if data.get("gnomad"):
+            gn = data["gnomad"]
+            gnomad_entry = GnomADEntry(
+                rsid=gn.get("rsid", rsid),
+                allele_frequency=gn.get("allele_frequency"),
+                af_popmax=gn.get("af_popmax"),
+                ac=gn.get("ac"),
+                an=gn.get("an"),
+                nhomalt=gn.get("nhomalt"),
+            )
+
+        # Adjust significance rank based on population frequency
+        adjusted_rank = _calculate_frequency_adjustment(sig_rank, gnomad_entry, genotype)
+
+        # Skip benign variants unless requested
+        if not include_benign and adjusted_rank >= 8:
+            continue
+
         # Create result
         result = VariantResult(
             rsid=rsid,
@@ -302,10 +379,11 @@ def analyze_variants(
             genotype=genotype,
             clinvar_entries=[clinvar_entry] if clinvar_entry else [],
             gwas_entries=gwas_entries,
+            gnomad_entry=gnomad_entry,
             category=category,
-            significance_rank=sig_rank
+            significance_rank=adjusted_rank,
         )
-        
+
         results.append(result)
     
     # Sort by significance rank (lower = more significant)
