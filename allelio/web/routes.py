@@ -17,7 +17,8 @@ from allelio import __version__
 from allelio.parsers import parse_genotype_file
 from allelio.database.store import AllelioDB
 from allelio.analysis.lookup import analyze_variants
-from allelio.ai.engine import AIEngine
+from allelio.ai.attribution import Explanation, attribution
+from allelio.ai.engine import AIEngine, REFUSED, UNREACHABLE
 from allelio.ai.safety import get_variant_warnings
 from allelio.web.app import templates
 
@@ -35,13 +36,52 @@ async def read_root(request: Request) -> str:
 
 @router.get("/api/status")
 async def get_status() -> Dict[str, Any]:
-    """Get system status including ollama availability and database info."""
+    """System status: which model is answering, and whether the database is built."""
+    # Named, not just "connected": with a model server configurable by
+    # environment, "AI ready" on its own does not tell anyone which model wrote
+    # the explanations they are about to read, or where it is running.
+    ai: Dict[str, Any] = {
+        "available": False,
+        "model_available": False,
+        # The five-way answer the pill switches on. Present even when there is
+        # no engine to ask, because a key that appears only sometimes is a key
+        # the page has to guess about.
+        "status": UNREACHABLE,
+        "provider": None,
+        "model": None,
+        "host": None,
+        "error": None,
+    }
     try:
-        # Check ollama availability
         ai_engine = AIEngine()
-        ollama_available = await ai_engine.check_connection()
+    except ValueError as exc:
+        # A model server that is not on this machine, refused rather than used.
+        # Say that on the page; "disconnected" would send them looking for a
+        # crash that never happened.
+        ai["error"] = str(exc)
+        ai_engine = None
     except Exception:
-        ollama_available = False
+        ai_engine = None
+
+    if ai_engine is not None:
+        await ai_engine.check_connection()
+        ai["available"] = ai_engine.available
+        # "Reachable", "not serving that", "will not say what it serves" and
+        # "nothing there" are four different things to put on a status pill, and
+        # two booleans cannot carry four.
+        ai["status"] = ai_engine.status
+        # A server that answered with a model this tool will not use is not a
+        # server that is down, and the page should not say it is.
+        ai["error"] = ai_engine.refusal
+        # Reachable is not the same as loaded: a server answering with a dozen
+        # models it will happily list, none of them the one configured, would
+        # otherwise show green beside a name that explains nothing.
+        ai["model_available"] = ai_engine.check_model_available()
+        ai["provider"] = ai_engine.provider
+        # Read after check_connection, which is where a server holding a single
+        # model gets to name it.
+        ai["model"] = ai_engine.model
+        ai["host"] = ai_engine.host
 
     # Get database stats
     db_ready = False
@@ -65,11 +105,21 @@ async def get_status() -> Dict[str, Any]:
         pass
 
     return {
-        "ollama_available": ollama_available,
+        "ai": ai,
         "db_ready": db_ready,
         "db_stats": db_stats,
         "version": __version__,
     }
+
+
+def _text_of(explanation) -> str:
+    """The card's text. Nothing was written for it below the top 50."""
+    return explanation.text if explanation is not None else ""
+
+
+def _model_of(explanation) -> Optional[str]:
+    """Who wrote the card, or None — including "nobody asked" below the top 50."""
+    return explanation.model if explanation is not None else None
 
 
 def _gene_of(variant) -> Optional[str]:
@@ -120,6 +170,17 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
     """
     temp_file_path = None
     try:
+        # Settle the model address first. A local model is optional — the README
+        # promises the tool still works without one, minus the plain-English
+        # explanations — but an address that is not on this machine is a refusal,
+        # and it should arrive now rather than half an hour into the analysis.
+        # Construction only parses and resolves; nothing is contacted yet, so an
+        # empty upload still gets its 400 without waiting on a connect timeout.
+        try:
+            ai_engine = AIEngine()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
         # Validate file
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
@@ -127,6 +188,18 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         content = await file.read()
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+        await ai_engine.check_connection()
+        # Refused, not unreachable: the same answer construction gives a remote
+        # address, for the same reason. Reporting it as a run with no
+        # explanations would hide why there are none.
+        if ai_engine.status == REFUSED:
+            raise HTTPException(status_code=400, detail=ai_engine.refusal)
+        # Nothing to switch off here any more. A listing that contradicts the
+        # configured name, a server that is not there, and one that will not
+        # enumerate are all answered by engine.will_explain(), which explain
+        # and generate_summary ask themselves — so no caller has to reach in and
+        # set `available = False` to keep a prompt from going out.
 
         # The multipart filename is raw header data: "../../../.zshenv" resolves
         # out of the temp directory, and multipart is CORS-safelisted, so any
@@ -172,11 +245,6 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 detail="No variants found in database"
             )
 
-        # Create AI engine. Ollama is optional — the README promises the tool
-        # still works without it, minus the plain-English explanations.
-        ai_engine = AIEngine()
-        ai_available = await ai_engine.check_connection()
-
         # analyze_variants already returns these most-significant-first, so the
         # top 50 are the 50 worth spending an AI call on.
         top_variants = analysis_results[:50]
@@ -190,6 +258,8 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         def on_explained(done: int, total: int) -> None:
             _progress.update(done=done, total=total)
 
+        # rsID -> Explanation. The credit rides on the card from here to the
+        # browser; nothing else on this payload decides who wrote what.
         explanations = await ai_engine.explain_variants_batch(
             top_variants, progress_callback=on_explained
         )
@@ -197,8 +267,8 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         # Generate executive summary
         _progress.update(stage="Summarizing", done=0, total=0)
         try:
-            if not ai_available:
-                raise RuntimeError("ollama unavailable")
+            if not ai_engine.will_explain():
+                raise RuntimeError("no model server answering")
             summary = await ai_engine.generate_summary(top_variants)
         except Exception:
             summary = ("AI summary unavailable. Variant findings below come "
@@ -217,7 +287,11 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 "genotype": variant.genotype if hasattr(variant, 'genotype') else None,
                 "category": variant.category if hasattr(variant, 'category') else "Unknown",
                 "significance_rank": i + 1,
-                "explanation": explanations.get(variant.rsid, ""),
+                "explanation": _text_of(explanations.get(variant.rsid)),
+                # Null on a card the model did not write. The page reads this
+                # and nothing else: a card cannot be credited to a model that
+                # did not write it, because the credit is on the card.
+                "explained_by": _model_of(explanations.get(variant.rsid)),
                 "gene": _gene_of(variant),
                 "significance": _significance_of(variant),
                 "pubmed_id": next(
@@ -233,6 +307,10 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             "results": formatted_results,
             "total_variants": len(analysis_results),
             "analyzed_at": _get_timestamp(),
+            # Counted off the cards above, for the saved-analysis report and
+            # for anything reading the payload that is not the page. "none" is
+            # a run where no card was written by a model.
+            "model_used": attribution(explanations).model or "none",
         }
         return payload
 
@@ -449,9 +527,39 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     total_variants = escape(str(analysis_data.get("total_variants", 0)))
     analyzed_at = escape(str(analysis_data.get("analyzed_at") or "Unknown"))
 
+    # The table below stops at a hundred rows, and this line describes the rows
+    # underneath it rather than the run they came from — so it is counted off
+    # the same hundred. Counted off all of them, a genome with four hundred
+    # significant variants reads "340 of 512" over a table holding a hundred.
+    rows = results[:100]
+
+    # Counted off the cards in the payload, by the same rule the analysis used
+    # when it wrote them.
+    cards = [r for r in rows if isinstance(r, dict)]
+    if any("explained_by" in r for r in cards):
+        credit = attribution({
+            # Keyed by position: two rows with one rsID would otherwise count
+            # as one.
+            i: Explanation(str(r.get("explanation") or ""), r.get("explained_by"))
+            for i, r in enumerate(cards)
+        })
+        model_used = (
+            f"{escape(str(credit.model))} "
+            f"({credit.written} of {credit.total} explanations)"
+            if credit.model
+            else "none"
+        )
+    elif analysis_data.get("model_used"):
+        # Saved before the cards carried their own credit: one name for the
+        # whole run is all there is, and it is reported as that.
+        model_used = escape(str(analysis_data["model_used"])) + " (whole run)"
+    else:
+        # Saved before even that. Not "no model" — nobody wrote it down.
+        model_used = "not recorded"
+
     # Build results table HTML
     results_html = ""
-    for result in results[:100]:  # Limit to first 100 for report
+    for result in rows:
         # These come from the uploaded file and the model, and the report is
         # opened in a browser — none of it is trusted markup.
         def field(name):
@@ -466,7 +574,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
 
         # The safety layer computes these for BRCA1/2, TP53, Lynch and APOE.
         # A report that omits them is the one place they matter most.
-        # explain_variant folds these into the explanation via
+        # explain folds these into the explanation via
         # wrap_with_disclaimer — but only on the path where the model answered.
         # A fallback explanation carries no warning, so test the text itself.
         explanation_text = str(result.get("explanation") or "")
@@ -548,6 +656,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         <div class="metadata">
             <p><strong>Analysis Date:</strong> {analyzed_at}</p>
             <p><strong>Total Variants Analyzed:</strong> {total_variants}</p>
+            <p><strong>AI Model:</strong> {model_used}</p>
         </div>
         
         <h2>Executive Summary</h2>

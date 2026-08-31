@@ -653,6 +653,16 @@
             color: #D1D5DB;
         }
 
+        .result-credit {
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+            color: var(--gray-600);
+        }
+
+        body.dark-mode .result-credit {
+            color: #9CA3AF;
+        }
+
         .result-warning {
             margin-top: 0.75rem;
             padding: 0.75rem;
@@ -921,10 +931,10 @@
                 </div>
             </div>
             <div class="status-item">
-                <div class="status-indicator" id="ollamaIndicator"></div>
+                <div class="status-indicator" id="aiIndicator"></div>
                 <div class="status-text">
-                    <div class="status-label">Ollama Status</div>
-                    <div class="status-value" id="ollamaStatus">Loading...</div>
+                    <div class="status-label">AI Model</div>
+                    <div class="status-value" id="aiStatus">Loading...</div>
                 </div>
             </div>
         </div>
@@ -970,6 +980,10 @@
                 <div class="summary-title">Analysis Summary</div>
                 <div class="summary-text" id="summaryText"></div>
             </div>
+
+            <!-- Who wrote the explanations below, for this run. The status pill
+                 at the top is read once at page load and can be stale by now. -->
+            <div class="summary-text" id="modelUsed" style="display: none;"></div>
 
             <!-- Category Tabs -->
             <div class="results-tabs" id="resultsTabs"></div>
@@ -1067,15 +1081,36 @@
                     dbStatus.textContent = 'Database Not Set Up';
                 }
 
-                // Update Ollama Status
-                const ollamaIndicator = document.getElementById('ollamaIndicator');
-                const ollamaStatus = document.getElementById('ollamaStatus');
-                if (data.ollama_available) {
-                    ollamaIndicator.classList.add('connected');
-                    ollamaStatus.textContent = 'Ollama Connected';
+                // The model by name, not just "connected": the explanations
+                // below are written by whatever this says, and which model wrote
+                // them is the difference between two very different reports.
+                const ai = data.ai || {};
+                const aiIndicator = document.getElementById('aiIndicator');
+                const aiStatus = document.getElementById('aiStatus');
+                const aiItem = aiIndicator.parentElement;
+                // Five states, from the one word the engine answers with. The
+                // dot used to follow the listing, so a server that will not
+                // enumerate its models — a bare llama.cpp has no /v1/models at
+                // all — showed red beside a model that was about to write every
+                // explanation on the page.
+                const serving = ai.status === 'serving';
+                const unlisted = ai.status === 'unlisted';
+                aiIndicator.classList.toggle('connected', serving || unlisted);
+                if (serving) {
+                    aiStatus.textContent = `${ai.model} · ${ai.provider}`;
+                    aiItem.title = `${ai.model} running on ${ai.provider} at ${ai.host}`;
+                } else if (unlisted) {
+                    aiStatus.textContent = `${ai.model} · ${ai.provider}`;
+                    aiItem.title = `${ai.provider} at ${ai.host} did not list its models, so this is the name it will be asked for`;
+                } else if (ai.status === 'refuted') {
+                    aiStatus.textContent = `${ai.model} not in this server's list`;
+                    aiItem.title = `${ai.provider} answered at ${ai.host}, but it is not serving ${ai.model}`;
+                } else if (ai.error) {
+                    aiStatus.textContent = 'Model server refused';
+                    aiItem.title = ai.error;
                 } else {
-                    ollamaIndicator.classList.remove('connected');
-                    ollamaStatus.textContent = 'Ollama Disconnected';
+                    aiStatus.textContent = 'No model connected';
+                    aiItem.title = ai.host ? `Nothing answering at ${ai.host}` : '';
                 }
             } catch (error) {
                 console.error('Error fetching status:', error);
@@ -1175,14 +1210,29 @@
             return /^\d+$/.test(String(value ?? '')) ? String(value) : '';
         }
 
+        // credit-line start
+        // Keyed on the presence of explained_by, not on its value: a payload
+        // saved before the cards carried their credit has no key at all, and
+        // telling that reader the model's own prose came from ClinVar is worse
+        // than telling them nothing.
+        function creditLine(result) {
+            if (!result.explanation || !('explained_by' in result)) return '';
+            return `<div class="result-credit">${result.explained_by
+                ? `Written by ${esc(result.explained_by)}.`
+                : 'No model wrote this. Data from ClinVar and the GWAS Catalog.'}</div>`;
+        }
+        // credit-line end
+
         function rsidFor(value) {
             return /^(rs|i)\d+$/.test(String(value ?? '')) ? String(value) : '';
         }
 
         // "Health Conditions" -> "health_conditions"
+        // slugify start
         function slugify(category) {
             return (category || '').toLowerCase().replace(/ /g, '_');
         }
+        // slugify end
 
         function displayResults() {
             if (!analysisResults) return;
@@ -1200,6 +1250,7 @@
                 summaryText.textContent = analysisResults.summary;
                 executiveSummary.style.display = 'block';
             }
+
 
             // Create Category Tabs
             const categories = ['all', 'health_conditions', 'carrier_status', 'risk_factors', 'pharmacogenomics', 'traits', 'unknown'];
@@ -1243,12 +1294,57 @@
             renderResultCards();
         }
 
+        // Counted off the cards themselves, never off a run-level name: a run
+        // where some calls answered and some did not used to print one model's
+        // name over every card in the batch. Each card carries explained_by —
+        // the model that wrote it, or null.
+        //
+        // Takes the cards it is describing rather than reading the whole
+        // payload: the tabs filter the list underneath this line, and "12 of
+        // 50" over three pharmacogenomics cards is a count of a set the reader
+        // cannot see.
+        // attribution-block start
+        function renderAttribution(results) {
+            const modelUsed = document.getElementById('modelUsed');
+            const cards = (results || []).filter(r => r && typeof r === 'object');
+            const explained = cards.filter(r => r.explanation);
+            const written = explained.filter(r => r.explained_by);
+            const names = [...new Set(written.map(r => r.explained_by))].sort();
+            if (!cards.some(r => 'explained_by' in r)) {
+                // A payload saved before the cards carried their credit.
+                // Saying "no model wrote these" over cards a model did write
+                // is worse than saying nothing.
+                modelUsed.style.display = 'none';
+            } else if (names.length) {
+                // "12 of 50", not a bare name: the reader can tell the two
+                // apart, and the cards the model did not write say so in their
+                // own text.
+                modelUsed.textContent = written.length === explained.length
+                    ? `Explanations written by ${names.join(', ')}.`
+                    : `${written.length} of ${explained.length} explanations written by ${names.join(', ')}. The rest come straight from ClinVar and the GWAS Catalog.`;
+                modelUsed.style.display = 'block';
+            } else {
+                // About the cards, not about the summary above them: the
+                // summary is a separate call and can succeed while every
+                // explanation fails.
+                modelUsed.textContent = 'No model wrote the explanations below. They come straight from ClinVar and the GWAS Catalog.';
+                modelUsed.style.display = 'block';
+            }
+        }
+        // attribution-block end
+
         // Render Result Cards
+        // render-cards start
         function renderResultCards() {
             const container = document.getElementById('resultsContainer');
             container.innerHTML = '';
 
-            if (!analysisResults || !analysisResults.results) return;
+            if (!analysisResults || !analysisResults.results) {
+                // The cards are cleared above; the line describing them must
+                // not outlive them and go on counting a previous analysis.
+                renderAttribution([]);
+                return;
+            }
 
             let results = analysisResults.results;
 
@@ -1258,6 +1354,10 @@
                 // "Health Conditions", so every tab but All matched nothing.
                 results = results.filter(r => slugify(r.category) === currentCategory);
             }
+
+            // After the filter, and on every render rather than once per
+            // analysis: the line sits above these cards and counts these cards.
+            renderAttribution(results);
 
             if (results.length === 0) {
                 container.innerHTML = '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No results found for this category.</p>';
@@ -1269,6 +1369,7 @@
                 container.appendChild(card);
             });
         }
+        // render-cards end
 
         // Create Result Card
         function createResultCard(result) {
@@ -1301,6 +1402,7 @@
                 ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                 <div class="result-body">
                     <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>
+                    ${creditLine(result)}
                     <div class="result-sources">
                         ${rsidFor(result.rsid) ? `<a href="https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsidFor(result.rsid)}" target="_blank" rel="noopener noreferrer" class="source-link">ClinVar</a>` : ''}
                         ${idFor(result.pubmed_id) ? `<a href="https://www.ncbi.nlm.nih.gov/pubmed/${idFor(result.pubmed_id)}/" target="_blank" rel="noopener noreferrer" class="source-link">PubMed</a>` : ''}

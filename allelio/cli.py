@@ -77,8 +77,8 @@ def setup():
 )
 @click.option(
     "--model",
-    default="llama3.1:8b",
-    help="Ollama model name for explanations",
+    default=None,
+    help="Model name for explanations (default: $ALLELIO_MODEL, else llama3.1:8b)",
 )
 @click.option(
     "--top",
@@ -97,7 +97,7 @@ def analyze(
     output: str,
     no_ai: bool,
     include_benign: bool,
-    model: str,
+    model: Optional[str],
     top: int,
     traits_only: bool,
 ):
@@ -122,7 +122,52 @@ def analyze(
             )
         )
         raise click.Abort()
-    
+
+    # Settle the model before anything is read. Construction only parses and
+    # resolves the address, and the listing call costs one request — both are
+    # cheap here and useless after half an hour of parsing and lookups, which is
+    # where a refusal or a stale model name used to surface.
+    engine = None
+    if not no_ai:
+        try:
+            from allelio.ai.engine import (
+                AIEngine,
+                attribution,
+                OLLAMA,
+                OPENAI_COMPATIBLE,
+                REFUSED,
+                REFUTED,
+                UNREACHABLE,
+            )
+        except ImportError:
+            console.print("  [yellow]⚠[/yellow] AI module not available (pip install ollama)")
+            console.print("    Skipping AI explanations.\n")
+        else:
+            try:
+                engine = AIEngine(model=model)
+            except ValueError as e:
+                console.print(f"\n[bold red]✗[/bold red] {escape(str(e))}\n", style="red")
+                raise click.Abort()
+
+            if engine.client is None:
+                # engine.py swallows the ImportError so the rest of the tool
+                # still runs, which leaves this as the only place the missing
+                # package can be told apart from a daemon that is not up.
+                console.print("  [yellow]⚠[/yellow] AI module not available (pip install ollama)")
+                console.print("    Skipping AI explanations.\n")
+                engine = None
+            elif engine.provider == OPENAI_COMPATIBLE:
+                # One thing has to be known before the genome is read: a server
+                # whose only model is an Ollama Cloud tag relays the prompt off
+                # this machine, and adoption — the only place that name appears —
+                # happens on this provider's path alone. Asking costs one
+                # request to loopback. Nothing else is decided here: the listing
+                # is advisory, and it is read again inside the explanation loop.
+                asyncio.run(engine.check_connection())
+                if engine.status == REFUSED:
+                    console.print(f"\n[bold red]✗[/bold red] {escape(engine.refusal)}\n", style="red")
+                    raise click.Abort()
+
     # Parse genotype file
     try:
         with Progress(
@@ -161,33 +206,105 @@ def analyze(
         raise click.Abort()
     
     # Generate AI explanations if enabled
+    # rsID -> Explanation: the text and, where the model wrote it, its name.
+    # Everything printed about who wrote what is counted off this, so there is
+    # no second number that can disagree with the pages in the report.
     explanations = {}
-    if not no_ai:
+    if engine is not None:
         # Sort by significance and take top N
         top_variants = sorted(
             results, key=lambda x: x.significance_rank
         )[:top]
 
         try:
-            from allelio.ai.engine import AIEngine
+            # One loop for the whole run, the listing included. asyncio.run()
+            # per variant closes the loop the ollama client's connection pool is
+            # bound to, so every second call came back "Event loop is closed" —
+            # swallowed into a fallback that reads like an explanation, on the
+            # default provider. That is also why the listing is fetched in here
+            # rather than beside the one above: for Ollama it would be the first
+            # use of that pool, on a loop that then closes.
+            async def explain_each():
+                # Asked here, on the loop the prompts will run on: ollama's
+                # client binds its connection pool to the first loop it is used
+                # on, so a listing fetched anywhere else leaves every prompt
+                # talking to a loop that has closed. The OpenAI-compatible
+                # client builds a fresh httpx client per call and was already
+                # asked above, for the refusal — so it is not asked twice.
+                if engine.provider == OLLAMA:
+                    await engine.check_connection()
+                if not engine.will_explain():
+                    return
+                # engine.model, not the option, and read after the listing —
+                # which is where a server holding a single model names it.
+                console.print(
+                    f"  Generating AI explanations for top {len(top_variants)} variants "
+                    f"using {escape(engine.model)} "
+                    f"({escape(engine.provider)} at {escape(engine.host)})...\n"
+                )
+                for idx, variant in enumerate(top_variants, 1):
+                    try:
+                        written = await engine.explain(variant)
+                        explanations[variant.rsid] = written
+                        # A failed call still returns text — the fallback, written
+                        # from ClinVar and the GWAS Catalog. This card's own
+                        # record says which of the two it got.
+                        if written.model:
+                            console.print(f"    [{idx}/{len(top_variants)}] {variant.rsid} ✓")
+                        else:
+                            # This card's own reason. The engine keeps one
+                            # slot for the last error, which is a different
+                            # sentence the moment anything runs concurrently.
+                            said = f" ({escape(written.error)})" if written.error else ""
+                            console.print(
+                                f"    [{idx}/{len(top_variants)}] {variant.rsid} ✗{said}"
+                            )
+                    except Exception as e:
+                        console.print(f"    [{idx}/{len(top_variants)}] {variant.rsid} ✗ ({escape(str(e))})")
 
-            engine = AIEngine(model=model)
-            # Skip model listing — just try to use the model directly
-            engine.available = True
+            asyncio.run(explain_each())
 
-            console.print(f"  Generating AI explanations for top {len(top_variants)} variants using {model}...\n")
-            for idx, variant in enumerate(top_variants, 1):
-                try:
-                    explanation = asyncio.run(engine.explain_variant(variant))
-                    explanations[variant.rsid] = explanation
-                    console.print(f"    [{idx}/{len(top_variants)}] {variant.rsid} ✓")
-                except Exception as e:
-                    console.print(f"    [{idx}/{len(top_variants)}] {variant.rsid} ✗ ({e})")
-
-            if explanations:
-                console.print(f"\n  [bold green]✓[/bold green] Generated {len(explanations)} AI explanations\n")
+            status = engine.status
+            if status == REFUSED:
+                # Unreachable as things stand — the OpenAI-compatible path is
+                # the only one that adopts a served name, and it was refused
+                # above, before the file was read. Kept because it is the lock
+                # on a prompt leaving this machine, and the cost of keeping it
+                # is one string comparison.
+                console.print(f"\n[bold red]✗[/bold red] {escape(engine.refusal)}\n", style="red")
+                raise click.Abort()
+            elif status in (REFUTED, UNREACHABLE):
+                # The analysis is still worth having; the attribution on it is
+                # not. Say which of the two happened and what fixes it.
+                console.print(f"\n  [yellow]⚠[/yellow] {escape(engine.reason())}")
+                if status == REFUTED and engine.provider == OLLAMA:
+                    console.print(
+                        f"  Pull it: [bold cyan]ollama pull {escape(engine.model)}[/bold cyan]"
+                    )
+                elif status == REFUTED:
+                    console.print(
+                        "  Name one with [bold cyan]ALLELIO_MODEL[/bold cyan], "
+                        "or run with [bold cyan]--no-ai[/bold cyan]."
+                    )
+                console.print("  Continuing without explanations.\n")
+            # Counted off the cards, not off the run: a failed call still
+            # returns text — the variant's own data, wrapped in the disclaimer —
+            # and counting those would credit the model for pages it never wrote.
+            elif attribution(explanations).written:
+                console.print(
+                    f"\n  [bold green]✓[/bold green] Generated "
+                    f"{attribution(explanations).written} AI explanations\n"
+                )
             else:
-                console.print(f"\n  [yellow]⚠[/yellow] No explanations generated. Is Ollama running? (ollama serve)\n")
+                # It answered and then wrote nothing. Its own sentence is the
+                # diagnostic — "model 'x' not found" — and it is server text.
+                # Read off the cards, like everything else here: the engine's
+                # own slot holds whichever call wrote to it last.
+                reasons = [w.error for w in explanations.values() if w.error]
+                said = f" ({escape(reasons[-1])})" if reasons else ""
+                console.print(
+                    f"\n  [yellow]⚠[/yellow] No explanations generated.{said}\n"
+                )
         except ImportError:
             console.print("  [yellow]⚠[/yellow] AI module not available (pip install ollama)")
             console.print("    Skipping AI explanations.\n")
@@ -239,7 +356,6 @@ def analyze(
         metadata = {
             "generated_at": __import__("datetime").datetime.now().isoformat(),
             "db_version": db.version(),
-            "model_used": model if not no_ai else "none",
             "file_analyzed": Path(file).name,
             "total_variants": len(variants),
             "significant_variants": len(significant),
@@ -396,20 +512,67 @@ def info():
         
         console.print(info_table)
         
-        # Check Ollama status
+        # Which model would answer, and where it is running. Asked through the
+        # engine rather than Ollama's own port, so this still tells the truth
+        # when ALLELIO_OPENAI_BASE has pointed the tool somewhere else.
         console.print("\n[bold]AI/LLM Status[/bold]")
         try:
-            import httpx
-            response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
-            if response.status_code == 200:
-                console.print("[bold green]✓[/bold green] Ollama available at localhost:11434")
-                models = response.json().get("models", [])
-                if models:
-                    console.print(f"  Installed models: {', '.join([m.get('name', 'unknown') for m in models[:3]])}")
-            else:
-                console.print("[bold yellow]⚠[/bold yellow] Ollama not responding")
+            from allelio.ai.engine import (
+                AIEngine,
+                OLLAMA,
+                REFUSED,
+                REFUTED,
+                UNREACHABLE,
+            )
+
+            engine = AIEngine()
+        except ValueError as e:
+            console.print(f"[bold red]✗[/bold red] {escape(str(e))}")
         except Exception:
-            console.print("[bold yellow]⚠[/bold yellow] Ollama not available (install for AI features)")
+            console.print("[bold yellow]⚠[/bold yellow] AI module not available (pip install ollama)")
+        else:
+            if engine.client is None:
+                # engine.py swallows the ImportError, so nothing above this can
+                # tell the missing package from a server that is not answering.
+                console.print("[bold yellow]⚠[/bold yellow] AI module not available (pip install ollama)")
+            else:
+                # The same five-way answer `analyze` gets, so the diagnostic
+                # command and the one doing the work cannot disagree about the
+                # same server — which they did, in both directions.
+                asyncio.run(engine.check_connection())
+                status = engine.status
+                if status == REFUSED:
+                    console.print(f"[bold red]✗[/bold red] {escape(engine.refusal)}")
+                elif status == UNREACHABLE:
+                    console.print(
+                        f"[bold yellow]⚠[/bold yellow] {escape(engine.reason())} "
+                        "(optional — Allelio runs without it)"
+                    )
+                else:
+                    console.print(
+                        f"[bold green]✓[/bold green] {escape(engine.provider)} answering at "
+                        f"{escape(engine.host)}"
+                    )
+                    console.print(f"  Model: [bold cyan]{escape(engine.model)}[/bold cyan]")
+                    if status == REFUTED:
+                        console.print(
+                            f"  [bold yellow]⚠[/bold yellow] {escape(engine.model)} is not on that server."
+                        )
+                        if engine.provider == OLLAMA:
+                            console.print(
+                                f"  Pull it: [bold cyan]ollama pull {escape(engine.model)}[/bold cyan]"
+                            )
+                        elif engine.served_models:
+                            # A llama-swap config lists a dozen and none of them
+                            # is named llama3.1:8b, so print the menu rather
+                            # than a command that cannot work here.
+                            offered = ", ".join(engine.served_models[:8])
+                            console.print(f"  That server offers: {escape(offered)}")
+                            console.print(
+                                "  Name one with [bold cyan]ALLELIO_MODEL[/bold cyan]."
+                            )
+                    # UNLISTED says nothing about the model: this server does
+                    # not enumerate, so there is nothing to contradict it with.
         
         console.print()
     except Exception as e:

@@ -10,6 +10,24 @@ import sqlite3
 from allelio.database.store import AllelioDB
 
 
+@pytest.fixture(autouse=True)
+def no_ambient_model_config(monkeypatch) -> None:
+    """Whatever is exported in the shell does not get to decide these tests.
+
+    ALLELIO_OPENAI_BASE in particular would send every AIEngine() in the suite
+    to a different provider than the one the test set up.
+    """
+    for name in (
+        "ALLELIO_OPENAI_BASE",
+        "ALLELIO_MODEL",
+        # ollama-python reads these two itself, so a developer signed in to
+        # Ollama Cloud would otherwise get different results than CI.
+        "OLLAMA_HOST",
+        "OLLAMA_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture
 def tmp_dir() -> Generator[str, None, None]:
     """Create a temporary directory for test files.
