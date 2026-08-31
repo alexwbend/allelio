@@ -62,6 +62,23 @@ class AllelioDB:
             )
         """)
         
+        # Create gnomAD population frequency table
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gnomad (
+                rsid TEXT PRIMARY KEY,
+                allele_frequency REAL,
+                af_popmax REAL,
+                ac INTEGER,
+                an INTEGER,
+                nhomalt INTEGER,
+                af_afr REAL,
+                af_eas REAL,
+                af_fin REAL,
+                af_nfe REAL,
+                af_sas REAL
+            )
+        """)
+
         # Create metadata table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS metadata (
@@ -78,7 +95,11 @@ class AllelioDB:
         self.cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_gwas_rsid ON gwas(rsid)
         """)
-        
+
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_gnomad_rsid ON gnomad(rsid)
+        """)
+
         self.conn.commit()
     
     def insert_clinvar_batch(self, records: List[Dict[str, Any]]) -> None:
@@ -119,28 +140,67 @@ class AllelioDB:
         )
         self.conn.commit()
     
+    def insert_gnomad_batch(self, records: List[Dict[str, Any]]) -> None:
+        """Bulk insert gnomAD population frequency records.
+
+        Args:
+            records: List of dicts with keys: rsid, allele_frequency, af_popmax,
+                    ac, an, nhomalt, af_afr, af_eas, af_fin, af_nfe, af_sas
+        """
+        if not records:
+            return
+
+        self.cursor.executemany(
+            """INSERT OR REPLACE INTO gnomad
+               (rsid, allele_frequency, af_popmax, ac, an, nhomalt,
+                af_afr, af_eas, af_fin, af_nfe, af_sas)
+               VALUES (:rsid, :allele_frequency, :af_popmax, :ac, :an, :nhomalt,
+                        :af_afr, :af_eas, :af_fin, :af_nfe, :af_sas)
+            """,
+            records
+        )
+        self.conn.commit()
+
+    def _has_gnomad_table(self) -> bool:
+        """Check whether the gnomad table exists (backward compatibility)."""
+        try:
+            self.cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='gnomad'"
+            )
+            return self.cursor.fetchone() is not None
+        except Exception:
+            return False
+
     def lookup_rsid(self, rsid: str) -> Dict[str, Any]:
-        """Look up combined ClinVar and GWAS data for a single rsID.
-        
+        """Look up combined ClinVar, GWAS, and gnomAD data for a single rsID.
+
         Args:
             rsid: The rsID to look up (e.g., "rs123456")
-        
+
         Returns:
-            Dict with 'clinvar' (list of dicts) and 'gwas' (list of dicts) keys
+            Dict with 'clinvar' (list of dicts), 'gwas' (list of dicts),
+            and 'gnomad' (dict or None) keys
         """
-        result = {"clinvar": [], "gwas": []}
-        
+        result = {"clinvar": [], "gwas": [], "gnomad": None}
+
         # Query ClinVar
         self.cursor.execute("SELECT * FROM clinvar WHERE rsid = ?", (rsid,))
         clinvar_row = self.cursor.fetchone()
         if clinvar_row:
             result["clinvar"] = [dict(clinvar_row)]
-        
+
         # Query GWAS
         self.cursor.execute("SELECT * FROM gwas WHERE rsid = ?", (rsid,))
         gwas_rows = self.cursor.fetchall()
         result["gwas"] = [dict(row) for row in gwas_rows]
-        
+
+        # Query gnomAD (backward compatible — table may not exist)
+        if self._has_gnomad_table():
+            self.cursor.execute("SELECT * FROM gnomad WHERE rsid = ?", (rsid,))
+            gnomad_row = self.cursor.fetchone()
+            if gnomad_row:
+                result["gnomad"] = dict(gnomad_row)
+
         return result
     
     def lookup_rsids_batch(self, rsids: List[str]) -> Dict[str, Dict[str, Any]]:
@@ -150,16 +210,18 @@ class AllelioDB:
             rsids: List of rsIDs to look up
 
         Returns:
-            Dict mapping rsid -> {clinvar: [...], gwas: [...]}
+            Dict mapping rsid -> {clinvar: [...], gwas: [...], gnomad: dict|None}
         """
         result = {}
 
         if not rsids:
             return result
 
+        has_gnomad = self._has_gnomad_table()
+
         # Initialize result dict with all rsids
         for rsid in rsids:
-            result[rsid] = {"clinvar": [], "gwas": []}
+            result[rsid] = {"clinvar": [], "gwas": [], "gnomad": None}
 
         # SQLite has a variable limit — process in chunks of 500
         chunk_size = 500
@@ -180,6 +242,14 @@ class AllelioDB:
             for row in self.cursor.fetchall():
                 rsid = row["rsid"]
                 result[rsid]["gwas"].append(dict(row))
+
+            # Query gnomAD (backward compatible)
+            if has_gnomad:
+                query = f"SELECT * FROM gnomad WHERE rsid IN ({placeholders})"
+                self.cursor.execute(query, chunk)
+                for row in self.cursor.fetchall():
+                    rsid = row["rsid"]
+                    result[rsid]["gnomad"] = dict(row)
 
         return result
     
@@ -222,6 +292,15 @@ class AllelioDB:
         self.cursor.execute("SELECT COUNT(*) FROM gwas")
         gwas_count = self.cursor.fetchone()[0]
 
+        # Get gnomAD count (backward compatible)
+        gnomad_count = 0
+        if self._has_gnomad_table():
+            try:
+                self.cursor.execute("SELECT COUNT(*) FROM gnomad")
+                gnomad_count = self.cursor.fetchone()[0]
+            except Exception:
+                pass
+
         # Count distinct genes across both tables
         gene_count = 0
         try:
@@ -238,6 +317,7 @@ class AllelioDB:
         return {
             "clinvar_entries": clinvar_count,
             "gwas_entries": gwas_count,
+            "gnomad_entries": gnomad_count,
             "variant_count": clinvar_count + gwas_count,
             "gene_count": gene_count,
             "last_update": last_update,

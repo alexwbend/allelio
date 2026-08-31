@@ -19,6 +19,9 @@ VARIANT_PROMPT_TEMPLATE = """Please explain the following genetic variant findin
 **Gene:** {gene}
 **Chromosome:** {chromosome}, Position: {position}
 
+**Population Frequency (gnomAD):**
+{gnomad_summary}
+
 **ClinVar Data:**
 {clinvar_summary}
 
@@ -28,8 +31,9 @@ VARIANT_PROMPT_TEMPLATE = """Please explain the following genetic variant findin
 Please provide:
 1. A plain-English explanation of what this variant means
 2. What the user's specific genotype ({genotype}) implies
-3. Any relevant lifestyle, dietary, or environmental context from research
-4. Important caveats and limitations"""
+3. How the population frequency affects interpretation (e.g., common variants are less likely to cause rare diseases)
+4. Any relevant lifestyle, dietary, or environmental context from research
+5. Important caveats and limitations"""
 
 
 def format_clinvar_summary(clinvar_entries: List[dict]) -> str:
@@ -97,6 +101,55 @@ def format_gwas_summary(gwas_entries: List[dict]) -> str:
         return "No GWAS associations available."
 
 
+def format_gnomad_summary(gnomad_entry) -> str:
+    """
+    Format gnomAD population frequency data for inclusion in prompts.
+
+    Args:
+        gnomad_entry: A GnomADEntry object or None
+
+    Returns:
+        Formatted string summarizing population frequency data
+    """
+    if gnomad_entry is None:
+        return "No population frequency data available for this variant."
+
+    af = getattr(gnomad_entry, 'allele_frequency', None)
+    if af is None:
+        return "No population frequency data available for this variant."
+
+    af_percent = af * 100
+    af_popmax = getattr(gnomad_entry, 'af_popmax', None)
+    ac = getattr(gnomad_entry, 'ac', None)
+    an = getattr(gnomad_entry, 'an', None)
+
+    lines = []
+
+    # Main frequency line
+    if ac is not None and an is not None:
+        lines.append(f"- Global Allele Frequency: {af_percent:.4f}% ({ac:,} / {an:,} alleles)")
+    else:
+        lines.append(f"- Global Allele Frequency: {af_percent:.4f}%")
+
+    # Popmax
+    if af_popmax is not None and af_popmax > af:
+        lines.append(f"- Highest in any population: {af_popmax * 100:.4f}%")
+
+    # Interpretation hint for the LLM
+    if af > 0.05:
+        lines.append("- Context: Common variant (>5% frequency) — typically benign or population-specific")
+    elif af > 0.01:
+        lines.append("- Context: Moderately common variant (1-5% frequency)")
+    elif af > 0.001:
+        lines.append("- Context: Uncommon variant (0.1-1% frequency)")
+    elif af > 0.00001:
+        lines.append("- Context: Rare variant (<0.1% frequency) — more likely to be clinically significant")
+    else:
+        lines.append("- Context: Very rare variant (<0.001% frequency) — warrants careful interpretation")
+
+    return "\n".join(lines)
+
+
 def build_variant_prompt(result) -> str:
     """
     Build a complete prompt for explaining a variant by formatting all relevant data.
@@ -140,7 +193,11 @@ def build_variant_prompt(result) -> str:
         })
     clinvar_summary = format_clinvar_summary(clinvar_dicts)
     gwas_summary = format_gwas_summary(gwas_dicts)
-    
+
+    # Format gnomAD frequency data
+    gnomad_entry = getattr(result, 'gnomad_entry', None)
+    gnomad_summary = format_gnomad_summary(gnomad_entry)
+
     # Build the prompt using the template
     prompt = VARIANT_PROMPT_TEMPLATE.format(
         rsid=rsid,
@@ -148,8 +205,9 @@ def build_variant_prompt(result) -> str:
         gene=gene,
         chromosome=chromosome,
         position=position,
+        gnomad_summary=gnomad_summary,
         clinvar_summary=clinvar_summary,
-        gwas_summary=gwas_summary
+        gwas_summary=gwas_summary,
     )
-    
+
     return prompt

@@ -59,6 +59,57 @@ def _get_review_stars_html(variant) -> str:
     return f'<span style="color: {color}; letter-spacing: 2px;">{filled}{empty}</span>'
 
 
+def _get_frequency_html(variant) -> str:
+    """Generate population frequency HTML for a variant's gnomAD data.
+
+    Returns an HTML snippet with color-coded frequency display,
+    or empty string if no gnomAD data is available.
+    """
+    gnomad = getattr(variant, 'gnomad_entry', None)
+    if gnomad is None:
+        return ""
+
+    af = getattr(gnomad, 'allele_frequency', None)
+    if af is None:
+        return ""
+
+    af_percent = af * 100
+
+    # Color code by frequency tier
+    if af > 0.05:
+        color = "#16a34a"  # green — common
+        label = "Common"
+    elif af > 0.01:
+        color = "#d97706"  # amber — moderate
+        label = "Moderate"
+    elif af > 0.001:
+        color = "#f97316"  # orange — uncommon
+        label = "Uncommon"
+    else:
+        color = "#dc2626"  # red — rare
+        label = "Rare"
+
+    freq_html = f'''
+                <div class="info-row">
+                    <span class="label">Population Frequency:</span>
+                    <span class="value" style="color: {color}; font-weight: bold;">{af_percent:.3f}% ({label})</span>
+                </div>
+'''
+
+    # Show popmax if significantly different
+    af_popmax = getattr(gnomad, 'af_popmax', None)
+    if af_popmax is not None and af_popmax > af * 1.5:
+        popmax_pct = af_popmax * 100
+        freq_html += f'''
+                <div class="info-row">
+                    <span class="label">Highest in Population:</span>
+                    <span class="value">{popmax_pct:.3f}%</span>
+                </div>
+'''
+
+    return freq_html
+
+
 def _format_explanation_html(text: str) -> str:
     """Convert AI explanation text to safe HTML with paragraph breaks."""
     if not text:
@@ -184,6 +235,11 @@ def generate_html_report(
                     <span class="value">{review_stars_html}</span>
                 </div>
 '''
+        # Population frequency from gnomAD
+        freq_html = _get_frequency_html(variant)
+        if freq_html:
+            card_html += freq_html
+
         card_html += f'''
                 <div class="info-row">
                     <span class="label">Condition / Trait:</span>
@@ -706,6 +762,7 @@ def generate_html_report(
                 <strong>Data Sources</strong><br>
                 ClinVar: https://www.ncbi.nlm.nih.gov/clinvar<br>
                 GWAS Catalog: https://www.ebi.ac.uk/gwas<br>
+                gnomAD: https://gnomad.broadinstitute.org<br>
                 dbSNP: https://www.ncbi.nlm.nih.gov/snp
             </div>
 
