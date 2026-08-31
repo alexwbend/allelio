@@ -1812,6 +1812,30 @@ def test_the_downloaded_report_counts_the_rows_it_prints() -> None:
     assert html.count("<tr>") == 101  # the header row and the hundred it kept
 
 
+def test_the_report_counts_explanations_not_unexplained_rows() -> None:
+    """The page counts the cards that carry an explanation, and the report has
+    to agree. Only the top of a run is explained, so a genome with more findings
+    than that read "50 of 100" in the report while the page read "50 of 50".
+    """
+    from allelio.web import routes as routes_module
+
+    results = [
+        {"rsid": f"rs{i}", "explanation": "Written.", "explained_by": "llama3.1:8b"}
+        for i in range(50)
+    ] + [
+        # Past the top of the run: no explanation, and no model was ever called.
+        {"rsid": f"rs{i}", "explanation": "", "explained_by": None}
+        for i in range(50, 100)
+    ]
+
+    html = routes_module._generate_html_report(
+        {"summary": "s", "results": results, "total_variants": 100, "analyzed_at": "now"}
+    )
+
+    assert "llama3.1:8b (50 of 50 explanations)" in html
+    assert "of 100 explanations" not in html
+
+
 def test_the_downloaded_report_escapes_the_model_name() -> None:
     from allelio.web import routes as routes_module
 

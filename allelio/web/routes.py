@@ -527,21 +527,22 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     total_variants = escape(str(analysis_data.get("total_variants", 0)))
     analyzed_at = escape(str(analysis_data.get("analyzed_at") or "Unknown"))
 
-    # The table below stops at a hundred rows, and this line describes the rows
-    # underneath it rather than the run they came from — so it is counted off
-    # the same hundred. Counted off all of them, a genome with four hundred
-    # significant variants reads "340 of 512" over a table holding a hundred.
+    # The table below stops at a hundred rows.
     rows = results[:100]
 
-    # Counted off the cards in the payload, by the same rule the analysis used
-    # when it wrote them.
     cards = [r for r in rows if isinstance(r, dict)]
+    # Count the credit over the cards that actually carry an explanation, the
+    # same set the page counts (renderAttribution's `explained`). Rows past the
+    # top of the report have no explanation and never had a model call, so
+    # counting them in the denominator made the report read "48 of 100" where
+    # the page read "48 of 50".
+    explained = [r for r in cards if r.get("explanation")]
     if any("explained_by" in r for r in cards):
         credit = attribution({
             # Keyed by position: two rows with one rsID would otherwise count
             # as one.
             i: Explanation(str(r.get("explanation") or ""), r.get("explained_by"))
-            for i, r in enumerate(cards)
+            for i, r in enumerate(explained)
         })
         model_used = (
             f"{escape(str(credit.model))} "
