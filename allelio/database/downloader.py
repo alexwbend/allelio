@@ -44,7 +44,7 @@ DEFAULT_GNOMAD_MANIFEST = {
     "source": "gnomAD",
     "version": "v4.1.1",
     "file": "gnomad_v4.1.1_array_freq.tsv.gz",
-    "sha256": None,
+    "sha256": "38b450846eddfa76a1e710f7e6dfdecb92763afe3430ae21778ee717a506ff5d",
     "urls": [
         # Permaweb (Arweave via Permavault) — filled in once published.
         # "https://arweave.net/<tx-id>",
