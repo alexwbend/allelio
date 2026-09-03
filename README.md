@@ -73,19 +73,10 @@ This downloads the ClinVar and GWAS reference databases (~500 MB total). You onl
 allelio setup
 ```
 
-> **Note on population frequencies (gnomAD).** Setup also fetches a small gnomAD
-> allele-frequency file, used to downgrade common variants so genuinely rare
-> findings stand out. This file is being published — until it is live, setup
-> still completes and analysis still runs; it just skips the frequency
-> adjustment and prints a short warning. Everything else works normally.
->
-> **Maintainer TODO — publish the frequency extract:** build it with
-> `scripts/build_gnomad_freq.py` against a 23andMe/AncestryDNA array manifest,
-> upload it to the permaweb via Permavault (gnomAD is CC0), then fill in
-> `data/gnomad_manifest.json` with the permaweb URL and SHA-256 (plus the
-> GitHub-release mirror). Once the manifest points at a real file, the
-> download verifies its checksum and the adjustment runs. See the manifest's
-> own `_notes` for the exact steps.
+Setup also fetches a small gnomAD allele-frequency file (about 24 MB) that lets
+Allelio downgrade common variants so genuinely rare findings stand out. See
+[Where the reference data lives](#where-the-reference-data-lives) below for how
+that file is hosted.
 
 ### Launch the web interface
 
@@ -193,6 +184,39 @@ Allelio's pipeline is straightforward:
 5. **Present** — displays results in your browser or exports them as an HTML report
 
 The reference databases are stored locally on your machine after the initial download. During analysis, Allelio makes **zero network requests** — your data stays put.
+
+---
+
+## Where the reference data lives
+
+Allelio splits its reference data into two layers, hosted differently on purpose.
+
+- **Clinical databases (ClinVar, GWAS Catalog) are fetched live** from their
+  sources at setup. They are curated weekly, so you want the freshest copy.
+  Allelio warns you when your local copy gets old and prompts `allelio update`.
+- **Population frequencies (gnomAD) are pinned to a permanent copy.** Allele
+  frequencies barely move between releases, so Allelio ships a compact extract
+  (about 24 MB, trimmed to consumer-array sites) rather than making you download
+  gnomAD's raw multi-hundred-gigabyte files.
+
+That frequency extract is stored permanently on the **permaweb (Arweave) via
+[Permavault](https://permavault.co)**. The address is derived from the file's
+contents, so it cannot 404 and cannot be silently swapped, and the address is
+itself the integrity check. gnomAD is public-domain (CC0), so a permanent copy
+carries no licensing friction. Allelio resolves the file through a small
+manifest (`data/gnomad_manifest.json`), which means a future data refresh is a
+one-line manifest change rather than a code change, and it keeps a GitHub
+release as a mirror. On setup, Allelio downloads the extract and verifies its
+SHA-256 before trusting it; a mismatch is rejected and the mirror is tried
+instead.
+
+This is a deliberate resilience choice. Genomics data sources move, retire
+endpoints, and occasionally disappear (the reason Allelio exists at all is the
+23andMe collapse). Pinning the stable layer to content-addressed storage means
+Allelio keeps working even if a provider reorganizes or goes away.
+
+To rebuild or update the extract, see `scripts/build_gnomad_freq.py` and the
+`_notes` in `data/gnomad_manifest.json`.
 
 ---
 
