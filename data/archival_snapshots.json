@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "description": "Datestamped, checksummed snapshots archived to the permaweb (Arweave via Permavault) for reproducibility and resilience. Public-domain or clearly-redistributable data only, since permaweb copies are public and permanent. Each entry lets any past Allelio result be reproduced against the exact reference data it used.",
+  "snapshots": [
+    {
+      "source": "gnomAD",
+      "version": "v4.1.1",
+      "file": "gnomad_v4.1.1_array_freq.tsv.gz",
+      "date": "2026-09-01",
+      "size_bytes": 24740259,
+      "sha256": "38b450846eddfa76a1e710f7e6dfdecb92763afe3430ae21778ee717a506ff5d",
+      "arweave_tx": "sZmCL2kLlKvSTo_ob4p9by5q9HUBlBYBR2yEIsOsjos",
+      "arweave_url": "https://arweave.net/sZmCL2kLlKvSTo_ob4p9by5q9HUBlBYBR2yEIsOsjos",
+      "bitcoin_anchor_block": 965344,
+      "license": "CC0",
+      "note": "Consumer-array frequency extract that the tool ships and loads; see data/gnomad_manifest.json."
+    },
+    {
+      "source": "ClinVar",
+      "version": "2026-09-03",
+      "file": "clinvar_variant_summary_2026-09-03.txt.gz",
+      "date": "2026-09-03",
+      "size_bytes": 442495433,
+      "rows": 9049133,
+      "sha256": "186ad2838a138f0bc7a79b1b7b6dde5533b105175d293e1131652889529804c9",
+      "arweave_tx": null,
+      "arweave_url": null,
+      "license": "public domain (NCBI/NIH, available without restriction)",
+      "note": "variant_summary.txt.gz. Weekly rolling release; this is an insurance/reproducibility snapshot, NOT loaded by the tool (which fetches ClinVar live). Fill arweave_tx and arweave_url after the Permavault upload."
+    }
+  ]
+}
