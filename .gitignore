@@ -46,7 +46,10 @@ htmlcov/
 # Large local reference-data build artifacts (never commit reference data)
 *.tsv.gz
 *.bgz
+*.txt.gz
 gnomad_*.tsv*
+clinvar_*.txt.gz
+variant_summary*.txt.gz
 
 # Generated analysis reports (root)
 allelio_report*.html
