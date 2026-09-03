@@ -46,9 +46,9 @@ DEFAULT_GNOMAD_MANIFEST = {
     "file": "gnomad_v4.1.1_array_freq.tsv.gz",
     "sha256": "38b450846eddfa76a1e710f7e6dfdecb92763afe3430ae21778ee717a506ff5d",
     "urls": [
-        # Permaweb (Arweave via Permavault) — filled in once published.
-        # "https://arweave.net/<tx-id>",
-        # GitHub release mirror (fallback during transition).
+        # Permaweb (Arweave via Permavault) — content-addressed, never 404s.
+        "https://arweave.net/sZmCL2kLlKvSTo_ob4p9by5q9HUBlBYBR2yEIsOsjos",
+        # GitHub release mirror (fallback).
         "https://github.com/alexwbend/allelio/releases/download/"
         "v0.2.1-data/gnomad_v4.1.1_array_freq.tsv.gz",
     ],
