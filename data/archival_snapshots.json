@@ -23,10 +23,10 @@
       "size_bytes": 442495433,
       "rows": 9049133,
       "sha256": "186ad2838a138f0bc7a79b1b7b6dde5533b105175d293e1131652889529804c9",
-      "arweave_tx": null,
-      "arweave_url": null,
+      "arweave_tx": "QJ1NCBOzdVxazwJ_NZAARNbiWjhJmwf1JpXAGVdGGxQ",
+      "arweave_url": "https://arweave.net/QJ1NCBOzdVxazwJ_NZAARNbiWjhJmwf1JpXAGVdGGxQ",
       "license": "public domain (NCBI/NIH, available without restriction)",
-      "note": "variant_summary.txt.gz. Weekly rolling release; this is an insurance/reproducibility snapshot, NOT loaded by the tool (which fetches ClinVar live). Fill arweave_tx and arweave_url after the Permavault upload."
+      "note": "variant_summary.txt.gz. Weekly rolling release; this is an insurance/reproducibility snapshot, NOT loaded by the tool (which fetches ClinVar live)."
     }
   ]
 }
