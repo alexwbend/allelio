@@ -208,7 +208,9 @@ manifest (`data/gnomad_manifest.json`), which means a future data refresh is a
 one-line manifest change rather than a code change, and it keeps a GitHub
 release as a mirror. On setup, Allelio downloads the extract and verifies its
 SHA-256 before trusting it; a mismatch is rejected and the mirror is tried
-instead.
+instead. The current extract is also anchored into Bitcoin (block 965,344), so
+its exact contents are provable against an independent, tamper-resistant
+timestamp.
 
 This is a deliberate resilience choice. Genomics data sources move, retire
 endpoints, and occasionally disappear (the reason Allelio exists at all is the
