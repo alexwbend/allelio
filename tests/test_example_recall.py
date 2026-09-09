@@ -14,23 +14,12 @@ from pathlib import Path
 
 import pytest
 
-from allelio.analysis.example_check import compare, load_expected
-from allelio.database.clinvar import parse_clinvar
-from allelio.database.gnomad import parse_gnomad
-from allelio.database.gwas import parse_gwas
-from allelio.database.store import AllelioDB
-
-FIXTURES = Path(__file__).parent / "fixtures"
+from allelio.analysis.example_check import build_fixture_db, compare, load_expected
 
 
 @pytest.fixture(scope="module")
 def example_db(tmp_path_factory):
-    db = AllelioDB(str(tmp_path_factory.mktemp("example") / "example.db"))
-    db.initialize()
-    db.insert_clinvar_batch(list(parse_clinvar(str(FIXTURES / "example_clinvar.tsv"))))
-    db.insert_gwas_batch(list(parse_gwas(str(FIXTURES / "example_gwas.tsv"))))
-    db.insert_gnomad_batch(list(parse_gnomad(str(FIXTURES / "example_gnomad.tsv.gz"))))
-    return db
+    return build_fixture_db(str(tmp_path_factory.mktemp("example") / "example.db"))
 
 
 def test_fixture_database_is_populated(example_db):

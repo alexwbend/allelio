@@ -345,6 +345,13 @@ then association, and so on down to benign), then two adjustments are applied:
    downgraded toward "less significant," capped so they never fully cross the
    benign boundary.
 
+To see exactly what the frequency adjustment does, run
+`python3 scripts/ablation_frequency.py`: it ranks the example file with the
+adjustment off and on and prints both orderings side by side (add `--real`
+to use your full local database). On the example, the adjustment leaves the
+rare pathogenic alleles where they are and pushes two common
+"conflicting" variants (APOE ε4, HFE H63D) below the default cutoff.
+
 The frequency *thresholds* are cited to ACMG/AMP; the specific *penalty
 sizes* are not — ACMG/AMP's BA1/BS1 are qualitative evidence codes, not point
 values, so Allelio's amounts are an author choice, documented as such at each
