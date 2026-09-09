@@ -37,6 +37,30 @@ explanations and you keep everything else: the ClinVar and GWAS findings are
 still there for every variant, and the results say plainly that no model wrote
 them.
 
+## Reasoning models
+
+Models that think before they answer — DeepSeek-R1 and its distills, QwQ,
+Qwen3 in thinking mode, gpt-oss — work with Allelio too, through either
+provider. Their chain-of-thought is discarded before the safety gate ever
+sees it and before it reaches your explanation, whether the server sends it
+inline in the answer wrapped in `<think>...</think>` tags (the common case for
+local GGUFs) or in a separate field (`reasoning_content` or `reasoning`).
+Only the model's final answer is ever scanned for unsafe language or shown to
+you — the same guarantee as any other model, just with an extra step to get
+there.
+
+They are markedly slower than a non-reasoning model of the same size, and can
+need more output budget to finish a thought before answering. If explanations
+come back empty with "model returned only reasoning", give it more room:
+
+```bash
+export ALLELIO_MAX_TOKENS=4096
+export ALLELIO_REQUEST_TIMEOUT=900
+```
+
+A couple of reasonable picks if you want to try one: `deepseek-r1-distill-qwen`
+or `qwq` on Ollama.
+
 ## Picking a model your machine can run
 
 A model that is too big for your RAM will swap to disk and crawl, or fail to
