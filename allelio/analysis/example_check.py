@@ -15,6 +15,27 @@ from allelio.parsers.base import parse_genotype_file_with_stats
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE_FILE = ROOT / "examples" / "example_23andme.txt"
 EXPECTED_FILE = ROOT / "examples" / "expected_findings.json"
+FIXTURES = ROOT / "tests" / "fixtures"
+
+
+def build_fixture_db(db_path: str):
+    """A database holding only the reference rows for the example's rsIDs.
+
+    Built with the real parsers from the excerpts in tests/fixtures/ (see
+    scripts/build_example_fixtures.py), so it behaves like the full database
+    on those sites without the 2 GB download.
+    """
+    from allelio.database.clinvar import parse_clinvar
+    from allelio.database.gnomad import parse_gnomad
+    from allelio.database.gwas import parse_gwas
+    from allelio.database.store import AllelioDB
+
+    db = AllelioDB(db_path)
+    db.initialize()
+    db.insert_clinvar_batch(list(parse_clinvar(str(FIXTURES / "example_clinvar.tsv"))))
+    db.insert_gwas_batch(list(parse_gwas(str(FIXTURES / "example_gwas.tsv"))))
+    db.insert_gnomad_batch(list(parse_gnomad(str(FIXTURES / "example_gnomad.tsv.gz"))))
+    return db
 
 
 def load_expected() -> Dict[str, Any]:
