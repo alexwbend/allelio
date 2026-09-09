@@ -1037,6 +1037,7 @@ class AIEngine:
             f"- Chromosome: {result.chromosome or 'Unknown'}, Position: {result.position or 'Unknown'}",
             f"- Genotype: {result.genotype or 'Unknown'}",
             f"- Zygosity: {_zygosity_line(result)}",
+            f"- Inheritance (ClinGen): {getattr(result, 'inheritance', None) or 'not curated'}",
         ]
 
         if result.clinvar_entries:

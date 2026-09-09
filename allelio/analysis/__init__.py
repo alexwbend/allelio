@@ -3,6 +3,7 @@
 from .zygosity import Zygosity, ZygosityCall, call_zygosity
 from .lookup import (
     ClinVarEntry,
+    ClinGenEntry,
     GWASEntry,
     VariantResult,
     VariantCategory,
@@ -18,6 +19,7 @@ from .lookup import (
 
 __all__ = [
     "ClinVarEntry",
+    "ClinGenEntry",
     "GWASEntry",
     "VariantResult",
     "VariantCategory",

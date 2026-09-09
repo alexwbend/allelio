@@ -309,6 +309,8 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 "alt_copies": getattr(variant, "alt_copies", None),
                 "matched_allele": getattr(variant, "matched_allele", None),
                 "zygosity_label": _zygosity_label(variant),
+                "inheritance": getattr(variant, "inheritance", None) if getattr(variant, "clinvar_entries", None) else None,
+                "inheritance_note": getattr(variant, "inheritance_note", None),
                 "category": variant.category if hasattr(variant, 'category') else "Unknown",
                 "significance_rank": i + 1,
                 "explanation": _text_of(explanations.get(variant.rsid)),
