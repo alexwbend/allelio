@@ -15,8 +15,16 @@ from rich.table import Table
 
 from allelio.analysis.lookup import analyze_variants
 from allelio.database import AllelioDB, setup_database, staleness_warning
-from allelio.parsers import parse_genotype_file
+from allelio.parsers import parse_genotype_file_with_stats
 from allelio.report import generate_html_report
+
+# See README "Known gaps: 23andMe internal IDs" and PUB-11-lite in
+# PUBLICATION_PLAN.md — printed wherever a parsed 23andMe file skipped i-ID
+# rows, so `analyze` and `info` cannot describe the same file differently.
+_I_ID_GAP_NOTE = (
+    "Skipped {count:,} rows with 23andMe internal (i) IDs — "
+    "not yet looked up. See README: known gaps."
+)
 
 console = Console()
 
@@ -193,8 +201,13 @@ def analyze(
             console=console,
         ) as progress:
             task = progress.add_task("Parsing genotype file...", total=None)
-            variants = parse_genotype_file(file)
+            variants, parse_stats = parse_genotype_file_with_stats(file)
             progress.update(task, description=f"✓ Parsed {len(variants)} variants")
+        # A 23andMe file's i-ID rows are parsed but never looked up — this is
+        # a disclosed scope boundary, not an error, so it prints once here
+        # rather than failing or staying silent.
+        if parse_stats and parse_stats.i_id_rows:
+            console.print(f"  [yellow]⚠[/yellow] {_I_ID_GAP_NOTE.format(count=parse_stats.i_id_rows)}\n")
     except Exception as e:
         console.print(f"\n[bold red]✗[/bold red] Failed to parse file: {e}\n", style="red")
         raise click.Abort()
@@ -376,6 +389,7 @@ def analyze(
             "file_analyzed": Path(file).name,
             "total_variants": len(variants),
             "significant_variants": len(significant),
+            "skipped_i_id_rows": parse_stats.i_id_rows if parse_stats else 0,
         }
         
         html_content = generate_html_report(
@@ -500,10 +514,13 @@ def update():
 
 
 @allelio.command()
-def info():
+@click.argument("file", type=click.Path(exists=True), required=False, default=None)
+def info(file: Optional[str]):
     """Display database and system information.
-    
-    Shows database statistics, version info, and Ollama availability.
+
+    Shows database statistics, version info, and Ollama availability. If FILE
+    (a genotype file) is given, also reports parsing stats for it, including
+    any 23andMe internal (i) ID rows skipped — see README: known gaps.
     """
     console.print("\n[bold cyan]Allelio System Information[/bold cyan]\n")
     
@@ -607,7 +624,23 @@ def info():
                             )
                     # UNLISTED says nothing about the model: this server does
                     # not enumerate, so there is nothing to contradict it with.
-        
+
+        if file:
+            console.print("\n[bold]File[/bold]")
+            try:
+                variants, parse_stats = parse_genotype_file_with_stats(file)
+                console.print(
+                    f"  Parsed [bold cyan]{len(variants):,}[/bold cyan] variants from "
+                    f"{escape(Path(file).name)}"
+                )
+                if parse_stats and parse_stats.i_id_rows:
+                    console.print(
+                        f"  [bold yellow]⚠[/bold yellow] "
+                        f"{escape(_I_ID_GAP_NOTE.format(count=parse_stats.i_id_rows))}"
+                    )
+            except Exception as e:
+                console.print(f"  [bold red]✗[/bold red] Failed to parse file: {escape(str(e))}")
+
         console.print()
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Failed to get info: {e}\n", style="red")

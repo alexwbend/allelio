@@ -621,3 +621,111 @@ class TestWeightedSignificanceRanking:
         # rs_a (4 stars) should come before rs_b (0 stars)
         assert results[0].rsid == "rs_a"
         assert results[1].rsid == "rs_b"
+
+
+class TestRankingOrderRegression:
+    """PUB-10: pins the current triage ordering on a small, named fixture.
+
+    significance_rank is a documented heuristic (see analyze_variants'
+    docstring and the COMMON_AF_THRESHOLD/_PENALTY family in lookup.py), not
+    a validated score. This test does not judge whether the ordering is
+    "correct" — it exists so that a future change to those constants shows up
+    here as a deliberate, visible diff instead of a silent behavior change.
+    """
+
+    def _gnomad_record(self, rsid: str, allele_frequency) -> dict:
+        return {
+            "rsid": rsid,
+            "allele_frequency": allele_frequency,
+            "af_popmax": allele_frequency,
+            "ac": None,
+            "an": None,
+            "nhomalt": None,
+            "af_afr": None,
+            "af_eas": None,
+            "af_fin": None,
+            "af_nfe": None,
+            "af_sas": None,
+        }
+
+    def test_pinned_triage_order(self, tmp_dir):
+        """Multi-star pathogenic < zero-star pathogenic < VUS < common benign < rare benign."""
+        from pathlib import Path
+
+        db_path = str(Path(tmp_dir) / "ranking_regression.db")
+        db = AllelioDB(db_path=db_path)
+        db.initialize()
+
+        db.insert_clinvar_batch([
+            {
+                "rsid": "rs_path_4star",
+                "gene": "GENE1",
+                "clinical_significance": "pathogenic",
+                "conditions": "Condition A",
+                "review_status": "practice guideline",
+                "last_evaluated": "2024-01-01",
+            },
+            {
+                "rsid": "rs_path_0star",
+                "gene": "GENE2",
+                "clinical_significance": "pathogenic",
+                "conditions": "Condition B",
+                "review_status": "no assertion criteria provided",
+                "last_evaluated": "2024-01-01",
+            },
+            {
+                "rsid": "rs_vus",
+                "gene": "GENE3",
+                "clinical_significance": "uncertain significance",
+                "conditions": "Condition C",
+                "review_status": "no assertion criteria provided",
+                "last_evaluated": "2024-01-01",
+            },
+            {
+                "rsid": "rs_benign_common",
+                "gene": "GENE4",
+                "clinical_significance": "benign",
+                "conditions": "Condition D",
+                "review_status": "no assertion criteria provided",
+                "last_evaluated": "2024-01-01",
+            },
+            {
+                "rsid": "rs_benign_rare",
+                "gene": "GENE5",
+                "clinical_significance": "benign",
+                "conditions": "Condition E",
+                "review_status": "no assertion criteria provided",
+                "last_evaluated": "2024-01-01",
+            },
+        ])
+
+        db.insert_gnomad_batch([
+            self._gnomad_record("rs_benign_common", 0.30),
+            self._gnomad_record("rs_benign_rare", 0.00001),
+        ])
+
+        variants = [
+            Variant(rsid="rs_benign_rare", chromosome="1", position=500, genotype="AA"),
+            Variant(rsid="rs_vus", chromosome="1", position=300, genotype="AA"),
+            Variant(rsid="rs_benign_common", chromosome="1", position=400, genotype="AA"),
+            Variant(rsid="rs_path_0star", chromosome="1", position=200, genotype="AA"),
+            Variant(rsid="rs_path_4star", chromosome="1", position=100, genotype="AA"),
+        ]
+
+        results = analyze_variants(variants, db, include_benign=True)
+        assert len(results) == 5
+
+        assert [r.rsid for r in results] == [
+            "rs_path_4star",
+            "rs_path_0star",
+            "rs_vus",
+            "rs_benign_common",
+            "rs_benign_rare",
+        ]
+
+        ranks = {r.rsid: r.significance_rank for r in results}
+        assert ranks["rs_path_4star"] == pytest.approx(0.6)
+        assert ranks["rs_path_0star"] == pytest.approx(1.0)
+        assert ranks["rs_vus"] == pytest.approx(7.0)
+        assert ranks["rs_benign_common"] == pytest.approx(9.9)
+        assert ranks["rs_benign_rare"] == pytest.approx(10.0)

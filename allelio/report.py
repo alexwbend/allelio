@@ -158,6 +158,9 @@ def generate_html_report(
     file_analyzed = metadata.get("file_analyzed", "Unknown")
     total_variants = metadata.get("total_variants", 0)
     significant_variants = metadata.get("significant_variants", 0)
+    # Disclosed scope boundary, not an error — see README "Known gaps:
+    # 23andMe internal IDs" and PUB-11-lite in PUBLICATION_PLAN.md.
+    skipped_i_id_rows = metadata.get("skipped_i_id_rows", 0)
 
     # Categorize results using actual VariantCategory values
     health_conditions = [r for r in results if r.category == "Health Conditions"]
@@ -328,6 +331,18 @@ def generate_html_report(
     # and reporting that as the model's work credits it for pages it never
     # wrote. On a run where every call answered the two numbers are the same
     # and it reads as it always did.
+    # A disclosed scope boundary, not an error: these rows were parsed but
+    # never looked up because every lookup is keyed by rsID, not 23andMe's
+    # internal i-prefixed probe IDs. See README "Known gaps: 23andMe internal
+    # IDs" and PUB-11-lite in PUBLICATION_PLAN.md.
+    gap_note = ""
+    if skipped_i_id_rows:
+        gap_note = (
+            f'<div class="gap-note"><strong>Known gap:</strong> '
+            f'skipped {skipped_i_id_rows:,} rows with 23andMe internal (i) IDs '
+            f'— not yet looked up. See README: known gaps.</div>'
+        )
+
     ai_note = ""
     if explained_count:
         ai_note = (
@@ -462,6 +477,16 @@ def generate_html_report(
             margin-bottom: 30px;
             font-size: 14px;
             color: #5b21b6;
+        }}
+
+        .gap-note {{
+            background: #f3f4f6;
+            border-left: 4px solid #6b7280;
+            padding: 12px 20px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            font-size: 14px;
+            color: #374151;
         }}
 
         .category-section {{
@@ -740,6 +765,8 @@ def generate_html_report(
             <h2>Executive Summary</h2>
             <p>{html_escape.escape(summary)}</p>
         </div>
+
+        {gap_note}
 
         {ai_note}
 

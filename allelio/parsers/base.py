@@ -9,7 +9,7 @@ This module provides:
 import gzip
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -137,5 +137,41 @@ def parse_genotype_file(filepath: str) -> List[Variant]:
     elif fmt == "vcf":
         from .vcf_parser import parse_vcf
         return parse_vcf(filepath)
+    else:
+        raise ValueError(f"Unknown format: {fmt}")
+
+
+def parse_genotype_file_with_stats(filepath: str) -> Tuple[List[Variant], Optional["ParseStats"]]:
+    """Like parse_genotype_file, but also reports 23andMe i-ID row counts.
+
+    Only the 23andMe format carries the internal `i`-prefixed identifiers
+    this counts (see twentythree.ParseStats and PUB-11-lite in
+    PUBLICATION_PLAN.md); AncestryDNA and VCF have no such gap, so their
+    stats are None.
+
+    Args:
+        filepath: Path to the genotype file (can be gzipped)
+
+    Returns:
+        (variants, stats) — stats is None for non-23andMe formats.
+
+    Raises:
+        ValueError: If format cannot be detected or parsing fails
+        FileNotFoundError: If file does not exist
+    """
+    if not Path(filepath).exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+
+    fmt = detect_format(filepath)
+
+    if fmt == "23andme":
+        from .twentythree import parse_23andme_with_stats
+        return parse_23andme_with_stats(filepath)
+    elif fmt == "ancestry":
+        from .ancestry import parse_ancestry
+        return parse_ancestry(filepath), None
+    elif fmt == "vcf":
+        from .vcf_parser import parse_vcf
+        return parse_vcf(filepath), None
     else:
         raise ValueError(f"Unknown format: {fmt}")

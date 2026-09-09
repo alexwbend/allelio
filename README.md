@@ -192,6 +192,59 @@ The reference databases are stored locally on your machine after the initial dow
 
 ---
 
+## How variants are ranked
+
+Allelio sorts findings by a `significance_rank` (lower = shown first). This is
+a **prioritization heuristic for presentation order, not a validated clinical
+or diagnostic score** — it is meant to surface the findings most worth a
+closer look, nothing more.
+
+The rank starts from ClinVar's clinical significance (pathogenic ranks
+highest, then likely pathogenic, risk factor, association, and so on down to
+benign), then two adjustments are applied:
+
+1. **Review quality.** ClinVar's [review-status star
+   system](https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/) (0–4
+   stars) nudges the rank within its own tier — a 4-star pathogenic call
+   ranks slightly above a 0-star one — capped so it can never cross into a
+   different significance tier.
+2. **Population frequency.** A variant common in gnomAD is less likely to be
+   truly pathogenic, so common variants (allele frequency above roughly 5%
+   and 1%, echoing the [ACMG/AMP BA1 and BS1 population-frequency
+   thresholds](https://doi.org/10.1038/gim.2015.30), Richards et al. 2015) are
+   downgraded toward "less significant," capped so they never fully cross the
+   benign boundary.
+
+The frequency *thresholds* are cited to ACMG/AMP; the specific *penalty
+sizes* are not — ACMG/AMP's BA1/BS1 are qualitative evidence codes, not point
+values, so Allelio's amounts are an author choice, documented as such at each
+constant in `allelio/analysis/lookup.py`.
+
+---
+
+## Known gaps: 23andMe internal IDs
+
+A 23andMe raw file has two kinds of variant identifiers. Most rows use
+standard `rs####` IDs (dbSNP rsIDs). A minority — 23andMe's internal
+`i####` identifiers — are custom probes 23andMe added for variants the
+standard array chemistry doesn't cover well, and disproportionately
+clinically important ones. Two verified examples: Prothrombin G20210A
+(`rs1799963`, venous-thrombosis risk) is carried as 23andMe **`i3002432`**,
+and GBA N370S (`rs76763715`, Gaucher/Parkinson association) as 23andMe
+**`i4000415`**.
+
+Every lookup in Allelio is keyed by rsID, so this version does not resolve
+`i`-ID rows — they are parsed but not looked up. This is a disclosed scope
+boundary, not a silent one: every `allelio analyze` and `allelio info` run on
+a 23andMe file reports how many rows were skipped this way, and the same
+count appears in the HTML report. If Prothrombin or GBA matter to you,
+check your raw file directly for `i3002432` or `i4000415`. Resolving these
+via a dbSNP coordinate mapping is planned for a future release (see
+`PUBLICATION_PLAN.md`, PUB-11-full) but was deferred to avoid adding a large
+reference-data dependency before this version's first release.
+
+---
+
 ## Where the reference data lives
 
 Allelio splits its reference data into two layers, hosted differently on purpose.

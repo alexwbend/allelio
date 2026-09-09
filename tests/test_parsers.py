@@ -3,8 +3,9 @@
 import pytest
 from pathlib import Path
 
-from allelio.parsers import detect_format, parse_genotype_file
+from allelio.parsers import detect_format, parse_genotype_file, parse_genotype_file_with_stats
 from allelio.parsers.base import Variant
+from allelio.parsers.twentythree import parse_23andme_with_stats
 
 
 class TestFormatDetection:
@@ -241,3 +242,74 @@ rs7412\t19\t45412079\tTC
         
         # All should have variants
         assert all(isinstance(v, Variant) for v in v23 + vAncestry + vVCF)
+
+
+class TestTwentyThreeIDStats:
+    """PUB-11-lite: 23andMe i-ID rows are parsed but never looked up (every
+    lookup in allelio/analysis/lookup.py is keyed by rsID). These tests pin
+    that the row counts used to disclose that gap are counted correctly.
+    """
+
+    @pytest.fixture
+    def mixed_id_file(self, tmp_dir) -> str:
+        """A 23andMe file mixing standard rsIDs with internal i-IDs.
+
+        i3002432 (Prothrombin G20210A / rs1799963) and i4000415 (GBA N370S /
+        rs76763715) are the two named examples in README/paper.md — included
+        literally so a regression in either the count or the disclosure text
+        would be caught here.
+        """
+        file_path = Path(tmp_dir) / "mixed_ids.txt"
+        content = """# rsid\tchromosome\tposition\tgenotype
+rs1234\t1\t100000\tAA
+rs429358\t19\t45411941\tCT
+i3002432\t11\t46761055\tGA
+i4000415\t1\t155205634\tAG
+i5000001\t2\t200000\tCC
+rsNOCALL\t3\t300000\t--
+"""
+        file_path.write_text(content)
+        return str(file_path)
+
+    def test_parse_23andme_with_stats_counts_rs_and_i_rows(self, mixed_id_file):
+        variants, stats = parse_23andme_with_stats(mixed_id_file)
+
+        # 5 valid rows total: 2 rs-ID, 3 i-ID; the "--" no-call row is excluded.
+        assert stats.total_rows == 5
+        assert stats.rs_id_rows == 2
+        assert stats.i_id_rows == 3
+        assert len(variants) == 5
+
+        rsids = {v.rsid for v in variants}
+        assert {"i3002432", "i4000415", "i5000001", "rs1234", "rs429358"} == rsids
+
+    def test_parse_23andme_with_stats_matches_plain_parse(self, mixed_id_file):
+        """parse_23andme_with_stats must not change what gets parsed."""
+        from allelio.parsers.twentythree import parse_23andme
+
+        plain = parse_23andme(mixed_id_file)
+        with_stats, _ = parse_23andme_with_stats(mixed_id_file)
+
+        assert [v.rsid for v in plain] == [v.rsid for v in with_stats]
+
+    def test_no_i_id_rows_gives_zero_count(self, sample_23andme_file):
+        """The existing all-rsID fixture has no i-ID rows at all."""
+        _, stats = parse_23andme_with_stats(sample_23andme_file)
+
+        assert stats.i_id_rows == 0
+        assert stats.rs_id_rows == stats.total_rows
+
+    def test_parse_genotype_file_with_stats_23andme(self, mixed_id_file):
+        variants, stats = parse_genotype_file_with_stats(mixed_id_file)
+
+        assert len(variants) == 5
+        assert stats is not None
+        assert stats.i_id_rows == 3
+
+    def test_parse_genotype_file_with_stats_none_for_non_23andme(self, sample_ancestry_file, sample_vcf_file):
+        """Only 23andMe carries the i-ID gap; other formats report no stats."""
+        _, ancestry_stats = parse_genotype_file_with_stats(sample_ancestry_file)
+        _, vcf_stats = parse_genotype_file_with_stats(sample_vcf_file)
+
+        assert ancestry_stats is None
+        assert vcf_stats is None
