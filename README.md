@@ -27,9 +27,9 @@ No programming experience is needed to use Allelio's web interface — just uplo
 2. **Looks up your variants** in five public scientific databases:
    - [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) — clinically significant genetic variants curated by the NIH
    - [GWAS Catalog](https://www.ebi.ac.uk/gwas/) — genome-wide association studies linking variants to traits and conditions
-   - [gnomAD](https://gnomad.broadinstitute.org/) — how common each variant is in the population, so common ones rank lower
-   - [ClinGen](https://clinicalgenome.org/) — how each gene-disease link is inherited and how well established it is, so one copy of a recessive variant is reported as carrier status
-   - [ClinPGx](https://www.clinpgx.org/) (formerly PharmGKB) — how variants affect response to specific drugs, with the annotation written for your exact genotype
+   - [gnomAD](https://gnomad.broadinstitute.org/): how common each variant is in the population, so common ones rank lower
+   - [ClinGen](https://clinicalgenome.org/): how each gene-disease link is inherited and how well established it is, so one copy of a recessive variant is reported as carrier status
+   - [ClinPGx](https://www.clinpgx.org/) (formerly PharmGKB): how variants affect response to specific drugs, with the annotation written for your exact genotype
 3. **Explains findings in plain English** using a local AI model — Ollama, or any OpenAI-compatible server you already run — so you don't need a genetics degree to understand the results
 4. **Generates a report** you can save, print, or share with your doctor
 
@@ -128,7 +128,7 @@ Then open your browser to **http://localhost:8080**. You'll see a clean interfac
 Don't have a DNA file handy? [`examples/`](examples/) has a small synthetic
 one you can run right away, with a file that says exactly what Allelio must
 find in it (`examples/expected_findings.json`, checked by the test suite and
-by `python3 scripts/check_example.py` against your own database) — see
+by `python3 scripts/check_example.py` against your own database), see
 [`examples/README.md`](examples/README.md). If you installed straight from
 GitHub rather than cloning, grab just that file:
 
@@ -229,8 +229,8 @@ Allelio's pipeline is straightforward:
 2. **Lookup** — checks each variant against the local ClinVar and GWAS databases
 3. **Analyze** — gathers clinical significance, associated traits, and biological context
 4. **Explain** — sends the findings to your local AI model for plain-English summaries
-5. **Check** — runs each explanation through a safety filter before you see it (below)
-6. **Present** — displays results in your browser or exports them as an HTML report
+5. **Check**: runs each explanation through a safety filter before you see it (below)
+6. **Present**: displays results in your browser or exports them as an HTML report
 
 The reference databases are stored locally on your machine after the initial download. During analysis, Allelio makes **zero network requests** — your data stays put.
 
@@ -242,9 +242,9 @@ explanation passes through a lexical safety filter (`allelio/ai/safety.py`)
 before it reaches you. It flags three kinds of unhedged, second-person
 language and appends a visible Safety Note naming which kind it found:
 
-- **diagnostic** — "you have Lynch syndrome", "this confirms that you have…"
-- **prognostic** — "you will develop…", "guaranteed to…", "100% chance…"
-- **prescriptive** — "stop taking warfarin", "double your dose"
+- **diagnostic**: "you have Lynch syndrome", "this confirms that you have…"
+- **prognostic**: "you will develop…", "guaranteed to…", "100% chance…"
+- **prescriptive**: "stop taking warfarin", "double your dose"
 
 It is built to leave the language the prompt asks for alone: hedged statements
 ("you may have a higher risk"), population-level ones ("carriers have…"), and
@@ -535,7 +535,7 @@ If you use Allelio in your own work, see [CITATION.cff](CITATION.cff) for how to
 
 **"Model not found"** — You need to download the AI model first: `ollama pull llama3.1:8b`
 
-**A release shows as "unknown" or "(from file date)" in `allelio info`** — "unknown" means the database was built before Allelio recorded release dates; "(from file date)" means the reference file was already on disk when the database was built, so the date is the file's own timestamp rather than the one the server reported. Either way, `allelio update` re-downloads the sources and records the real release dates and checksums.
+**A release shows as "unknown" or "(from file date)" in `allelio info`**: "unknown" means the database was built before Allelio recorded release dates; "(from file date)" means the reference file was already on disk when the database was built, so the date is the file's own timestamp rather than the one the server reported. Either way, `allelio update` re-downloads the sources and records the real release dates and checksums.
 
 **Analysis seems slow** — the lookups are instant; the AI explanations are what take the time, and how long they take depends entirely on your model and hardware. On an Apple Silicon Mac with `llama3.1:8b`, expect roughly half a minute per variant, so a default run (top 20) is on the order of ten minutes. `--no-ai` skips the explanations and returns findings in a few seconds, and the report is still complete, just without the plain-English write-ups.
 

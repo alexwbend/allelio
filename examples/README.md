@@ -59,15 +59,15 @@ why. In short, the default run reports 17 sites and sets the rest aside:
 
 Set aside or hidden, and counted in the output rather than silently dropped:
 
-- **`rs1800497`, `rs6311`** — genotypes carry no copy of the annotated
+- **`rs1800497`, `rs6311`**: genotypes carry no copy of the annotated
   allele. A database entry for an allele you do not have is not a finding;
   the CLI and report say "2 annotated positions where you carry only the
   reference allele were set aside".
-- **`rs429358` APOE ε4, `rs1799945` HFE H63D** — one copy each, but the
+- **`rs429358` APOE ε4, `rs1799945` HFE H63D**: one copy each, but the
   classification is "conflicting" and the variants are common, so the
   frequency adjustment pushes them past the benign cutoff. `--include-benign`
   shows them.
-- **`rs762551`, `rs1042714`** — benign / likely benign.
+- **`rs762551`, `rs1042714`**: benign / likely benign.
 - **two no-calls** (`--`), **two made-up rsIDs** in no database (most positions
   on a real chip are like this), and **one 23andMe internal `i`-ID row**,
   which is counted and disclosed but not looked up (see README: known gaps).

@@ -21,7 +21,7 @@ from allelio.database.store import AllelioDB  # noqa: E402
 def main() -> int:
     db = AllelioDB()
     if not db.is_initialized():
-        print("Database not initialised — run `allelio setup` first.")
+        print("Database not initialised, run `allelio setup` first.")
         return 2
     print(f"Reference data: {db.describe_sources()}\n")
     rows = compare(db, load_expected())

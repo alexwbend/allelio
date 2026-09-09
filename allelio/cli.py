@@ -584,7 +584,7 @@ def info(file: Optional[str]):
 
             # One row per reference source: which release, and the checksum of
             # the exact file it was built from. "unknown" means the database
-            # predates provenance recording — rerun `allelio update` to fix.
+            # predates provenance recording, rerun `allelio update` to fix.
             for info in provenance_of(db).values():
                 release = info.get("release")
                 if release == "unavailable":
@@ -596,7 +596,7 @@ def info(file: Optional[str]):
                     if info.get("sha256"):
                         value += f" [dim]sha256 {info['sha256'][:12]}…[/dim]"
                 else:
-                    value = "[dim]Unknown — run allelio update[/dim]"
+                    value = "[dim]Unknown: run allelio update[/dim]"
                 info_table.add_row(f"{info['label']} Release", value)
 
             # Freshness: green when recent, yellow with a nudge when stale.
@@ -625,12 +625,12 @@ def info(file: Optional[str]):
                 if clingen_count > 0:
                     info_table.add_row("ClinGen Curations", f"{clingen_count:,}")
                 else:
-                    info_table.add_row("ClinGen Curations", "[dim]Not available — run allelio update[/dim]")
+                    info_table.add_row("ClinGen Curations", "[dim]Not available: run allelio update[/dim]")
                 clinpgx_count = stats.get('clinpgx_entries', 0)
                 if clinpgx_count > 0:
                     info_table.add_row("ClinPGx Annotations", f"{clinpgx_count:,}")
                 else:
-                    info_table.add_row("ClinPGx Annotations", "[dim]Not available — run allelio update[/dim]")
+                    info_table.add_row("ClinPGx Annotations", "[dim]Not available: run allelio update[/dim]")
             except Exception:
                 pass
         else:

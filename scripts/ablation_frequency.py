@@ -56,7 +56,7 @@ def render(rows) -> str:
     out = ["| rsID | Gene | ClinVar classification | gnomAD AF | Rank (no adjustment) | Rank (adjusted) | Position: no adj. → adj. | Shown by default |",
            "|---|---|---|---:|---:|---:|---|---|"]
     for r in rows:
-        af = "—" if r["af"] is None else f"{r['af']:.3g}"
+        af = "-" if r["af"] is None else f"{r['af']:.3g}"
         cls = r["classification"]
         if len(cls) > 40:
             cls = cls[:37] + "…"
@@ -72,7 +72,7 @@ def main() -> int:
     if args.real:
         db = AllelioDB()
         if not db.is_initialized():
-            print("Database not initialised — run `allelio setup` first.")
+            print("Database not initialised, run `allelio setup` first.")
             return 2
         print(f"Database: {db.describe_sources()}\n")
     else:

@@ -47,7 +47,7 @@ class ZygosityCall:
         allele: The annotated allele that was counted, as written in the
             reference source (e.g. ``"A"``), or None.
         strand_flipped: True if the genotype only matched after complementing
-            it — worth showing, since it is an inference, not a read.
+            it, worth showing, since it is an inference, not a read.
         note: Short human-readable reason when the call is ``UNKNOWN``.
     """
 

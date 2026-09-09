@@ -1532,7 +1532,7 @@
                     </div>
                     <div class="result-genotype" title="${esc(result.zygosity_label || '')}">${esc(result.genotype)}${result.zygosity_label ? `<div class="result-zygosity">${esc(result.zygosity_label)}</div>` : ''}</div>
                 </div>
-                ${result.inheritance ? `<div class="result-inheritance">Inheritance (ClinGen): ${esc(result.inheritance)}${result.inheritance_note ? ' — ' + esc(result.inheritance_note) : ''}</div>` : ''}
+                ${result.inheritance ? `<div class="result-inheritance">Inheritance (ClinGen): ${esc(result.inheritance)}${result.inheritance_note ? ', ' + esc(result.inheritance_note) : ''}</div>` : ''}
                 ${(result.pgx || []).map(p => `<div class="result-pgx"><strong>${esc(p.drugs || '')}</strong> <span class="pgx-level">level ${esc(p.level || '?')}</span>${p.phenotype_category ? ' · ' + esc(p.phenotype_category) : ''}<br>${esc(p.annotation_text || '')}${p.strand_flipped ? ' (genotype read on the opposite strand)' : ''}${p.url ? ` <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" class="source-link">ClinPGx</a>` : ''}</div>`).join('')}
                 ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                 <div class="result-body">

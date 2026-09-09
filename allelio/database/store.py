@@ -60,7 +60,7 @@ class AllelioDB:
         if self._columns("clinvar") and not self.clinvar_is_allele_aware():
             self.cursor.execute("DROP TABLE clinvar")
 
-        # Create ClinVar table — one row per (rsID, ref, alt). ClinVar carries
+        # Create ClinVar table, one row per (rsID, ref, alt). ClinVar carries
         # several rows for one rsID when different alternate alleles at the
         # same site have different classifications (rs334: T>A is pathogenic
         # sickle-cell, T>G is likely benign), so the allele is part of the key.
@@ -376,7 +376,7 @@ class AllelioDB:
         """
         result = {"clinvar": [], "gwas": [], "gnomad": None}
 
-        # Query ClinVar — every allele row for the rsID, in a stable order
+        # Query ClinVar, every allele row for the rsID, in a stable order
         order = " ORDER BY ref_allele, alt_allele" if self.clinvar_is_allele_aware() else ""
         self.cursor.execute(f"SELECT * FROM clinvar WHERE rsid = ?{order}", (rsid,))
         result["clinvar"] = [dict(row) for row in self.cursor.fetchall()]
@@ -424,7 +424,7 @@ class AllelioDB:
             chunk = rsids[i:i + chunk_size]
             placeholders = ",".join("?" * len(chunk))
 
-            # Query ClinVar — one row per annotated allele
+            # Query ClinVar, one row per annotated allele
             query = f"SELECT * FROM clinvar WHERE rsid IN ({placeholders}){clinvar_order}"
             self.cursor.execute(query, chunk)
             for row in self.cursor.fetchall():
