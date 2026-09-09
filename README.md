@@ -275,6 +275,50 @@ disk), so a refresh moves the release dates forward.
 
 ---
 
+## Which allele you carry: zygosity
+
+A database entry describes one allele at one position. Your file says which
+two alleles you have there. Allelio matches the two before it reports anything,
+because the same ClinVar row means three different things depending on the
+match:
+
+- **no copies** of the annotated allele (homozygous reference): the entry does
+  not apply to you. It is **not a finding** and is not listed. The report and
+  the CLI say how many such positions were set aside, so the omission is
+  visible rather than silent.
+- **one copy** (heterozygous): for a condition inherited recessively this is
+  carrier status; for a dominant one it is the affected genotype.
+- **two copies** (homozygous alternate), or one copy on the X chromosome in a
+  male (hemizygous): the affected genotype for a recessive condition.
+
+Every finding shows its zygosity next to the genotype, e.g.
+`heterozygous (1 copy of the A allele)`, and the AI prompt carries the same
+phrase so the explanation can say carrier when it means carrier. ClinVar
+alleles are read from its VCF-style columns and GWAS Catalog risk alleles from
+the "strongest SNP-risk allele" field. Both are on the forward strand of the
+reference build, as consumer files are; if a genotype only matches after
+complementing it, and the site is not an A/T or C/G one where a flip cannot be
+detected, Allelio uses the complement and marks the call "read on the opposite
+strand". 23andMe's `I`/`D` indel notation is matched by allele length.
+
+Two things follow from this that earlier versions got wrong. ClinVar can
+carry several rows for one rsID, one per alternate allele, with different
+classifications (at `rs334`, T>A is sickle-cell disease and T>G is likely
+benign); Allelio now keeps every row and reports the one for the allele you
+actually carry. And a pathogenic entry at a position where you carry only the
+reference allele used to be reported as a finding; it no longer is.
+
+When the source does not name an allele (ClinVar writes `na` for some large or
+complex variants; some GWAS studies report `?`), or your genotype matches it on
+neither strand, the finding is still listed but marked **zygosity unknown**,
+and the report counts those too.
+
+**Upgrading from 0.2.x:** the ClinVar table changed shape to hold one row per
+allele. Run `allelio setup` once (it re-indexes the files already on disk, no
+re-download) and `allelio info` will show the database as initialized again.
+
+---
+
 ## How variants are ranked
 
 Allelio sorts findings by a `significance_rank` (lower = shown first). This is
