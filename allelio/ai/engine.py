@@ -13,7 +13,7 @@ import ipaddress
 import os
 import re
 import socket
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -59,6 +59,12 @@ MODEL_ENV = "ALLELIO_MODEL"
 # Points at an OpenAI-compatible server on this machine, used instead of
 # Ollama — "http://127.0.0.1:1234/v1" for LM Studio, ":8080/v1" for llama.cpp.
 OPENAI_BASE_ENV = "ALLELIO_OPENAI_BASE"
+# Reasoning models (DeepSeek-R1 and its distills, QwQ, Qwen3 in thinking mode,
+# gpt-oss) think before they answer and need more room to do it in than a
+# non-reasoning model ever would. Unset by default, so a non-reasoning setup
+# never changes behavior.
+MAX_TOKENS_ENV = "ALLELIO_MAX_TOKENS"
+REQUEST_TIMEOUT_ENV = "ALLELIO_REQUEST_TIMEOUT"
 
 OLLAMA = "Ollama"
 OPENAI_COMPATIBLE = "OpenAI-compatible"
@@ -263,6 +269,85 @@ def _tagged(name: str) -> str:
     """Ollama reads a bare model name as ":latest"; spell that out before comparing."""
     return name if ":" in name else f"{name}:latest"
 
+
+# Paired tags only: <think>...</think> and <thinking>...</thinking>, matched
+# with a backreference so a <think> is never closed by a </thinking> or the
+# other way round. re.IGNORECASE also folds the backreference's case.
+_THINK_BLOCK = re.compile(r"<(think|thinking)>.*?</\1>", re.IGNORECASE | re.DOTALL)
+_THINK_OPEN = re.compile(r"<(?:think|thinking)>", re.IGNORECASE)
+
+
+def _strip_reasoning(content: str) -> Tuple[str, Optional[str]]:
+    """Remove inline <think>/<thinking> blocks from a chat message's content.
+
+    This is the common convention for local reasoning-model GGUFs on
+    llama.cpp, LM Studio and Ollama: the model's private chain-of-thought is
+    delivered inline, ahead of the answer, wrapped in one of these tags —
+    exactly where unhedged "this means you have X" language tends to show up,
+    since a model hedges in its final answer but thinks freely before it. A
+    tag left open with no matching close means the model ran out of tokens
+    mid-thought: there is no way to tell a genuine answer from unfinished
+    reasoning at that point, so the whole remainder is treated as reasoning
+    and the answer comes back empty rather than leaking any of it.
+    """
+    reasoning_parts = []
+
+    def _capture(match):
+        reasoning_parts.append(match.group(0))
+        return ""
+
+    content = _THINK_BLOCK.sub(_capture, content)
+    if _THINK_OPEN.search(content):
+        reasoning_parts.append(content)
+        content = ""
+    return content, ("\n".join(reasoning_parts) if reasoning_parts else None)
+
+
+def _field(message: Any, name: str) -> Optional[str]:
+    """Read an optional string field off a chat message, dict or model alike."""
+    value = message.get(name) if isinstance(message, dict) else getattr(message, name, None)
+    return value or None
+
+
+def _split_answer_and_reasoning(message: Any) -> Tuple[str, Optional[str]]:
+    """Separate a chat response's message into (answer, reasoning).
+
+    Reasoning arrives inline in `content`, wrapped in <think>/<thinking> tags
+    (see `_strip_reasoning`), or in a separate `reasoning_content` field
+    (DeepSeek's API convention) or `reasoning` (used by some other servers).
+    Only ever the stripped `content` is the answer — it is what the safety
+    gate scans and what becomes the explanation. `reasoning` is returned for
+    callers that want to know a trace was there; nothing here shows it to a
+    user.
+    """
+    content, inline_reasoning = _strip_reasoning(_field(message, "content") or "")
+    field_reasoning = _field(message, "reasoning_content") or _field(message, "reasoning")
+    bits = [r for r in (field_reasoning, inline_reasoning) if r]
+    return content, ("\n".join(bits) if bits else None)
+
+
+def _positive_int(value: Optional[str]) -> Optional[int]:
+    """Parse an env var as a positive int, or None if unset/invalid."""
+    if not value:
+        return None
+    try:
+        parsed = int(value)
+    except ValueError:
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _positive_float(value: Optional[str], default: float) -> float:
+    """Parse an env var as a positive float, or `default` if unset/invalid."""
+    if not value:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
 # Sixty seconds is not enough for the default 8B model on a warm machine
 # once a few explanations run at once; every other one came back as a
 # timeout fallback.
@@ -314,17 +399,32 @@ class _OpenAICompatClient:
             "aliases": [a for m in served for a in _aliases_of(m)],
         }
 
-    async def chat(self, model, messages, stream=False, **kwargs) -> Dict[str, Any]:
+    async def chat(
+        self,
+        model,
+        messages,
+        stream=False,
+        max_tokens=None,
+        timeout=REQUEST_TIMEOUT,
+        **kwargs,
+    ) -> Dict[str, Any]:
         async with httpx.AsyncClient(
-            timeout=REQUEST_TIMEOUT, follow_redirects=False, trust_env=TRUST_ENV
+            timeout=timeout, follow_redirects=False, trust_env=TRUST_ENV
         ) as client:
+            payload = {"model": model, "messages": messages, "stream": False}
+            if max_tokens:
+                payload["max_tokens"] = max_tokens
             response = await client.post(
                 f"{self.base_url}/chat/completions",
-                json={"model": model, "messages": messages, "stream": False},
+                json=payload,
             )
             _raise_for_status(response)
-            content = response.json()["choices"][0]["message"]["content"]
-        return {"message": {"content": content}}
+            # The whole message, not just `content`: a reasoning model may
+            # carry its chain-of-thought in a sibling field (`reasoning_content`
+            # or `reasoning`), and that has to survive the trip so it can be
+            # kept out of the answer downstream rather than never being seen.
+            message = response.json()["choices"][0]["message"]
+        return {"message": message}
 
 
 class AIEngine:
@@ -348,6 +448,13 @@ class AIEngine:
         if named:
             _refuse_cloud(named)
         self.model = named or DEFAULT_MODEL
+        # Reasoning models need more output budget and more wall-clock than a
+        # non-reasoning model ever would; unset by default, so a plain setup
+        # sees no change at all.
+        self.max_tokens = _positive_int(os.environ.get(MAX_TOKENS_ENV))
+        self.request_timeout = _positive_float(
+            os.environ.get(REQUEST_TIMEOUT_ENV), REQUEST_TIMEOUT
+        )
         # A server with a single model loaded calls it whatever it likes, and
         # guessing "llama3.1:8b" would be wrong every time. An unnamed model is
         # filled in from the server on connect; a named one is a choice, and stays.
@@ -402,6 +509,10 @@ class AIEngine:
         self.served_models: List[str] = []
         # Matched against, but never shown: see _aliases_of.
         self.served_aliases: List[str] = []
+        # Set by explain() when a reasoning model's response carried a
+        # chain-of-thought that was stripped before the safety gate saw it.
+        # A count, never the content — see _split_answer_and_reasoning.
+        self.last_reasoning_chars: Optional[int] = None
     
     async def check_connection(self) -> bool:
         """
@@ -564,6 +675,22 @@ class AIEngine:
         """
         return f"{self.model} ({self.provider} at {self.host})"
 
+    def _chat_extra_kwargs(self) -> Dict[str, Any]:
+        """Provider-specific knobs a reasoning model benefits from.
+
+        Ollama takes an output-length cap through `options.num_predict`; the
+        OpenAI-compatible client takes `max_tokens` and its own request
+        timeout, since it opens the httpx client itself rather than sharing
+        the one `asyncio.wait_for` wraps. Empty unless ALLELIO_MAX_TOKENS or
+        ALLELIO_REQUEST_TIMEOUT is set, so a non-reasoning setup is unaffected.
+        """
+        if self.provider == OPENAI_COMPATIBLE:
+            kwargs: Dict[str, Any] = {"timeout": self.request_timeout}
+            if self.max_tokens:
+                kwargs["max_tokens"] = self.max_tokens
+            return kwargs
+        return {"options": {"num_predict": self.max_tokens}} if self.max_tokens else {}
+
     async def explain(self, result) -> Explanation:
         """The same call, as a record of what came back and who wrote it.
 
@@ -582,7 +709,7 @@ class AIEngine:
             # card entirely — no text, no row, no reason.
             user_prompt = build_variant_prompt(result)
 
-            # Call Ollama chat API
+            # Call the model
             response = await asyncio.wait_for(
                 self.client.chat(
                     model=self.model,
@@ -596,22 +723,45 @@ class AIEngine:
                             "content": user_prompt
                         }
                     ],
-                    stream=False
+                    stream=False,
+                    **self._chat_extra_kwargs(),
                 ),
-                timeout=REQUEST_TIMEOUT
+                timeout=self.request_timeout
             )
-            
-            explanation = response['message']['content']
-            
+
+            # Response -> strip reasoning -> safety gate -> render. This exact
+            # order is what the paper's safety-architecture claim rests on: a
+            # reasoning model's private chain-of-thought is where unhedged
+            # diagnostic language tends to appear, and it must never reach
+            # check_safety or the page — only the stripped answer does.
+            answer, reasoning = _split_answer_and_reasoning(response['message'])
+            # Char count only, never the content itself — enough for a
+            # developer to confirm the layer fired without printing anyone's
+            # genome-derived explanation anywhere.
+            self.last_reasoning_chars = len(reasoning) if reasoning else None
+
+            if not answer.strip():
+                # The model spent its whole budget thinking (or was cut off
+                # mid-thought) and left nothing to show. A blank explanation
+                # reads as a bug; say what actually happened.
+                self.last_error = (
+                    "model returned only reasoning — increase max output tokens"
+                )
+                return Explanation(
+                    self._fallback_explanation(result, reason=self.last_error),
+                    None,
+                    self.last_error,
+                )
+
             # Run safety checks
-            explanation, safety_warnings = check_safety(explanation)
-            
+            explanation, safety_warnings = check_safety(answer)
+
             # Get variant-specific warnings
             variant_warnings = get_variant_warnings(result)
-            
+
             # Wrap with disclaimers
             final_explanation = wrap_with_disclaimer(explanation, variant_warnings)
-            
+
             # A later failure must not print the reason a call that has since
             # succeeded gave.
             self.last_error = None
@@ -823,21 +973,30 @@ class AIEngine:
                             "content": summary_prompt
                         }
                     ],
-                    stream=False
+                    stream=False,
+                    **self._chat_extra_kwargs(),
                 ),
-                timeout=REQUEST_TIMEOUT
+                timeout=self.request_timeout
             )
-            
-            summary = response['message']['content']
-            
+
+            # Same invariant as explain(): strip reasoning before anything
+            # downstream sees it, and never scan or render the trace itself.
+            answer, _reasoning = _split_answer_and_reasoning(response['message'])
+
+            if not answer.strip():
+                return (
+                    "Summary generation returned only reasoning — "
+                    "increase max output tokens and try again."
+                )
+
             # Apply safety checks to summary
-            summary, _ = check_safety(summary)
-            
+            summary, _ = check_safety(answer)
+
             # Wrap with standard disclaimer
             final_summary = wrap_with_disclaimer(summary, [])
-            
+
             return final_summary
-            
+
         except Exception:
             return "Summary generation failed. Please review individual variant explanations."
     
