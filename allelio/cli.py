@@ -621,6 +621,11 @@ def info(file: Optional[str]):
                     info_table.add_row("gnomAD Frequencies", f"{gnomad_count:,}")
                 else:
                     info_table.add_row("gnomAD Frequencies", "[dim]Not available[/dim]")
+                clingen_count = stats.get('clingen_entries', 0)
+                if clingen_count > 0:
+                    info_table.add_row("ClinGen Curations", f"{clingen_count:,}")
+                else:
+                    info_table.add_row("ClinGen Curations", "[dim]Not available — run allelio update[/dim]")
             except Exception:
                 pass
         else:

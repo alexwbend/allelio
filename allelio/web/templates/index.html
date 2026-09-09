@@ -612,6 +612,12 @@
             color: #C4B5FD;
         }
 
+        .result-inheritance {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            padding: 0.25rem 0 0.5rem;
+        }
+
         .result-zygosity {
             font-family: inherit;
             font-size: 0.75rem;
@@ -1372,7 +1378,7 @@
 
 
             // Create Category Tabs
-            const categories = ['all', 'health_conditions', 'carrier_status', 'risk_factors', 'pharmacogenomics', 'traits', 'unknown'];
+            const categories = ['all', 'health_conditions', 'carrier_status', 'risk_factors', 'pharmacogenomics', 'traits', 'benign', 'unknown'];
             const categoryLabels = {
                 'all': 'All',
                 'health_conditions': 'Health Conditions',
@@ -1380,6 +1386,7 @@
                 'risk_factors': 'Risk Factors',
                 'pharmacogenomics': 'Pharmacogenomics',
                 'traits': 'Traits',
+                'benign': 'Benign',
                 'unknown': 'Uncategorized'
             };
 
@@ -1518,6 +1525,7 @@
                     </div>
                     <div class="result-genotype" title="${esc(result.zygosity_label || '')}">${esc(result.genotype)}${result.zygosity_label ? `<div class="result-zygosity">${esc(result.zygosity_label)}</div>` : ''}</div>
                 </div>
+                ${result.inheritance ? `<div class="result-inheritance">Inheritance (ClinGen): ${esc(result.inheritance)}${result.inheritance_note ? ' — ' + esc(result.inheritance_note) : ''}</div>` : ''}
                 ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                 <div class="result-body">
                     <div class="result-explanation">${esc(result.explanation) || 'No explanation available.'}</div>

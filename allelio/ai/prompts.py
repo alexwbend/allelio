@@ -17,6 +17,7 @@ VARIANT_PROMPT_TEMPLATE = """Please explain the following genetic variant findin
 **Variant:** {rsid}
 **User's Genotype:** {genotype}
 **Zygosity:** {zygosity}
+**Inheritance (ClinGen gene-disease validity):** {inheritance}
 **Gene:** {gene}
 **Chromosome:** {chromosome}, Position: {position}
 
@@ -31,7 +32,7 @@ VARIANT_PROMPT_TEMPLATE = """Please explain the following genetic variant findin
 
 Please provide:
 1. A plain-English explanation of what this variant means
-2. What the user's specific genotype ({genotype}, {zygosity}) implies — for a condition inherited recessively, one copy usually means carrier status rather than being affected; two copies (or one on X in a male) is the affected genotype; if the zygosity is unknown, say so and do not assume either
+2. What the user's specific genotype ({genotype}, {zygosity}) implies given the inheritance ({inheritance}) — for an autosomal recessive condition, one copy means carrier status rather than being affected and two copies is the affected genotype; for an autosomal dominant one, one copy is the relevant genotype; if the inheritance is mixed or not curated, or the zygosity is unknown, say so and do not assume either
 3. How the population frequency affects interpretation (e.g., common variants are less likely to cause rare diseases)
 4. Any relevant lifestyle, dietary, or environmental context from research
 5. Important caveats and limitations"""
@@ -46,6 +47,13 @@ def _zygosity_of(result) -> str:
         except Exception:
             pass
     return "unknown"
+
+
+def _inheritance_of(result) -> str:
+    """Inheritance phrase plus ClinGen note; ``not curated`` if absent."""
+    inheritance = getattr(result, "inheritance", None) or "not curated"
+    note = getattr(result, "inheritance_note", None)
+    return f"{inheritance} ({note})" if note else str(inheritance)
 
 
 def format_clinvar_summary(clinvar_entries: List[dict]) -> str:
@@ -176,6 +184,7 @@ def build_variant_prompt(result) -> str:
     rsid = result.rsid or "Unknown"
     genotype = result.genotype or "Unknown"
     zygosity = _zygosity_of(result)
+    inheritance = _inheritance_of(result)
     chromosome = result.chromosome or "Unknown"
     position = result.position or "Unknown"
 
@@ -216,6 +225,7 @@ def build_variant_prompt(result) -> str:
         rsid=rsid,
         genotype=genotype,
         zygosity=zygosity,
+        inheritance=inheritance,
         gene=gene,
         chromosome=chromosome,
         position=position,

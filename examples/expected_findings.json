@@ -1,9 +1,9 @@
 {
   "_about": "What Allelio must report for examples/example_23andme.txt. Checked by tests/test_example_recall.py against a small database built from the real ClinVar/GWAS/gnomAD rows for these rsIDs (tests/fixtures/example_*), and by scripts/check_example.py against a full local database. 'reported' is whether the site appears in the default results (no --include-benign); 'category' is checked only where ClinVar drives it (GWAS-only categories depend on which association loads first); zygosity fields are checked wherever present.",
   "stats": {
-    "parsed_variants": 23,
+    "parsed_variants": 24,
     "i_id_rows": 1,
-    "annotated_sites": 20,
+    "annotated_sites": 21,
     "reference_genotype_sites": 2,
     "zygosity_unknown_sites": 0
   },
@@ -14,7 +14,17 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "T",
-      "why": "BRCA1 pathogenic (expert panel), one copy"
+      "why": "BRCA1 pathogenic (expert panel), one copy; ClinGen curates BRCA1 for a dominant (cancer predisposition) and a recessive (Fanconi anemia) condition, so one copy is not demoted to carrier status",
+      "inheritance": "mixed (dominant and recessive conditions)"
+    },
+    "rs113993960": {
+      "reported": true,
+      "category": "Health Conditions",
+      "zygosity": "homozygous alternate",
+      "alt_copies": 2,
+      "matched_allele": "A",
+      "inheritance": "autosomal recessive",
+      "why": "CFTR F508del (ATCT>A), written DD in 23andMe's I/D notation and matched by allele length: two copies, the affected genotype for cystic fibrosis (ClinGen: autosomal recessive, Definitive)"
     },
     "rs1799963": {
       "reported": true,
@@ -30,7 +40,8 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "C",
-      "why": "GBA1 N370S, one copy (carrier for Gaucher, recessive)"
+      "why": "GBA1 N370S, one copy. ClinGen curates GBA1 for Gaucher disease (recessive) and Parkinson disease (dominant), so gene-level inheritance is mixed and the site stays a health condition with that note",
+      "inheritance": "mixed (dominant and recessive conditions)"
     },
     "rs334": {
       "reported": true,
@@ -38,15 +49,17 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "A",
-      "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported"
+      "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported",
+      "inheritance": "mixed (dominant and recessive conditions)"
     },
     "rs1800562": {
       "reported": true,
-      "category": "Health Conditions",
-      "zygosity": "homozygous alternate",
-      "alt_copies": 2,
+      "category": "Carrier Status",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
       "matched_allele": "A",
-      "why": "HFE C282Y, two copies (affected genotype for recessive hemochromatosis)"
+      "inheritance": "autosomal recessive",
+      "why": "HFE C282Y, one copy. ClinGen curates HFE only for a recessive condition (hemochromatosis type 1, Definitive), so one copy is carrier status, ordered a tier below the affected genotype"
     },
     "rs3918290": {
       "reported": true,
@@ -94,7 +107,8 @@
       "zygosity": "homozygous alternate",
       "alt_copies": 2,
       "matched_allele": "T",
-      "why": "MC1R R160W, conflicting classification, two copies"
+      "why": "MC1R R160W, conflicting classification, two copies; ClinVar lists the gene as MC1R;TUBB3 and only the first gene is consulted for inheritance (TUBB3's dominant curation is about a different condition)",
+      "inheritance": "not curated"
     },
     "rs9939609": {
       "reported": true,

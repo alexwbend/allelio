@@ -88,6 +88,36 @@ def gwas_subset(src: Path, rsids, dest: Path) -> int:
     return n
 
 
+def clingen_subset(src: Path, genes, dest: Path) -> int:
+    """Keep the preamble and header, and the rows for the example's genes."""
+    n = 0
+    with open(src, "r", encoding="utf-8", errors="ignore") as f, open(dest, "w", encoding="utf-8") as out:
+        for line in f:
+            if line.startswith('"GENE SYMBOL"') or line.startswith('"+++') or not line.startswith('"'):
+                out.write(line)
+                continue
+            if line.startswith('"CLINGEN') or line.startswith('"FILE CREATED') or line.startswith('"WEBPAGE'):
+                out.write(line)
+                continue
+            gene = line.split(",", 1)[0].strip('"')
+            if gene in genes:
+                out.write(line)
+                n += 1
+    return n
+
+
+def example_genes(clinvar_subset_path: Path):
+    """Gene symbols named in the ClinVar excerpt (column GeneSymbol)."""
+    genes = set()
+    with open(clinvar_subset_path, encoding="utf-8") as f:
+        next(f)
+        for line in f:
+            for g in line.split("\t")[4].split(";"):
+                if g:
+                    genes.add(g)
+    return genes
+
+
 def gnomad_subset(src: Path, rsids, dest: Path) -> int:
     wanted = set(rsids)
     n = 0
@@ -115,6 +145,13 @@ def main():
     print(f"GWAS rows: {n}")
     n = gnomad_subset(data / "gnomad_freq.tsv.gz", rsids, FIXTURES / "example_gnomad.tsv.gz")
     print(f"gnomAD rows: {n}")
+    clingen_src = data / "clingen_gene_validity.csv"
+    if clingen_src.exists():
+        genes = example_genes(FIXTURES / "example_clinvar.tsv")
+        n = clingen_subset(clingen_src, genes, FIXTURES / "example_clingen.csv")
+        print(f"ClinGen rows: {n} (for {len(genes)} genes)")
+    else:
+        print("ClinGen file not found; run `allelio update` first to fetch it")
 
 
 if __name__ == "__main__":

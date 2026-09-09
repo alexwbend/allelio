@@ -14,6 +14,7 @@ from .downloader import (
 from .clinvar import parse_clinvar
 from .gwas import parse_gwas
 from .gnomad import parse_gnomad
+from .clingen import parse_clingen
 
 __all__ = [
     "AllelioDB",
@@ -28,4 +29,5 @@ __all__ = [
     "parse_clinvar",
     "parse_gwas",
     "parse_gnomad",
+    "parse_clingen",
 ]
