@@ -316,22 +316,9 @@ allelio/
 
 ## Contributing
 
-Whether you're a bioinformatician, a developer, a designer, or just someone who wants to help — contributions are welcome.
+Whether you're a bioinformatician, a developer, a designer, or just someone who wants to help — contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up a development environment, run the tests, and submit a pull request. Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-**Ways to help:**
-- Report bugs or suggest features via [GitHub Issues](https://github.com/alexwbend/allelio/issues)
-- Submit pull requests
-- Improve documentation or write tutorials
-- Test on different platforms and file formats
-- Spread the word
-
-**To set up a development environment:**
-
-```bash
-git clone https://github.com/alexwbend/allelio.git
-cd allelio
-pip install -e ".[dev]"
-```
+If you use Allelio in your own work, see [CITATION.cff](CITATION.cff) for how to cite it.
 
 ---
 

@@ -1,0 +1,31 @@
+# This CITATION.cff file was generated for Allelio.
+# Visit https://citation-file-format.github.io/ for more info.
+cff-version: 1.2.0
+message: "If you use Allelio in your research or software, please cite it as below."
+type: software
+title: "Allelio"
+abstract: "Privacy-first, fully local genomic variant analysis with AI-powered plain-English explanations. Reads raw genotype data from 23andMe, AncestryDNA, or VCF, cross-references it against ClinVar, the GWAS Catalog, and gnomAD, and never sends genomic data off the user's machine."
+authors:
+  - family-names: "Bendella"
+    given-names: "Wassim Alex"
+    orcid: "https://orcid.org/0009-0000-8956-6761"
+version: 0.2.1
+date-released: "2026-09-09"
+license: MIT
+repository-code: "https://github.com/alexwbend/allelio"
+url: "https://github.com/alexwbend/allelio"
+keywords:
+  - genomics
+  - genetics
+  - bioinformatics
+  - privacy
+  - consumer genetics
+  - large language models
+  - ClinVar
+  - GWAS
+# Once PUB-7 (Zenodo archival release) is done, add:
+#   identifiers:
+#     - type: doi
+#       value: 10.5281/zenodo.XXXXXXX
+#       description: "Archived release on Zenodo"
+# and, once the JOSS paper is accepted, a preferred-citation entry pointing at it.
