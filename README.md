@@ -1,5 +1,7 @@
 # Allelio
 
+[![Tests](https://github.com/alexwbend/allelio/actions/workflows/tests.yml/badge.svg)](https://github.com/alexwbend/allelio/actions/workflows/tests.yml)
+
 **Understand your DNA — privately, on your own computer.**
 
 Allelio is a free, open-source tool that analyzes your raw genetic data from services like 23andMe or AncestryDNA. It tells you what your genetic variants mean by cross-referencing them against trusted scientific databases — and it explains everything in plain English using AI.
@@ -49,7 +51,7 @@ We take this seriously, and you'll see reminders throughout the tool.
 
 ### What you'll need
 
-- **Python 3.10 or later** — [download here](https://www.python.org/downloads/) if you don't have it
+- **Python 3.9 or later** — [download here](https://www.python.org/downloads/) if you don't have it
 - **Your raw DNA data file** from 23andMe, AncestryDNA, or in VCF format
 - **Ollama** (optional but recommended) — this runs the AI that explains your results in plain English
   - [Download Ollama](https://ollama.com) and install it
@@ -87,6 +89,9 @@ allelio serve
 Then open your browser to **http://localhost:8080**. You'll see a clean interface where you can upload your DNA file, browse your variants, read AI explanations, and export a full report.
 
 ### Or use the command line
+
+Don't have a DNA file handy? [`examples/`](examples/) has a small synthetic
+one you can run right away — see [`examples/README.md`](examples/README.md).
 
 If you prefer the terminal:
 
