@@ -1,0 +1,12 @@
+Clinical Annotation ID	Genotype/Allele	Annotation Text	Allele Function
+900000001	CC	SYNTHETIC FIXTURE: patients with the rs9923231 CC genotype may require an increased dose of warfarin compared to CT or TT.	
+900000001	CT	SYNTHETIC FIXTURE: patients with the rs9923231 CT genotype may require a decreased dose of warfarin compared to CC, or an increased dose compared to TT.	
+900000001	TT	SYNTHETIC FIXTURE: patients with the rs9923231 TT genotype may require a decreased dose of warfarin compared to CC or CT.	
+900000002	CC	SYNTHETIC FIXTURE: patients with the rs4149056 CC genotype may have an increased risk of myopathy with rosuvastatin compared to TT.	
+900000002	CT	SYNTHETIC FIXTURE: patients with the rs4149056 CT genotype may have an increased risk of myopathy with rosuvastatin compared to TT.	
+900000002	TT	SYNTHETIC FIXTURE: patients with the rs4149056 TT genotype may have a decreased risk of myopathy with rosuvastatin compared to CC or CT.	
+900000003	CT	SYNTHETIC FIXTURE: level-3 note for simvastatin (should be hidden by default).	
+900000004	AA	SYNTHETIC FIXTURE: patients with the rs1042713 AA genotype may have decreased response to salmeterol compared to GG.	
+900000004	AG	SYNTHETIC FIXTURE: patients with the rs1042713 AG genotype may have decreased response to salmeterol compared to GG.	
+900000004	GG	SYNTHETIC FIXTURE: patients with the rs1042713 GG genotype may have increased response to salmeterol compared to AA or AG.	
+900000005	*1/*2	SYNTHETIC FIXTURE: star-allele row, must be skipped.	Decreased function

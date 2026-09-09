@@ -30,12 +30,17 @@ VARIANT_PROMPT_TEMPLATE = """Please explain the following genetic variant findin
 **GWAS Associations:**
 {gwas_summary}
 
+**Pharmacogenomics (ClinPGx clinical annotations for this exact genotype):**
+{pgx_summary}
+
 Please provide:
 1. A plain-English explanation of what this variant means
 2. What the user's specific genotype ({genotype}, {zygosity}) implies given the inheritance ({inheritance}) — for an autosomal recessive condition, one copy means carrier status rather than being affected and two copies is the affected genotype; for an autosomal dominant one, one copy is the relevant genotype; if the inheritance is mixed or not curated, or the zygosity is unknown, say so and do not assume either
 3. How the population frequency affects interpretation (e.g., common variants are less likely to cause rare diseases)
 4. Any relevant lifestyle, dietary, or environmental context from research
-5. Important caveats and limitations"""
+5. Important caveats and limitations
+
+If there are pharmacogenomic annotations, explain what they say about this genotype and the named drugs, quote the level of evidence, and make clear that any change to a medication or dose is a decision for the prescriber; never tell the user to start, stop, or adjust a medication."""
 
 
 def _zygosity_of(result) -> str:
@@ -54,6 +59,20 @@ def _inheritance_of(result) -> str:
     inheritance = getattr(result, "inheritance", None) or "not curated"
     note = getattr(result, "inheritance_note", None)
     return f"{inheritance} ({note})" if note else str(inheritance)
+
+
+def format_pgx_summary(entries) -> str:
+    """ClinPGx annotations for the prompt, best evidence first."""
+    if not entries:
+        return "No ClinPGx annotation for this genotype."
+    lines = []
+    for e in entries:
+        flip = " [genotype read on the opposite strand]" if getattr(e, "strand_flipped", False) else ""
+        lines.append(
+            f"- {e.drugs or 'unspecified drug'} (level {e.level or '?'}, {e.phenotype_category or 'unspecified'}): "
+            f"{e.annotation_text or ''}{flip}"
+        )
+    return "\n".join(lines)
 
 
 def format_clinvar_summary(clinvar_entries: List[dict]) -> str:
@@ -219,6 +238,7 @@ def build_variant_prompt(result) -> str:
     # Format gnomAD frequency data
     gnomad_entry = getattr(result, 'gnomad_entry', None)
     gnomad_summary = format_gnomad_summary(gnomad_entry)
+    pgx_summary = format_pgx_summary(getattr(result, "pgx_entries", None) or [])
 
     # Build the prompt using the template
     prompt = VARIANT_PROMPT_TEMPLATE.format(
@@ -230,6 +250,7 @@ def build_variant_prompt(result) -> str:
         chromosome=chromosome,
         position=position,
         gnomad_summary=gnomad_summary,
+        pgx_summary=pgx_summary,
         clinvar_summary=clinvar_summary,
         gwas_summary=gwas_summary,
     )

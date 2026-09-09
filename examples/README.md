@@ -37,7 +37,7 @@ Then open **http://localhost:8080** and upload `examples/example_23andme.txt`.
 
 [`expected_findings.json`](expected_findings.json) lists, for every line of
 the example, whether Allelio reports it, with which zygosity and category, and
-why. In short, the default run reports 15 sites and sets the rest aside:
+why. In short, the default run reports 17 sites and sets the rest aside:
 
 | Site | Genotype | What it shows |
 |---|---|---|
@@ -47,8 +47,10 @@ why. In short, the default run reports 15 sites and sets the rest aside:
 | `rs334` HBB sickle cell | TA | ClinVar has two alleles at this rsID (T>A pathogenic, T>G likely benign); the one you carry is reported |
 | `rs113993960` CFTR F508del | DD | a deletion in 23andMe's I/D notation, matched by allele length: **two copies**, the affected genotype for cystic fibrosis (ClinGen: autosomal recessive) |
 | `rs1800562` HFE C282Y | GA | pathogenic, one copy; ClinGen curates HFE only for a recessive condition, so this is **Carrier Status**, ordered a tier below affected genotypes |
-| `rs3918290` DPYD*2A | CT | ClinVar "drug response", one copy → Pharmacogenomics |
-| `rs1042713` ADRB2 | AG | drug response; a degenerate G/G row at the same rsID is ignored |
+| `rs3918290` DPYD*2A | CT | ClinVar "drug response", one copy → Pharmacogenomics (ClinPGx annotates DPYD by star allele, which arrays cannot call, so no ClinPGx note here) |
+| `rs9923231` VKORC1 | CT | ClinPGx level 1A warfarin-dosing annotation, with the text written for the CT genotype |
+| `rs4149056` SLCO1B1 | TC | ClinPGx level 1A statin-myopathy annotations; a level-3 note at the same site is below the default evidence cutoff |
+| `rs1042713` ADRB2 | AG | ClinVar drug response plus a ClinPGx level 2A salmeterol annotation; a degenerate G/G ClinVar row at the same rsID is ignored |
 | `rs12913832`, `rs4988235` | GG, GA | ClinVar "association" rows (eye colour, lactase persistence) |
 | `rs1805007`, `rs1805008` MC1R | CT, TT | conflicting classifications, still shown |
 | `rs9939609` FTO | AT | GWAS-only site, one copy of the risk allele |
@@ -73,7 +75,8 @@ Set aside or hidden, and counted in the output rather than silently dropped:
 ## Checking it
 
 The test suite builds a small database from the real ClinVar, GWAS Catalog,
-gnomAD and ClinGen rows for these rsIDs and genes (`tests/fixtures/example_*`, extracted with
+gnomAD and ClinGen rows for these rsIDs and genes, plus a synthetic
+ClinPGx-format fixture (the real bundle is CC BY-SA and is not redistributed) (`tests/fixtures/example_*`, extracted with
 `scripts/build_example_fixtures.py`) and checks every expectation above on
 every push (`tests/test_example_recall.py`). To check your own full database
 does the same:

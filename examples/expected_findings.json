@@ -1,9 +1,9 @@
 {
   "_about": "What Allelio must report for examples/example_23andme.txt. Checked by tests/test_example_recall.py against a small database built from the real ClinVar/GWAS/gnomAD rows for these rsIDs (tests/fixtures/example_*), and by scripts/check_example.py against a full local database. 'reported' is whether the site appears in the default results (no --include-benign); 'category' is checked only where ClinVar drives it (GWAS-only categories depend on which association loads first); zygosity fields are checked wherever present.",
   "stats": {
-    "parsed_variants": 24,
+    "parsed_variants": 26,
     "i_id_rows": 1,
-    "annotated_sites": 21,
+    "annotated_sites": 23,
     "reference_genotype_sites": 2,
     "zygosity_unknown_sites": 0
   },
@@ -75,7 +75,11 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "A",
-      "why": "ADRB2 salmeterol response; the degenerate G/G benign row at the same rsID must be ignored"
+      "why": "ADRB2 salmeterol response; the degenerate G/G benign row at the same rsID must be ignored; ClinPGx adds a level 2A salmeterol annotation for the AG genotype",
+      "pgx_level": "2A",
+      "pgx_drugs_any": [
+        "salmeterol"
+      ]
     },
     "rs12913832": {
       "reported": true,
@@ -118,6 +122,35 @@
       "matched_allele": "A",
       "allele_role": "risk",
       "why": "FTO, GWAS-only site, one copy of the risk allele A"
+    },
+    "rs9923231": {
+      "reported": true,
+      "category": "Pharmacogenomics",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "T",
+      "pgx_level": "1A",
+      "pgx_drugs_any": [
+        "warfarin"
+      ],
+      "why": "VKORC1 -1639G>A, one copy. ClinPGx level 1A annotation for warfarin dosing, shown with the annotation text written for the CT genotype"
+    },
+    "rs4149056": {
+      "reported": true,
+      "category": "Pharmacogenomics",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "C",
+      "pgx_level": "1A",
+      "pgx_drugs_any": [
+        "rosuvastatin",
+        "atorvastatin",
+        "pravastatin",
+        "fluvastatin",
+        "lovastatin",
+        "simvastatin"
+      ],
+      "why": "SLCO1B1 c.521T>C, one copy. ClinPGx level 1A annotations for statin-related myopathy; a level-3 simvastatin note at the same site is below the default evidence cutoff and is not shown"
     },
     "rs7412": {
       "reported": true,

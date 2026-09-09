@@ -311,6 +311,14 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 "zygosity_label": _zygosity_label(variant),
                 "inheritance": getattr(variant, "inheritance", None) if getattr(variant, "clinvar_entries", None) else None,
                 "inheritance_note": getattr(variant, "inheritance_note", None),
+                "pgx": [
+                    {
+                        "drugs": e.drugs, "level": e.level, "phenotype_category": e.phenotype_category,
+                        "annotation_text": e.annotation_text, "url": e.url,
+                        "strand_flipped": e.strand_flipped,
+                    }
+                    for e in (getattr(variant, "pgx_entries", None) or [])
+                ],
                 "category": variant.category if hasattr(variant, 'category') else "Unknown",
                 "significance_rank": i + 1,
                 "explanation": _text_of(explanations.get(variant.rsid)),
