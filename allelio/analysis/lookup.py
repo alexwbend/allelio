@@ -65,6 +65,44 @@ SIGNIFICANCE_RANKS = {
     "benign/likely benign": 10,
 }
 
+# --- Allele-frequency tiers used to adjust the rank ------------------------
+# ACMG/AMP (Richards et al. 2015, https://doi.org/10.1038/gim.2015.30) treats
+# population allele frequency as evidence against pathogenicity: BA1
+# (stand-alone) at roughly 5%, BS1 (strong) at roughly 1%, for a fully
+# penetrant dominant disorder. Those are the two cited cutoffs below. BA1/BS1
+# are categorical evidence codes, not numeric rank penalties, so the tier
+# boundaries are cited but the third, tighter tier and every penalty size
+# below are Allelio's own choices, not a re-derivation of ACMG/AMP.
+COMMON_AF_THRESHOLD = 0.05  # cf. ACMG/AMP BA1 (~5%), Richards et al. 2015
+MODERATELY_COMMON_AF_THRESHOLD = 0.01  # cf. ACMG/AMP BS1 (~1%), Richards et al. 2015
+UNCOMMON_AF_THRESHOLD = 0.001  # author choice, no ACMG/AMP precedent at this cutoff
+
+# Common variants are less likely to be truly pathogenic, so their rank is
+# pushed toward "less significant" — more at the common tier, less at the
+# uncommon one. ACMG/AMP's BA1/BS1 are evidence codes, not point values, so
+# none of these three sizes has an external citation: they are author
+# choices, sized only so a common variant is downgraded more than a
+# moderately common one, which is downgraded more than an uncommon one, and
+# so that no single downgrade crosses a full significance tier on its own
+# (see MAX_ADJUSTED_RANK).
+COMMON_AF_PENALTY = 3.0  # author choice, no external precedent
+MODERATELY_COMMON_AF_PENALTY = 1.5  # author choice, no external precedent
+UNCOMMON_AF_PENALTY = 0.5  # author choice, no external precedent
+
+# Keeps a frequency-adjusted rank below the "benign" tier boundary at 10, no
+# matter how common the variant is. Author choice, not an external constant.
+MAX_ADJUSTED_RANK = 9.9
+
+# ClinVar's review-status star system (0-4 stars; see
+# https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/) rates *review
+# quality*, not pathogenicity, so it should only ever nudge the rank within
+# its own significance tier, never move a variant into a different one.
+# Significance tiers in SIGNIFICANCE_RANKS are at least 1 apart, and stars
+# run 0-4, so 0.1 per star caps the maximum shift at 4 * 0.1 = 0.4 — safely
+# under 1. The weight itself is an author choice, sized to satisfy that
+# constraint; ClinVar's stars are the citation for the concept, not the value.
+REVIEW_STAR_WEIGHT = 0.1
+
 # High-impact genes requiring special attention
 HIGH_IMPACT_GENES = {
     "BRCA1", "BRCA2", "APOE", "TP53", "MLH1", "MSH2", "MSH6", "PMS2",
@@ -218,13 +256,13 @@ def _get_significance_rank(clinical_significance: Optional[str]) -> int:
 def _calculate_frequency_adjustment(
     base_rank: float,
     gnomad_entry: Optional[GnomADEntry],
-    genotype: Optional[str] = None,
 ) -> float:
     """Adjust significance rank based on gnomAD allele frequency.
 
     Common variants are less likely to be truly pathogenic, so we increase
     their rank (making them less significant). Rare variants keep their
-    original rank.
+    original rank. See the COMMON_AF_THRESHOLD/_PENALTY family above for
+    which parts of this are cited to ACMG/AMP and which are author choices.
 
     The adjustment is bounded so it never crosses major tier boundaries
     completely — a pathogenic variant with high AF will be downgraded but
@@ -233,7 +271,6 @@ def _calculate_frequency_adjustment(
     Args:
         base_rank: The original significance rank (lower = more significant)
         gnomad_entry: gnomAD frequency data, or None
-        genotype: User's genotype string (e.g., "AA", "CT")
 
     Returns:
         Adjusted rank as float (higher = less significant)
@@ -244,24 +281,17 @@ def _calculate_frequency_adjustment(
     af = gnomad_entry.allele_frequency
 
     # Determine adjustment based on frequency tiers
-    if af > 0.05:
-        # Common variant (>5%) — large downgrade
-        adjustment = 3.0
-    elif af > 0.01:
-        # Moderately common (1-5%) — moderate downgrade
-        adjustment = 1.5
-    elif af > 0.001:
-        # Uncommon (0.1-1%) — small downgrade
-        adjustment = 0.5
+    if af > COMMON_AF_THRESHOLD:
+        adjustment = COMMON_AF_PENALTY
+    elif af > MODERATELY_COMMON_AF_THRESHOLD:
+        adjustment = MODERATELY_COMMON_AF_PENALTY
+    elif af > UNCOMMON_AF_THRESHOLD:
+        adjustment = UNCOMMON_AF_PENALTY
     else:
-        # Rare (<0.1%) — no adjustment needed
+        # Rare — no adjustment needed
         return base_rank
 
-    # Cap adjusted rank so it doesn't exceed 9.9
-    # (keeps it below the "benign" tier boundary at 10)
-    adjusted = min(base_rank + adjustment, 9.9)
-
-    return adjusted
+    return min(base_rank + adjustment, MAX_ADJUSTED_RANK)
 
 
 def analyze_variants(
@@ -269,13 +299,19 @@ def analyze_variants(
     db: AllelioDB,
     include_benign: bool = False
 ) -> List[VariantResult]:
-    """Analyze variants against reference databases.
-    
+    """Analyze variants against reference databases and rank them for triage.
+
+    significance_rank is a prioritization heuristic for presentation order —
+    lower means "look at this one first" — built from ClinVar's categorical
+    significance, review-status quality, and gnomAD population frequency. It
+    is not a clinical or diagnostic score, has not been validated as one, and
+    must never be reported as one.
+
     Args:
         variants: List of Variant objects with rsid attribute
         db: AllelioDB database instance
         include_benign: Whether to include benign variants in results
-    
+
     Returns:
         List of VariantResult objects sorted by significance rank
     """
@@ -339,8 +375,8 @@ def analyze_variants(
         if clinvar_entry and clinvar_entry.clinical_significance:
             base_rank = _get_significance_rank(clinvar_entry.clinical_significance)
             # Weight by review stars: higher stars lower the rank (more significant)
-            # Max adjustment is 0.4 (4 stars * 0.1), so ranks never cross tiers
-            sig_rank = base_rank - (clinvar_entry.review_stars * 0.1)
+            # Max adjustment is 0.4 (4 stars * REVIEW_STAR_WEIGHT), so ranks never cross tiers
+            sig_rank = base_rank - (clinvar_entry.review_stars * REVIEW_STAR_WEIGHT)
         elif gwas_entries:
             # For GWAS-only variants, use a default rank
             sig_rank = float(SIGNIFICANCE_RANKS.get("association", 4))
@@ -365,7 +401,7 @@ def analyze_variants(
             )
 
         # Adjust significance rank based on population frequency
-        adjusted_rank = _calculate_frequency_adjustment(sig_rank, gnomad_entry, genotype)
+        adjusted_rank = _calculate_frequency_adjustment(sig_rank, gnomad_entry)
 
         # Skip benign variants unless requested
         if not include_benign and adjusted_rank >= 8:

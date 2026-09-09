@@ -1328,7 +1328,9 @@ def _analyze(monkeypatch, tmp_path, *extra, variants=None):
             pass
 
     monkeypatch.setattr(cli_module, "AllelioDB", lambda *a, **k: FakeDB())
-    monkeypatch.setattr(cli_module, "parse_genotype_file", lambda path: [_variant()])
+    monkeypatch.setattr(
+        cli_module, "parse_genotype_file_with_stats", lambda path: ([_variant()], None)
+    )
     found = variants if variants is not None else [_variant()]
     monkeypatch.setattr(cli_module, "analyze_variants", lambda v, **kwargs: found)
     return CliRunner().invoke(
@@ -2192,14 +2194,14 @@ def test_a_refused_address_arrives_before_the_genome_is_read(
 
     def parsed(path):
         ran.append("parse")
-        return [_variant()]
+        return [_variant()], None
 
     def analyzed(v, **kwargs):
         ran.append("analyze")
         return [_variant()]
 
     monkeypatch.setattr(cli_module, "AllelioDB", lambda *a, **k: FakeDB())
-    monkeypatch.setattr(cli_module, "parse_genotype_file", parsed)
+    monkeypatch.setattr(cli_module, "parse_genotype_file_with_stats", parsed)
     monkeypatch.setattr(cli_module, "analyze_variants", analyzed)
 
     from click.testing import CliRunner

@@ -11,16 +11,19 @@ Main API:
 - Variant: Dataclass for representing a parsed variant
 """
 
-from .base import Variant, parse_genotype_file, detect_format
-from .twentythree import parse_23andme
+from .base import Variant, parse_genotype_file, parse_genotype_file_with_stats, detect_format
+from .twentythree import parse_23andme, parse_23andme_with_stats, ParseStats
 from .ancestry import parse_ancestry
 from .vcf_parser import parse_vcf
 
 __all__ = [
     'Variant',
     'parse_genotype_file',
+    'parse_genotype_file_with_stats',
     'detect_format',
     'parse_23andme',
+    'parse_23andme_with_stats',
+    'ParseStats',
     'parse_ancestry',
     'parse_vcf',
 ]
