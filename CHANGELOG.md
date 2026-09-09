@@ -18,8 +18,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Staleness banner** — `allelio analyze` and `allelio info` warn when the local ClinVar/GWAS copy is older than 90 days, prompting `allelio update`.
 - **Tests** — new coverage for the GWAS URL, staleness logic, manifest resolution, checksum verification, and the array-site trimming.
 
+### Fixed
+
+- **The web interface was broken for anyone who installed the package.** `allelio/web/templates/index.html` wasn't declared as package data, so a wheel install shipped without it and every page load of `allelio serve` returned a 500. Invisible from a source checkout, which is why it survived this long. Found by the clean-install smoke test (PUB-4).
+- **`python3 -m allelio` now works.** The README offers it as the fallback when the console script isn't on PATH, but the package had no `__main__.py`, so the advice failed with "cannot be directly executed".
+
 ### Changed
 
+- **README install instructions match reality.** Allelio isn't on PyPI, so `pip install allelio` never worked; the install section now gives the tested `git+https://` and clone paths, adds the virtual-environment step that recent Pythons require, and states what `allelio setup` actually costs (about 540 MB downloaded, ~2 GB on disk, 15 to 30 minutes) instead of "~500 MB" and "a few minutes".
 - **GWAS Catalog download** moved off the retired EBI API v1 endpoint to the versioned FTP path (`releases/latest`), which is release-versioned and stable.
 - **gnomAD version pin** bumped v4.1 → v4.1.1. Provenance (source + version) is now stored from the manifest as database metadata (`gnomad_source`, `gnomad_version`) rather than hardcoded, keeping the frequency layer version-agnostic.
 

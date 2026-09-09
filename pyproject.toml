@@ -55,3 +55,11 @@ Issues = "https://github.com/alexwbend/allelio/issues"
 
 [tool.setuptools.packages.find]
 include = ["allelio*"]
+
+# The web UI's Jinja template is loaded from disk at request time
+# (allelio/web/app.py resolves it relative to __file__), so it has to travel
+# with the package. Without this, a wheel install builds fine and `allelio
+# serve` starts fine, then every page load 500s on a missing template —
+# invisible from a source checkout, broken for everyone who pip-installs.
+[tool.setuptools.package-data]
+allelio = ["web/templates/*.html"]
