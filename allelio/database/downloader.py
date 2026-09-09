@@ -457,6 +457,9 @@ def setup_database(
 
     # Parse ClinVar
     _log(f"[3/{total_steps}] Parsing ClinVar variants... (this takes 1-2 minutes)")
+    # Start from empty so rows the new release no longer carries do not
+    # survive beside the new ones.
+    db.clear_table("clinvar")
     clinvar_count = 0
     clinvar_records = []
     for record in parse_clinvar(str(clinvar_path)):
@@ -586,6 +589,7 @@ def setup_database(
 
         if gnomad_downloaded:
             _log(f"[7/{total_steps}] Parsing gnomAD frequencies...")
+            db.clear_table("gnomad")
             gnomad_records = []
             for record in parse_gnomad(str(gnomad_path)):
                 gnomad_records.append(record)
