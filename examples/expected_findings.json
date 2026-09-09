@@ -4,34 +4,169 @@
     "parsed_variants": 23,
     "i_id_rows": 1,
     "annotated_sites": 20,
-    "reference_genotype_sites": 3,
+    "reference_genotype_sites": 2,
     "zygosity_unknown_sites": 0
   },
   "sites": {
-    "rs28897696": {"reported": true,  "category": "Health Conditions", "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "T", "why": "BRCA1 pathogenic (expert panel), one copy"},
-    "rs1799963":  {"reported": true,  "category": "Health Conditions", "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "A", "why": "F2 prothrombin G20210A, one copy"},
-    "rs76763715": {"reported": true,  "category": "Health Conditions", "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "C", "why": "GBA1 N370S, one copy (carrier for Gaucher, recessive)"},
-    "rs334":      {"reported": true,  "category": "Health Conditions", "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "A", "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported"},
-    "rs1800562":  {"reported": true,  "category": "Health Conditions", "zygosity": "homozygous alternate", "alt_copies": 2, "matched_allele": "A", "why": "HFE C282Y, two copies (affected genotype for recessive hemochromatosis)"},
-    "rs3918290":  {"reported": true,  "category": "Pharmacogenomics",  "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "T", "why": "DPYD*2A drug response (fluoropyrimidine toxicity), one copy"},
-    "rs1042713":  {"reported": true,  "category": "Pharmacogenomics",  "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "A", "why": "ADRB2 salmeterol response; the degenerate G/G benign row at the same rsID must be ignored"},
-    "rs12913832": {"reported": true,  "category": "Risk Factors",      "zygosity": "homozygous alternate", "alt_copies": 2, "matched_allele": "G", "why": "HERC2 eye colour association, two copies"},
-    "rs4988235":  {"reported": true,  "category": "Risk Factors",      "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "A", "why": "MCM6 lactase persistence association, one copy"},
-    "rs1805007":  {"reported": true,  "category": null,                "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "T", "why": "MC1R R151C, conflicting classification, one copy"},
-    "rs1805008":  {"reported": true,  "category": null,                "zygosity": "homozygous alternate", "alt_copies": 2, "matched_allele": "T", "why": "MC1R R160W, conflicting classification, two copies"},
-    "rs9939609":  {"reported": true,  "category": null,                "zygosity": "heterozygous", "alt_copies": 1, "matched_allele": "A", "allele_role": "risk", "why": "FTO, GWAS-only site, one copy of the risk allele A"},
-    "rs7412":     {"reported": true,  "category": null,                "zygosity": "homozygous alternate", "alt_copies": 2, "matched_allele": "C", "allele_role": "risk", "why": "APOE: reference CC carries no copy of the ClinVar drug-response T allele (set aside), but GWAS associations reported for the C allele remain, two copies"},
-    "rs429358":   {"reported": false, "why": "APOE e4, conflicting classification; one copy but common (AF 16%) so the frequency adjustment pushes it past the benign cutoff. Visible with --include-benign."},
-    "rs1799945":  {"reported": false, "why": "HFE H63D, conflicting classification, common (AF 10%): same as above"},
-    "rs762551":   {"reported": false, "why": "CYP1A2, likely benign"},
-    "rs1042714":  {"reported": false, "why": "ADRB2, benign; its only row is not allele-specific"},
-    "rs1800497":  {"reported": false, "why": "ANKK1 Taq1A, benign, and homozygous reference"},
-    "rs6311":     {"reported": false, "why": "HTR2A, likely benign, homozygous reference"},
-    "rs6025":     {"reported": false, "reference_genotype": true, "why": "Factor V Leiden absent: CC carries no copy of the T allele, so the drug-response row is set aside; the degenerate C/C conflicting row is ignored"},
-    "rs2229991":  {"reported": false, "why": "no-call (--)"},
-    "rs4819132":  {"reported": false, "why": "no-call (--)"},
-    "rs99999901": {"reported": false, "why": "not a real rsID; in no database"},
-    "rs99999902": {"reported": false, "why": "not a real rsID; in no database"},
-    "i3002432":   {"reported": false, "why": "23andMe internal i-ID (prothrombin probe); parsed, counted, and disclosed, not looked up"}
+    "rs28897696": {
+      "reported": true,
+      "category": "Health Conditions",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "T",
+      "why": "BRCA1 pathogenic (expert panel), one copy"
+    },
+    "rs1799963": {
+      "reported": true,
+      "category": "Health Conditions",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "A",
+      "why": "F2 prothrombin G20210A, one copy"
+    },
+    "rs76763715": {
+      "reported": true,
+      "category": "Health Conditions",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "C",
+      "why": "GBA1 N370S, one copy (carrier for Gaucher, recessive)"
+    },
+    "rs334": {
+      "reported": true,
+      "category": "Health Conditions",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "A",
+      "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported"
+    },
+    "rs1800562": {
+      "reported": true,
+      "category": "Health Conditions",
+      "zygosity": "homozygous alternate",
+      "alt_copies": 2,
+      "matched_allele": "A",
+      "why": "HFE C282Y, two copies (affected genotype for recessive hemochromatosis)"
+    },
+    "rs3918290": {
+      "reported": true,
+      "category": "Pharmacogenomics",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "T",
+      "why": "DPYD*2A drug response (fluoropyrimidine toxicity), one copy"
+    },
+    "rs1042713": {
+      "reported": true,
+      "category": "Pharmacogenomics",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "A",
+      "why": "ADRB2 salmeterol response; the degenerate G/G benign row at the same rsID must be ignored"
+    },
+    "rs12913832": {
+      "reported": true,
+      "category": "Risk Factors",
+      "zygosity": "homozygous alternate",
+      "alt_copies": 2,
+      "matched_allele": "G",
+      "why": "HERC2 eye colour association, two copies"
+    },
+    "rs4988235": {
+      "reported": true,
+      "category": "Risk Factors",
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "A",
+      "why": "MCM6 lactase persistence association, one copy"
+    },
+    "rs1805007": {
+      "reported": true,
+      "category": null,
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "T",
+      "why": "MC1R R151C, conflicting classification, one copy"
+    },
+    "rs1805008": {
+      "reported": true,
+      "category": null,
+      "zygosity": "homozygous alternate",
+      "alt_copies": 2,
+      "matched_allele": "T",
+      "why": "MC1R R160W, conflicting classification, two copies"
+    },
+    "rs9939609": {
+      "reported": true,
+      "category": null,
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "A",
+      "allele_role": "risk",
+      "why": "FTO, GWAS-only site, one copy of the risk allele A"
+    },
+    "rs7412": {
+      "reported": true,
+      "category": null,
+      "zygosity": "homozygous alternate",
+      "alt_copies": 2,
+      "matched_allele": "C",
+      "allele_role": "risk",
+      "why": "APOE: reference CC carries no copy of the ClinVar drug-response T allele (set aside), but GWAS associations reported for the C allele remain, two copies"
+    },
+    "rs429358": {
+      "reported": false,
+      "why": "APOE e4, conflicting classification; one copy but common (AF 16%) so the frequency adjustment pushes it past the benign cutoff. Visible with --include-benign."
+    },
+    "rs1799945": {
+      "reported": false,
+      "why": "HFE H63D, conflicting classification, common (AF 10%): same as above"
+    },
+    "rs762551": {
+      "reported": false,
+      "why": "CYP1A2, likely benign"
+    },
+    "rs1042714": {
+      "reported": false,
+      "why": "ADRB2, benign; its only row is not allele-specific"
+    },
+    "rs1800497": {
+      "reported": false,
+      "why": "ANKK1 Taq1A, benign, and homozygous reference"
+    },
+    "rs6311": {
+      "reported": false,
+      "why": "HTR2A, likely benign, homozygous reference"
+    },
+    "rs6025": {
+      "reported": true,
+      "category": null,
+      "zygosity": "homozygous alternate",
+      "alt_copies": 2,
+      "matched_allele": "G",
+      "allele_role": "risk",
+      "strand_flipped": true,
+      "why": "Factor V Leiden absent: CC carries no copy of the ClinVar drug-response T allele, so that row is set aside, and the degenerate C/C conflicting row is ignored. But the GWAS Catalog also reports associations for allele 'G' at this site, which is the opposite-strand name for the reference C (ClinVar says the site is C/T); Allelio infers the flip, counts 2 copies, and flags the call 'read on the opposite strand'."
+    },
+    "rs2229991": {
+      "reported": false,
+      "why": "no-call (--)"
+    },
+    "rs4819132": {
+      "reported": false,
+      "why": "no-call (--)"
+    },
+    "rs99999901": {
+      "reported": false,
+      "why": "not a real rsID; in no database"
+    },
+    "rs99999902": {
+      "reported": false,
+      "why": "not a real rsID; in no database"
+    },
+    "i3002432": {
+      "reported": false,
+      "why": "23andMe internal i-ID (prothrombin probe); parsed, counted, and disclosed, not looked up"
+    }
   }
 }

@@ -37,7 +37,7 @@ Then open **http://localhost:8080** and upload `examples/example_23andme.txt`.
 
 [`expected_findings.json`](expected_findings.json) lists, for every line of
 the example, whether Allelio reports it, with which zygosity and category, and
-why. In short, the default run reports 13 sites and sets the rest aside:
+why. In short, the default run reports 14 sites and sets the rest aside:
 
 | Site | Genotype | What it shows |
 |---|---|---|
@@ -52,13 +52,14 @@ why. In short, the default run reports 13 sites and sets the rest aside:
 | `rs1805007`, `rs1805008` MC1R | CT, TT | conflicting classifications, still shown |
 | `rs9939609` FTO | AT | GWAS-only site, one copy of the risk allele |
 | `rs7412` APOE | CC | carries no copy of the ClinVar drug-response allele, so that row is set aside, but GWAS associations reported for the C allele remain |
+| `rs6025` Factor V Leiden | CC | the Leiden T allele is absent, so ClinVar's drug-response row is set aside; GWAS rows reported for "G" (the opposite-strand name for the reference C) remain, flagged "read on the opposite strand" |
 
 Set aside or hidden, and counted in the output rather than silently dropped:
 
-- **`rs6025` Factor V Leiden, `rs1800497`, `rs6311`** — genotypes carry no copy
-  of the annotated allele. A database entry for an allele you do not have is
-  not a finding; the CLI and report say "3 annotated positions where you carry
-  only the reference allele were set aside".
+- **`rs1800497`, `rs6311`** — genotypes carry no copy of the annotated
+  allele. A database entry for an allele you do not have is not a finding;
+  the CLI and report say "2 annotated positions where you carry only the
+  reference allele were set aside".
 - **`rs429358` APOE ε4, `rs1799945` HFE H63D** — one copy each, but the
   classification is "conflicting" and the variants are common, so the
   frequency adjustment pushes them past the benign cutoff. `--include-benign`
