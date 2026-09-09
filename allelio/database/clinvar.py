@@ -52,6 +52,38 @@ def _allele(fields, index: int) -> str:
     return "" if value in ("", "NA", "-", ".") else value
 
 
+def _bit(bitmap: bytearray, allele_id: str) -> bool:
+    try:
+        n = int(allele_id)
+    except ValueError:
+        return False
+    byte = n >> 3
+    return byte < len(bitmap) and bool(bitmap[byte] & (1 << (n & 7)))
+
+
+def _allele_ids_with_grch38(path: Path, open_func, mode: str) -> bytearray:
+    """Bitmap over AlleleID of the alleles that have a GRCh38 line."""
+    bitmap = bytearray(1 << 20)  # grows as needed; AlleleIDs are a few million
+    with open_func(path, mode, encoding='utf-8') as f:
+        for line in f:
+            if line.startswith("#AlleleID"):
+                continue
+            fields = line.split('\t', 17)
+            if len(fields) <= CLINVAR_COLUMNS["Assembly"]:
+                continue
+            if fields[CLINVAR_COLUMNS["Assembly"]].strip() != "GRCh38":
+                continue
+            try:
+                n = int(fields[0])
+            except ValueError:
+                continue
+            byte = n >> 3
+            if byte >= len(bitmap):
+                bitmap.extend(b"\0" * (byte + 1 - len(bitmap) + (1 << 20)))
+            bitmap[byte] |= 1 << (n & 7)
+    return bitmap
+
+
 def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
     """Parse ClinVar variant_summary.txt.gz file.
     
@@ -72,13 +104,13 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
     open_func = gzip.open if filepath.endswith('.gz') else open
     mode = 'rt' if filepath.endswith('.gz') else 'r'
 
-    # ClinVar lists each allele once per assembly, GRCh37 then GRCh38 on
-    # adjacent lines. The VCF-style allele columns of the GRCh37 line are
-    # not always trustworthy (rs6025's GRCh37 line reads T/T where GRCh38
-    # reads C/T), so when both builds are present only the GRCh38 line is
-    # emitted; a GRCh37-only allele is emitted as is. One line of lookahead
-    # is enough because the pairs are adjacent.
-    pending = None  # (allele_id, record) held back from a GRCh37 line
+    # ClinVar lists each allele once per assembly. The VCF-style allele
+    # columns of the GRCh37 line are not always trustworthy (rs6025's GRCh37
+    # line reads T/T where GRCh38 reads C/T), so when both builds are present
+    # only the GRCh38 line is emitted; a GRCh37-only allele is emitted as is.
+    # The two lines are not reliably adjacent, so a first pass collects the
+    # AlleleIDs that have a GRCh38 line (a bitmap, a few hundred KB).
+    has_grch38 = _allele_ids_with_grch38(path, open_func, mode)
 
     with open_func(path, mode, encoding='utf-8') as f:
         for line_num, line in enumerate(f, 1):
@@ -129,21 +161,10 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                     "last_evaluated": last_evaluated if last_evaluated else None,
                 }
 
-                if pending is not None and pending[0] != allele_id:
-                    # The held GRCh37 line had no GRCh38 twin: emit it.
-                    yield pending[1]
-                    pending = None
-
-                if assembly == "GRCh37":
-                    pending = (allele_id, record)
-                    continue
-                if pending is not None and pending[0] == allele_id:
-                    pending = None  # superseded by this GRCh38 line
+                if assembly == "GRCh37" and _bit(has_grch38, allele_id):
+                    continue  # the GRCh38 line for this allele is the one kept
                 yield record
                 
             except (IndexError, ValueError):
                 # Skip malformed lines
                 continue
-
-    if pending is not None:
-        yield pending[1]

@@ -57,7 +57,7 @@ def compare(db, expected: Dict[str, Any] = None) -> List[Tuple[str, bool, str]]:
         rows.append((f"{rsid} reported", True, r.describe_zygosity()))
         if exp.get("category") is not None:
             rows.append((f"{rsid} category", r.category == exp["category"], f"{r.category} vs {exp['category']}"))
-        for field in ("zygosity", "alt_copies", "matched_allele", "allele_role"):
+        for field in ("zygosity", "alt_copies", "matched_allele", "allele_role", "strand_flipped"):
             if field in exp:
                 got = getattr(r, field)
                 rows.append((f"{rsid} {field}", got == exp[field], f"{got!r} vs {exp[field]!r}"))

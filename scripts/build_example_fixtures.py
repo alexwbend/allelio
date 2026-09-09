@@ -23,6 +23,8 @@ EXAMPLE = ROOT / "examples" / "example_23andme.txt"
 FIXTURES = ROOT / "tests" / "fixtures"
 
 GWAS_ROWS_PER_RSID = 4  # enough to carry several traits and a risk allele
+# ...plus one row for every distinct risk allele the catalogue names at the
+# site, so the fixture makes the same strand decisions as the full catalogue.
 
 
 def example_rsids():
@@ -53,6 +55,7 @@ def clinvar_subset(src: Path, rsids, dest: Path) -> int:
 def gwas_subset(src: Path, rsids, dest: Path) -> int:
     wanted = set(rsids)
     per = {r: 0 for r in rsids}
+    alleles_seen = {r: set() for r in rsids}
     n = 0
     with open(src, "r", encoding="utf-8", errors="ignore") as f, open(dest, "w", encoding="utf-8") as out:
         header = f.readline()
@@ -71,12 +74,15 @@ def gwas_subset(src: Path, rsids, dest: Path) -> int:
                 rsid = "rs" + cur if cur and not cur.startswith("rs") else cur
                 if rsid not in wanted:
                     continue
-            # Prefer rows that name a risk allele, but keep a few either way.
-            if per[rsid] >= GWAS_ROWS_PER_RSID:
+            allele = fields[i_risk].strip().split("-")[-1].upper()
+            new_allele = allele.isalpha() and allele not in alleles_seen[rsid]
+            if per[rsid] >= GWAS_ROWS_PER_RSID and not new_allele:
                 continue
-            if per[rsid] >= GWAS_ROWS_PER_RSID - 1 and not fields[i_risk].strip().split("-")[-1].isalpha():
+            if per[rsid] >= GWAS_ROWS_PER_RSID - 1 and not allele.isalpha():
                 continue
             out.write(line)
+            if allele.isalpha():
+                alleles_seen[rsid].add(allele)
             per[rsid] += 1
             n += 1
     return n
