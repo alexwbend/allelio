@@ -156,7 +156,7 @@ class TestSetupRecordsProvenance:
         monkeypatch.setattr(downloader, "download_file", fake_download)
         db = AllelioDB(str(Path(tmp_dir) / "a.db"))
         downloader.setup_database(db, data_dir=str(data_dir), include_gnomad=False,
-                                  include_clingen=False, force_download=force)
+                                  include_clingen=False, include_clinpgx=False, force_download=force)
         return db, calls, data_dir
 
     def test_release_dates_and_checksums_stored(self, tmp_dir, monkeypatch):
@@ -175,6 +175,7 @@ class TestSetupRecordsProvenance:
         assert prov["gwas"]["release_source"] == "http-last-modified"
         assert prov["gnomad"]["release"] == "unavailable"
         assert prov["clingen"]["release"] == "unavailable"
+        assert prov["clinpgx"]["release"] == "unavailable"
         assert db.describe_sources() == "ClinVar 2026-09-06 · GWAS Catalog 2026-09-04"
         assert db.version().startswith("ClinVar 2026-09-06 · GWAS Catalog 2026-09-04 (built ")
 
@@ -193,7 +194,7 @@ class TestSetupRecordsProvenance:
         monkeypatch.setattr(downloader, "download_file", lambda *a, **k: calls.append(a[0]))
         again = AllelioDB(str(Path(tmp_dir) / "b.db"))
         try:
-            downloader.setup_database(again, data_dir=str(data_dir), include_gnomad=False, include_clingen=False)
+            downloader.setup_database(again, data_dir=str(data_dir), include_gnomad=False, include_clingen=False, include_clinpgx=False)
         except Exception:
             pass  # the padded files are not parseable; only the fetch count matters
         assert len(calls) == 2
@@ -211,7 +212,7 @@ class TestSetupRecordsProvenance:
             return orig(url, dest, *a, **kw)
         monkeypatch.setattr(dl, "download_file", counting)
         again = AllelioDB(str(Path(tmp_dir) / "c.db"))
-        dl.setup_database(again, data_dir=str(data_dir), include_gnomad=False, include_clingen=False, force_download=True)
+        dl.setup_database(again, data_dir=str(data_dir), include_gnomad=False, include_clingen=False, include_clinpgx=False, force_download=True)
         assert len(fetched) == 2
         assert again.get_metadata("clinvar_release") == "2026-09-06"
 
@@ -224,7 +225,7 @@ class TestReindexDoesNotDuplicateGwas:
         first = db.cursor.fetchone()[0]
         assert first == 1
         # Same database, same on-disk files: an update must not append.
-        downloader.setup_database(db, data_dir=str(data_dir), include_gnomad=False, include_clingen=False, force_download=True)
+        downloader.setup_database(db, data_dir=str(data_dir), include_gnomad=False, include_clingen=False, include_clinpgx=False, force_download=True)
         db.cursor.execute("SELECT COUNT(*) FROM gwas")
         assert db.cursor.fetchone()[0] == first
 
@@ -235,7 +236,7 @@ class TestReindexDoesNotDuplicateGwas:
         db.insert_clinvar_batch([{"rsid": "rs_withdrawn", "ref_allele": "A", "alt_allele": "G",
                                   "gene": "X", "clinical_significance": "Pathogenic",
                                   "conditions": "c", "review_status": "r", "last_evaluated": ""}])
-        downloader.setup_database(db, data_dir=str(data_dir), include_gnomad=False, include_clingen=False, force_download=True)
+        downloader.setup_database(db, data_dir=str(data_dir), include_gnomad=False, include_clingen=False, include_clinpgx=False, force_download=True)
         assert db.lookup_rsid("rs_withdrawn")["clinvar"] == []
         db.cursor.execute("SELECT COUNT(*) FROM clinvar")
         assert db.cursor.fetchone()[0] == 1

@@ -626,6 +626,11 @@ def info(file: Optional[str]):
                     info_table.add_row("ClinGen Curations", f"{clingen_count:,}")
                 else:
                     info_table.add_row("ClinGen Curations", "[dim]Not available — run allelio update[/dim]")
+                clinpgx_count = stats.get('clinpgx_entries', 0)
+                if clinpgx_count > 0:
+                    info_table.add_row("ClinPGx Annotations", f"{clinpgx_count:,}")
+                else:
+                    info_table.add_row("ClinPGx Annotations", "[dim]Not available — run allelio update[/dim]")
             except Exception:
                 pass
         else:

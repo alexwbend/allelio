@@ -133,6 +133,26 @@ class AllelioDB:
             )
         """)
 
+        # Create ClinPGx clinical-annotation table: one row per (annotation,
+        # genotype), so a person's genotype selects its own annotation text.
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clinpgx (
+                annotation_id TEXT NOT NULL,
+                genotype TEXT NOT NULL,
+                rsid TEXT NOT NULL,
+                gene TEXT,
+                level TEXT,
+                score REAL,
+                phenotype_category TEXT,
+                drugs TEXT,
+                phenotypes TEXT,
+                url TEXT,
+                annotation_text TEXT,
+                allele_function TEXT,
+                PRIMARY KEY (annotation_id, genotype)
+            )
+        """)
+
         # Create metadata table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS metadata (
@@ -156,6 +176,10 @@ class AllelioDB:
 
         self.cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_clingen_gene ON clingen(gene)
+        """)
+
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_clinpgx_rsid ON clinpgx(rsid)
         """)
 
         self.conn.commit()
@@ -238,7 +262,7 @@ class AllelioDB:
         longer carries (a withdrawn record, or one whose alleles are now read
         differently) would otherwise survive beside the new ones.
         """
-        if table not in ("clinvar", "gwas", "gnomad", "clingen"):
+        if table not in ("clinvar", "gwas", "gnomad", "clingen", "clinpgx"):
             raise ValueError(f"not a reference table: {table}")
         self.cursor.execute(f"DELETE FROM {table}")
         self.conn.commit()
@@ -270,6 +294,45 @@ class AllelioDB:
             records,
         )
         self.conn.commit()
+
+    def insert_clinpgx_batch(self, records: List[Dict[str, Any]]) -> None:
+        """Bulk insert ClinPGx (annotation, genotype) records."""
+        if not records:
+            return
+        self.cursor.executemany(
+            """INSERT OR REPLACE INTO clinpgx
+               (annotation_id, genotype, rsid, gene, level, score, phenotype_category,
+                drugs, phenotypes, url, annotation_text, allele_function)
+               VALUES (:annotation_id, :genotype, :rsid, :gene, :level, :score, :phenotype_category,
+                       :drugs, :phenotypes, :url, :annotation_text, :allele_function)
+            """,
+            records,
+        )
+        self.conn.commit()
+
+    def lookup_clinpgx(self, rsids: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+        """Every ClinPGx (annotation, genotype) row for each rsID; ``{}`` if no table."""
+        result: Dict[str, List[Dict[str, Any]]] = {r: [] for r in rsids if r}
+        if not result or not self._has_table("clinpgx"):
+            return result
+        names = list(result)
+        for i in range(0, len(names), 500):
+            chunk = names[i:i + 500]
+            placeholders = ",".join("?" * len(chunk))
+            self.cursor.execute(
+                f"SELECT * FROM clinpgx WHERE rsid IN ({placeholders}) ORDER BY rsid, level, annotation_id, genotype",
+                chunk,
+            )
+            for row in self.cursor.fetchall():
+                result[row["rsid"]].append(dict(row))
+        return result
+
+    def clinpgx_rsids(self) -> set:
+        """All rsIDs with a ClinPGx annotation (for finding PGx-only sites)."""
+        if not self._has_table("clinpgx"):
+            return set()
+        self.cursor.execute("SELECT DISTINCT rsid FROM clinpgx")
+        return {row[0] for row in self.cursor.fetchall()}
 
     def _has_table(self, name: str) -> bool:
         try:
@@ -433,6 +496,14 @@ class AllelioDB:
             except Exception:
                 pass
 
+        clinpgx_count = 0
+        if self._has_table("clinpgx"):
+            try:
+                self.cursor.execute("SELECT COUNT(DISTINCT annotation_id) FROM clinpgx")
+                clinpgx_count = self.cursor.fetchone()[0]
+            except Exception:
+                pass
+
         clingen_count = 0
         if self._has_table("clingen"):
             try:
@@ -459,6 +530,7 @@ class AllelioDB:
             "gwas_entries": gwas_count,
             "gnomad_entries": gnomad_count,
             "clingen_entries": clingen_count,
+            "clinpgx_entries": clinpgx_count,
             "variant_count": clinvar_count + gwas_count,
             "gene_count": gene_count,
             "last_update": last_update,
@@ -489,6 +561,7 @@ class AllelioDB:
         ("gwas", "GWAS Catalog"),
         ("gnomad", "gnomAD"),
         ("clingen", "ClinGen"),
+        ("clinpgx", "ClinPGx"),
     )
 
     def get_provenance(self) -> Dict[str, Dict[str, Optional[str]]]:

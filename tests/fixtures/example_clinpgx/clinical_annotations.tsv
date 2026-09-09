@@ -1,0 +1,6 @@
+Clinical Annotation ID	Variant/Haplotypes	Gene	Level of Evidence	Level Override	Level Modifiers	Score	Phenotype Category	PMID Count	Evidence Count	Drug(s)	Phenotype(s)	Latest History Date (YYYY-MM-DD)	URL	Specialty Population
+900000001	rs9923231	VKORC1	1A			480.0	Dosage	80	90	warfarin		2026-01-01	https://www.clinpgx.org/clinicalAnnotation/900000001	
+900000002	rs4149056	SLCO1B1	1A			120.0	Toxicity	20	25	rosuvastatin	statin-related myopathy	2026-01-01	https://www.clinpgx.org/clinicalAnnotation/900000002	
+900000003	rs4149056	SLCO1B1	3			5.0	Efficacy	1	1	simvastatin		2026-01-01	https://www.clinpgx.org/clinicalAnnotation/900000003	
+900000004	rs1042713	ADRB2	2A			30.0	Efficacy	6	8	salmeterol	Asthma	2026-01-01	https://www.clinpgx.org/clinicalAnnotation/900000004	
+900000005	CYP2C19*2	CYP2C19	1A			400.0	Efficacy	60	70	clopidogrel		2026-01-01	https://www.clinpgx.org/clinicalAnnotation/900000005	
