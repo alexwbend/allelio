@@ -1,10 +1,11 @@
 """Variant lookup and analysis engine."""
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
 
 from allelio.database.store import AllelioDB
+from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -124,13 +125,15 @@ class VariantCategory(str, Enum):
 
 @dataclass
 class ClinVarEntry:
-    """ClinVar variant entry."""
+    """ClinVar variant entry — one classified allele at one rsID."""
     rsid: str
     gene: Optional[str] = None
     clinical_significance: Optional[str] = None
     conditions: Optional[str] = None
     review_status: Optional[str] = None
     review_stars: int = 0
+    ref_allele: Optional[str] = None
+    alt_allele: Optional[str] = None
 
 
 @dataclass
@@ -143,6 +146,7 @@ class GWASEntry:
     mapped_gene: Optional[str] = None
     study: Optional[str] = None
     pubmed_id: Optional[str] = None
+    risk_allele: Optional[str] = None
 
 
 @dataclass
@@ -168,6 +172,54 @@ class VariantResult:
     gnomad_entry: Optional[GnomADEntry] = None
     category: str = VariantCategory.UNKNOWN.value
     significance_rank: float = 999
+    # How many copies of the annotated allele the user carries — the
+    # difference between a carrier, an affected genotype, and an entry that
+    # does not apply to this person at all. See allelio/analysis/zygosity.py.
+    zygosity: str = Zygosity.UNKNOWN.value
+    alt_copies: Optional[int] = None
+    matched_allele: Optional[str] = None
+    strand_flipped: bool = False
+    zygosity_note: Optional[str] = None
+
+    def describe_zygosity(self) -> str:
+        """Report phrase, e.g. ``heterozygous (1 copy of the A allele)``."""
+        return ZygosityCall(
+            Zygosity(self.zygosity), self.alt_copies, self.matched_allele,
+            self.strand_flipped, self.zygosity_note,
+        ).describe()
+
+
+class AnalysisResults(list):
+    """A list of VariantResult that also carries the ``AnalysisStats``.
+
+    ``analyze_variants`` returns one of these so callers keep getting a plain
+    list while the counts of what was set aside travel with it (``.stats``).
+    """
+
+    def __init__(self, results=(), stats: Optional["AnalysisStats"] = None):
+        super().__init__(results)
+        self.stats = stats if stats is not None else AnalysisStats()
+
+
+@dataclass
+class AnalysisStats:
+    """What happened to the annotated sites that are not in the results.
+
+    Attributes:
+        annotated_sites: rsIDs in the file with at least one ClinVar/GWAS row.
+        reference_genotype_sites: annotated sites where the user carries no
+            copy of any annotated allele. These are not findings and are left
+            out; the count is reported so the omission is visible.
+        zygosity_unknown_sites: sites reported without a zygosity call,
+            because the source does not give the allele or the genotype does
+            not match it on either strand.
+        benign_sites: sites left out because every match was benign
+            (unless include_benign).
+    """
+    annotated_sites: int = 0
+    reference_genotype_sites: int = 0
+    zygosity_unknown_sites: int = 0
+    benign_sites: int = 0
 
 
 def _determine_category(clinvar_entry: Optional[ClinVarEntry], gwas_entries: List[GWASEntry]) -> str:
@@ -294,66 +346,144 @@ def _calculate_frequency_adjustment(
     return min(base_rank + adjustment, MAX_ADJUSTED_RANK)
 
 
-def analyze_variants(
+def _clinvar_entry(cv_data: Dict[str, Any]) -> ClinVarEntry:
+    review_status = cv_data.get("review_status")
+    return ClinVarEntry(
+        rsid=cv_data.get("rsid"),
+        gene=cv_data.get("gene"),
+        clinical_significance=cv_data.get("clinical_significance"),
+        conditions=cv_data.get("conditions"),
+        review_status=review_status,
+        review_stars=_get_review_stars(review_status),
+        ref_allele=cv_data.get("ref_allele") or None,
+        alt_allele=cv_data.get("alt_allele") or None,
+    )
+
+
+def _rank_clinvar(entry: ClinVarEntry) -> float:
+    """Significance rank for one ClinVar row, weighted by review quality."""
+    if not entry.clinical_significance:
+        return 999.0
+    base_rank = _get_significance_rank(entry.clinical_significance)
+    # Weight by review stars: higher stars lower the rank (more significant)
+    # Max adjustment is 0.4 (4 stars * REVIEW_STAR_WEIGHT), so ranks never cross tiers
+    return base_rank - (entry.review_stars * REVIEW_STAR_WEIGHT)
+
+
+def _select_clinvar_rows(
+    genotype: Optional[str], rows: List[Dict[str, Any]]
+) -> Tuple[List[ClinVarEntry], Optional[ZygosityCall], bool]:
+    """Pick the ClinVar rows that apply to this genotype.
+
+    ClinVar can hold several rows for one rsID, one per alternate allele. Only
+    the rows whose allele the user carries are findings for that user; rows
+    whose alleles ClinVar does not record cannot be checked and are kept with
+    an unknown zygosity, as every row was before alleles were stored.
+
+    Returns:
+        (entries, call, is_reference) — the applicable entries ordered most
+        significant first, the zygosity call for the first of them, and
+        True when the user carries no copy of any annotated allele (nothing
+        applies; the site is a reference genotype, not a finding).
+    """
+    carried: List[Tuple[ClinVarEntry, ZygosityCall]] = []
+    unknown: List[Tuple[ClinVarEntry, ZygosityCall]] = []
+    absent: List[Tuple[ClinVarEntry, ZygosityCall]] = []
+    for cv in rows:
+        entry = _clinvar_entry(cv)
+        call = call_zygosity(genotype, entry.ref_allele, entry.alt_allele)
+        if call.alt_copies is None:
+            unknown.append((entry, call))
+        elif call.alt_copies > 0:
+            carried.append((entry, call))
+        else:
+            absent.append((entry, call))
+
+    if carried:
+        carried.sort(key=lambda ec: _rank_clinvar(ec[0]))
+        return [e for e, _ in carried], carried[0][1], False
+    if unknown:
+        unknown.sort(key=lambda ec: _rank_clinvar(ec[0]))
+        return [e for e, _ in unknown], unknown[0][1], False
+    if absent:
+        # Every allele ClinVar knows about was checked and none is carried.
+        # The entries come back so a caller that asked to see reference
+        # sites can show what was set aside; the flag says they do not apply.
+        absent.sort(key=lambda ec: _rank_clinvar(ec[0]))
+        return [e for e, _ in absent], absent[0][1], True
+    return [], None, False
+
+
+def _gwas_call(genotype: Optional[str], entries: List[GWASEntry]) -> Optional[ZygosityCall]:
+    """Zygosity against the GWAS risk allele, if the catalogue names one.
+
+    The GWAS Catalog gives only the risk allele (no reference), and studies do
+    not always report it on the forward strand, so a mismatch is "unknown",
+    never "0 copies". Returns the call for the first entry with a known
+    allele; None if no entry names one.
+    """
+    for e in entries:
+        if e.risk_allele:
+            return call_zygosity(genotype, None, e.risk_allele)
+    return None
+
+
+def analyze_variants_with_stats(
     variants: List[Any],
     db: AllelioDB,
-    include_benign: bool = False
-) -> List[VariantResult]:
-    """Analyze variants against reference databases and rank them for triage.
-
-    significance_rank is a prioritization heuristic for presentation order —
-    lower means "look at this one first" — built from ClinVar's categorical
-    significance, review-status quality, and gnomAD population frequency. It
-    is not a clinical or diagnostic score, has not been validated as one, and
-    must never be reported as one.
+    include_benign: bool = False,
+    include_reference: bool = False,
+) -> Tuple[List[VariantResult], AnalysisStats]:
+    """Like ``analyze_variants`` but also returns what was left out and why.
 
     Args:
         variants: List of Variant objects with rsid attribute
         db: AllelioDB database instance
         include_benign: Whether to include benign variants in results
+        include_reference: Whether to include annotated sites where the user
+            carries no copy of the annotated allele (never findings; off by
+            default and counted in the stats instead)
 
     Returns:
-        List of VariantResult objects sorted by significance rank
+        (results sorted by significance rank, AnalysisStats)
     """
+    stats = AnalysisStats()
     if not variants:
-        return []
-    
+        return [], stats
+
     # Extract rsIDs from variant objects
     rsids = [getattr(v, 'rsid', str(v)) for v in variants]
     rsids = [r for r in rsids if r]  # Filter empty rsids
-    
+
     if not rsids:
-        return []
-    
+        return [], stats
+
     # Create mapping of rsid to original variant for metadata
     rsid_to_variant = {
         getattr(v, 'rsid', str(v)): v for v in variants
     }
-    
+
     # Batch lookup from database
     lookup_results = db.lookup_rsids_batch(rsids)
-    
+
     # Build results
     results = []
-    
+
     for rsid, data in lookup_results.items():
         if not data["clinvar"] and not data["gwas"]:
             continue
-        
-        # Create ClinVar entry
-        clinvar_entry = None
-        if data["clinvar"]:
-            cv_data = data["clinvar"][0]
-            review_status = cv_data.get("review_status")
-            clinvar_entry = ClinVarEntry(
-                rsid=cv_data.get("rsid"),
-                gene=cv_data.get("gene"),
-                clinical_significance=cv_data.get("clinical_significance"),
-                conditions=cv_data.get("conditions"),
-                review_status=review_status,
-                review_stars=_get_review_stars(review_status),
-            )
-        
+        stats.annotated_sites += 1
+
+        # Get variant metadata
+        original_variant = rsid_to_variant.get(rsid)
+        chromosome = getattr(original_variant, 'chromosome', None)
+        position = getattr(original_variant, 'position', None)
+        genotype = getattr(original_variant, 'genotype', None)
+
+        # ClinVar rows that apply to this genotype (allele-aware)
+        clinvar_entries, call, is_reference = _select_clinvar_rows(genotype, data["clinvar"])
+        clinvar_entry = clinvar_entries[0] if clinvar_entries else None
+
         # Create GWAS entries
         gwas_entries = []
         for gw_data in data["gwas"]:
@@ -364,28 +494,46 @@ def analyze_variants(
                 odds_ratio=gw_data.get("odds_ratio"),
                 mapped_gene=gw_data.get("mapped_gene"),
                 study=gw_data.get("study"),
-                pubmed_id=gw_data.get("pubmed_id")
+                pubmed_id=gw_data.get("pubmed_id"),
+                risk_allele=gw_data.get("risk_allele"),
             ))
-        
+
+        # A site where the user carries none of ClinVar's annotated alleles is
+        # not a ClinVar finding for them. If GWAS rows remain, judge those on
+        # their own risk allele; otherwise the site is a reference genotype.
+        gwas_reference = False
+        if gwas_entries and (is_reference or call is None):
+            gcall = _gwas_call(genotype, gwas_entries)
+            if gcall is not None and gcall.alt_copies == 0:
+                gwas_reference = True
+            elif is_reference or call is None:
+                call = gcall if gcall is not None else call
+
+        site_is_reference = (
+            (is_reference or not clinvar_entries) and (gwas_reference or not gwas_entries)
+        )
+        if site_is_reference:
+            stats.reference_genotype_sites += 1
+            if not include_reference:
+                continue
+            if call is None:
+                call = ZygosityCall(Zygosity.HOMOZYGOUS_REFERENCE, 0)
+        elif is_reference:
+            # ClinVar rows do not apply; only the GWAS association remains.
+            clinvar_entries = []
+        elif gwas_reference:
+            gwas_entries = []
+
         # Determine category
         category = _determine_category(clinvar_entry, gwas_entries)
-        
+
         # Get significance rank from ClinVar, weighted by review quality
         sig_rank = 999.0
         if clinvar_entry and clinvar_entry.clinical_significance:
-            base_rank = _get_significance_rank(clinvar_entry.clinical_significance)
-            # Weight by review stars: higher stars lower the rank (more significant)
-            # Max adjustment is 0.4 (4 stars * REVIEW_STAR_WEIGHT), so ranks never cross tiers
-            sig_rank = base_rank - (clinvar_entry.review_stars * REVIEW_STAR_WEIGHT)
+            sig_rank = _rank_clinvar(clinvar_entry)
         elif gwas_entries:
             # For GWAS-only variants, use a default rank
             sig_rank = float(SIGNIFICANCE_RANKS.get("association", 4))
-        
-        # Get variant metadata
-        original_variant = rsid_to_variant.get(rsid)
-        chromosome = getattr(original_variant, 'chromosome', None)
-        position = getattr(original_variant, 'position', None)
-        genotype = getattr(original_variant, 'genotype', None)
 
         # Create gnomAD entry if data available
         gnomad_entry = None
@@ -405,7 +553,13 @@ def analyze_variants(
 
         # Skip benign variants unless requested
         if not include_benign and adjusted_rank >= 8:
+            stats.benign_sites += 1
             continue
+
+        if call is None:
+            call = ZygosityCall(Zygosity.UNKNOWN, None, note="annotated allele not recorded")
+        if call.alt_copies is None and call.zygosity != Zygosity.NO_CALL:
+            stats.zygosity_unknown_sites += 1
 
         # Create result
         result = VariantResult(
@@ -413,16 +567,54 @@ def analyze_variants(
             chromosome=chromosome,
             position=position,
             genotype=genotype,
-            clinvar_entries=[clinvar_entry] if clinvar_entry else [],
+            clinvar_entries=clinvar_entries,
             gwas_entries=gwas_entries,
             gnomad_entry=gnomad_entry,
             category=category,
             significance_rank=adjusted_rank,
+            zygosity=call.zygosity.value,
+            alt_copies=call.alt_copies,
+            matched_allele=call.allele,
+            strand_flipped=call.strand_flipped,
+            zygosity_note=call.note,
         )
 
         results.append(result)
-    
+
     # Sort by significance rank (lower = more significant)
     results.sort(key=lambda x: x.significance_rank)
-    
-    return results
+
+    return results, stats
+
+
+def analyze_variants(
+    variants: List[Any],
+    db: AllelioDB,
+    include_benign: bool = False,
+    include_reference: bool = False,
+) -> List[VariantResult]:
+    """Analyze variants against reference databases and rank them for triage.
+
+    significance_rank is a prioritization heuristic for presentation order —
+    lower means "look at this one first" — built from ClinVar's categorical
+    significance, review-status quality, and gnomAD population frequency. It
+    is not a clinical or diagnostic score, has not been validated as one, and
+    must never be reported as one.
+
+    Each result also carries a zygosity call: how many copies of the
+    annotated allele the user has. Sites where the user carries no copy of
+    any annotated allele are not findings and are left out (see
+    ``analyze_variants_with_stats`` for the counts).
+
+    Args:
+        variants: List of Variant objects with rsid attribute
+        db: AllelioDB database instance
+        include_benign: Whether to include benign variants in results
+        include_reference: Whether to include reference-genotype sites
+
+    Returns:
+        ``AnalysisResults`` — a list of VariantResult sorted by significance
+        rank, with the ``AnalysisStats`` on its ``.stats`` attribute
+    """
+    results, stats = analyze_variants_with_stats(variants, db, include_benign, include_reference)
+    return AnalysisResults(results, stats)

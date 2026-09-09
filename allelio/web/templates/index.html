@@ -612,6 +612,15 @@
             color: #C4B5FD;
         }
 
+        .result-zygosity {
+            font-family: inherit;
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--gray-600);
+            margin-top: 0.25rem;
+            text-align: right;
+        }
+
         .result-genotype {
             font-family: 'Courier New', monospace;
             font-weight: 600;
@@ -1507,7 +1516,7 @@
                             <span class="badge ${significanceBadgeClass}">${esc(significance)}</span>
                         </div>
                     </div>
-                    <div class="result-genotype">${esc(result.genotype)}</div>
+                    <div class="result-genotype" title="${esc(result.zygosity_label || '')}">${esc(result.genotype)}${result.zygosity_label ? `<div class="result-zygosity">${esc(result.zygosity_label)}</div>` : ''}</div>
                 </div>
                 ${(result.warnings || []).filter(w => !String(result.explanation || '').includes(w)).map(w => `<div class="result-warning">${esc(w)}</div>`).join('')}
                 <div class="result-body">

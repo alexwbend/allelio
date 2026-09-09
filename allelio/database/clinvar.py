@@ -44,6 +44,14 @@ CLINVAR_COLUMNS = {
 }
 
 
+def _allele(fields, index: int) -> str:
+    """Read an allele column; '' for missing, 'na', or '-' placeholders."""
+    if index >= len(fields):
+        return ""
+    value = fields[index].strip().upper()
+    return "" if value in ("", "NA", "-", ".") else value
+
+
 def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
     """Parse ClinVar variant_summary.txt.gz file.
     
@@ -51,7 +59,12 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
         filepath: Path to variant_summary.txt.gz file
     
     Yields:
-        Dict with keys: rsid, gene, clinical_significance, conditions, review_status, last_evaluated
+        Dict with keys: rsid, ref_allele, alt_allele, gene,
+        clinical_significance, conditions, review_status, last_evaluated.
+        Alleles come from the VCF-style columns (forward strand of the
+        reference build, the same convention consumer genotype files use);
+        they are '' when ClinVar gives "na", which happens for large or
+        complex variants.
     """
     path = Path(filepath)
     
@@ -81,6 +94,8 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                 review_status = fields[CLINVAR_COLUMNS["ReviewStatus"]].strip()
                 last_evaluated = fields[CLINVAR_COLUMNS["LastEvaluated"]].strip()
                 assembly = fields[CLINVAR_COLUMNS["Assembly"]].strip()
+                ref_allele = _allele(fields, CLINVAR_COLUMNS["ReferenceAlleleVCF"])
+                alt_allele = _allele(fields, CLINVAR_COLUMNS["AlternateAlleleVCF"])
                 
                 # Filter: must have an rsID (not "-1")
                 if rs_num == "-1" or not rs_num:
@@ -96,6 +111,8 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                 # Create record
                 record = {
                     "rsid": rsid,
+                    "ref_allele": ref_allele,
+                    "alt_allele": alt_allele,
                     "gene": gene_symbol if gene_symbol else None,
                     "clinical_significance": clinical_sig if clinical_sig else None,
                     "conditions": phenotype_list if phenotype_list else None,

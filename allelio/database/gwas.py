@@ -4,6 +4,26 @@ from typing import Generator, Dict, Any, Optional
 from pathlib import Path
 
 
+def parse_risk_allele(value: Optional[str]) -> Optional[str]:
+    """Extract the allele from a GWAS Catalog "STRONGEST SNP-RISK ALLELE" cell.
+
+    ``"rs6025-T"`` -> ``"T"``; ``"rs6025-?"``, ``""`` and ``"-"`` -> None. Cells
+    listing several SNPs (haplotypes, "rs1-A; rs2-G") are not one allele at
+    one site, so they return None too.
+    """
+    if not value:
+        return None
+    value = value.strip()
+    if not value or value == "-" or ";" in value or " x " in value:
+        return None
+    if "-" not in value:
+        return None
+    allele = value.rsplit("-", 1)[1].strip().upper()
+    if not allele or allele == "?" or not allele.isalpha():
+        return None
+    return allele
+
+
 def parse_gwas(filepath: str) -> Generator[Dict[str, Any], None, None]:
     """Parse GWAS associations TSV file.
     
@@ -21,8 +41,9 @@ def parse_gwas(filepath: str) -> Generator[Dict[str, Any], None, None]:
         
         # Find column indices
         col_indices = {}
-        for col_name in ["SNPS", "SNP_ID_CURRENT", "DISEASE/TRAIT", "P-VALUE", 
-                         "OR or BETA", "MAPPED_GENE", "STUDY", "PUBMEDID", "LINK"]:
+        for col_name in ["SNPS", "SNP_ID_CURRENT", "DISEASE/TRAIT", "P-VALUE",
+                         "OR or BETA", "MAPPED_GENE", "STUDY", "PUBMEDID", "LINK",
+                         "STRONGEST SNP-RISK ALLELE"]:
             try:
                 col_indices[col_name] = header.index(col_name)
             except ValueError:
@@ -101,10 +122,17 @@ def parse_gwas(filepath: str) -> Generator[Dict[str, Any], None, None]:
                     if not link or link == "-":
                         link = None
                 
+                # The allele the association is reported for, written by the
+                # catalogue as "rs123-A". "?" means the study did not say.
+                risk_allele = None
+                if col_indices["STRONGEST SNP-RISK ALLELE"] is not None:
+                    risk_allele = parse_risk_allele(fields[col_indices["STRONGEST SNP-RISK ALLELE"]])
+
                 # Create record
                 record = {
                     "rsid": rsid,
                     "trait": trait if trait else None,
+                    "risk_allele": risk_allele,
                     "p_value": p_value,
                     "odds_ratio": odds_ratio,
                     "mapped_gene": mapped_gene,

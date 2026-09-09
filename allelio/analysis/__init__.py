@@ -1,11 +1,15 @@
 """Allelio analysis module."""
 
+from .zygosity import Zygosity, ZygosityCall, call_zygosity
 from .lookup import (
     ClinVarEntry,
     GWASEntry,
     VariantResult,
     VariantCategory,
     analyze_variants,
+    analyze_variants_with_stats,
+    AnalysisStats,
+    AnalysisResults,
     SIGNIFICANCE_RANKS,
     REVIEW_STATUS_STARS,
     HIGH_IMPACT_GENES,
@@ -18,6 +22,12 @@ __all__ = [
     "VariantResult",
     "VariantCategory",
     "analyze_variants",
+    "analyze_variants_with_stats",
+    "AnalysisStats",
+    "AnalysisResults",
+    "Zygosity",
+    "ZygosityCall",
+    "call_zygosity",
     "SIGNIFICANCE_RANKS",
     "REVIEW_STATUS_STARS",
     "HIGH_IMPACT_GENES",
