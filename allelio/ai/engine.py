@@ -1039,6 +1039,8 @@ class AIEngine:
             f"- Zygosity: {_zygosity_line(result)}",
             f"- Inheritance (ClinGen): {getattr(result, 'inheritance', None) or 'not curated'}",
         ]
+        for e in (getattr(result, "pgx_entries", None) or []):
+            lines.append(f"- Pharmacogenomics (ClinPGx, level {e.level}): {e.drugs}: {e.annotation_text}")
 
         if result.clinvar_entries:
             lines.append("\nClinVar Information:")

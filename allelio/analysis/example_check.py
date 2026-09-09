@@ -39,6 +39,10 @@ def build_fixture_db(db_path: str):
     clingen = FIXTURES / "example_clingen.csv"
     if clingen.exists():
         db.insert_clingen_batch(list(parse_clingen(str(clingen))))
+    clinpgx = FIXTURES / "example_clinpgx"
+    if clinpgx.exists():
+        from allelio.database.clinpgx import parse_clinpgx
+        db.insert_clinpgx_batch(list(parse_clinpgx(str(clinpgx))))
     return db
 
 
@@ -86,4 +90,10 @@ def compare(db, expected: Dict[str, Any] = None) -> List[Tuple[str, bool, str]]:
             if field in exp:
                 got = getattr(r, field)
                 rows.append((f"{rsid} {field}", got == exp[field], f"{got!r} vs {exp[field]!r}"))
+        if "pgx_level" in exp:
+            rows.append((f"{rsid} pgx_level", r.pgx_level == exp["pgx_level"], f"{r.pgx_level!r} vs {exp['pgx_level']!r}"))
+        if "pgx_drugs_any" in exp:
+            drugs = " ".join((e.drugs or "").lower() for e in r.pgx_entries)
+            hit = any(d.lower() in drugs for d in exp["pgx_drugs_any"])
+            rows.append((f"{rsid} pgx_drugs", hit, f"{drugs[:60]!r} vs any of {exp['pgx_drugs_any']}"))
     return rows

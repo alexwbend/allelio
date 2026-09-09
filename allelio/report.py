@@ -116,6 +116,8 @@ _SOURCE_HOMEPAGES = {
     "gnomad": ("gnomAD", "https://gnomad.broadinstitute.org"),
     # ClinGen asks to be credited with the access date; the release line is it.
     "clingen": ("ClinGen gene-disease validity", "https://clinicalgenome.org"),
+    # CC BY-SA 4.0: credit ClinPGx/PharmGKB; the file is fetched, not redistributed.
+    "clinpgx": ("ClinPGx (PharmGKB) clinical annotations, CC BY-SA 4.0", "https://www.clinpgx.org"),
 }
 
 
@@ -142,6 +144,33 @@ def _sources_html(provenance: Dict[str, Any]) -> str:
             detail = "release unknown"
         lines.append(f"{label}: {homepage} &mdash; {detail}<br>")
     return "\n                ".join(lines)
+
+
+def _pgx_rows(variant) -> str:
+    """ClinPGx annotations for this person's genotype, one block each."""
+    entries = getattr(variant, "pgx_entries", None) or []
+    if not entries:
+        return ""
+    blocks = []
+    for e in entries:
+        drugs = html_escape.escape(str(e.drugs or "—"))
+        level = html_escape.escape(str(e.level or "?"))
+        cat = html_escape.escape(str(e.phenotype_category or ""))
+        text = html_escape.escape(str(e.annotation_text or ""))
+        flip = " (genotype read on the opposite strand)" if e.strand_flipped else ""
+        link = f' <a href="{html_escape.escape(str(e.url))}" target="_blank" class="link-btn" style="padding:2px 8px;">ClinPGx</a>' if e.url else ""
+        blocks.append(
+            f'<div style="margin:0.35rem 0;"><strong>{drugs}</strong> '
+            f'<span style="color:#7c3aed;">level {level}</span>'
+            f'{" · " + cat if cat else ""}{link}<br>'
+            f'<span style="color:#374151;">{text}{html_escape.escape(flip)}</span></div>'
+        )
+    return (
+        '\n                <div class="info-row">\n'
+        '                    <span class="label">Pharmacogenomics (ClinPGx):</span>\n'
+        '                    <span class="value">' + "".join(blocks) + '</span>\n'
+        '                </div>\n'
+    )
 
 
 def _inheritance_row(variant) -> str:
@@ -329,6 +358,7 @@ def generate_html_report(
                     <span class="value">{html_escape.escape(_zygosity_phrase(variant))}</span>
                 </div>
 {_inheritance_row(variant)}
+{_pgx_rows(variant)}
                 <div class="info-row">
                     <span class="label">Chromosome:</span>
                     <span class="value">{html_escape.escape(str(variant.chromosome or "N/A"))}</span>

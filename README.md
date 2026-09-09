@@ -24,11 +24,12 @@ No programming experience is needed to use Allelio's web interface — just uplo
 ## What does it do?
 
 1. **Reads your DNA file** — supports 23andMe (.txt), AncestryDNA (.csv), and VCF formats
-2. **Looks up your variants** in four public scientific databases:
+2. **Looks up your variants** in five public scientific databases:
    - [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) — clinically significant genetic variants curated by the NIH
    - [GWAS Catalog](https://www.ebi.ac.uk/gwas/) — genome-wide association studies linking variants to traits and conditions
    - [gnomAD](https://gnomad.broadinstitute.org/) — how common each variant is in the population, so common ones rank lower
    - [ClinGen](https://clinicalgenome.org/) — how each gene-disease link is inherited and how well established it is, so one copy of a recessive variant is reported as carrier status
+   - [ClinPGx](https://www.clinpgx.org/) (formerly PharmGKB) — how variants affect response to specific drugs, with the annotation written for your exact genotype
 3. **Explains findings in plain English** using a local AI model — Ollama, or any OpenAI-compatible server you already run — so you don't need a genetics degree to understand the results
 4. **Generates a report** you can save, print, or share with your doctor
 
@@ -264,7 +265,7 @@ ClinVar and the GWAS Catalog are rolling releases, so the same DNA file can
 produce different findings a month apart. To keep every result reproducible,
 Allelio records at setup **which release of each source it was built from**
 (the release date the server reports for ClinVar and GWAS, the creation date
-ClinGen stamps into its file, the pinned version for gnomAD), the download
+ClinGen and ClinPGx stamp into their files, the pinned version for gnomAD), the download
 URL, and the SHA-256 checksum of the exact file. You
 see this in three places:
 
@@ -345,6 +346,40 @@ is deliberately narrow:
 "Carrier Status" used to be where benign variants landed. They now have their
 own **Benign** category.
 
+### Pharmacogenomics from ClinPGx
+
+[ClinPGx](https://www.clinpgx.org/) (the successor to PharmGKB, which now
+also houses CPIC and PharmCAT) publishes clinical annotations: for a variant
+and a drug, a level of evidence and, for each genotype, a sentence saying
+what people with that genotype can expect. Allelio fetches the bundle at
+setup (about 1 MB) and, for every site in your file it annotates, shows the
+annotation written for **your** genotype under **Pharmacogenomics
+(ClinPGx)**, with the drug, the level, the phenotype category (dosage,
+efficacy, toxicity, metabolism) and a link. The same text goes into the AI
+prompt, which is told to explain it and never to advise starting, stopping
+or changing a medication; the safety filter's prescriptive family backs that
+up.
+
+Three deliberate limits:
+
+- **Single-rsID annotations only.** Most CYP2D6, CYP2C19 and DPYD guidance is
+  written against star alleles (`CYP2D6*4`), which need phased haplotypes
+  and copy-number calls a consumer array does not provide. Those annotations
+  are skipped rather than guessed at, which is why a DPYD site can show
+  ClinVar's "drug response" and no ClinPGx note.
+- **Evidence levels 1A–2B by default.** Level 3 (single or conflicting
+  studies) has thousands of annotations and would bury everything else;
+  `analyze_variants_with_stats(pgx_min_level="3")` includes them.
+- **No frequency downgrade.** The gnomAD adjustment says "a common allele is
+  unlikely to be pathogenic", which is beside the point for a drug-response
+  allele; pharmacogenomic findings are ranked by ClinPGx level alone
+  (1A/1B with risk factors, 2A/2B a tier below).
+
+ClinPGx data is **CC BY-SA 4.0 with a no-selling clause**. Allelio downloads
+it to your machine and never redistributes it (it is not on the permaweb, and
+the test suite uses a synthetic fixture in the same format); the report
+credits ClinPGx and PharmGKB with the file date.
+
 **Upgrading from 0.2.x:** the ClinVar table changed shape to hold one row per
 allele, and ClinGen is a new download. Run `allelio setup` once (it re-indexes the files already on disk, no
 re-download) and `allelio info` will show the database as initialized again.
@@ -415,8 +450,8 @@ reference-data dependency before this version's first release.
 
 Allelio splits its reference data into two layers, hosted differently on purpose.
 
-- **Clinical databases (ClinVar, GWAS Catalog, ClinGen) are fetched live** from
-  their sources at setup. They are curated continuously, so you want the
+- **Clinical databases (ClinVar, GWAS Catalog, ClinGen, ClinPGx) are fetched
+  live** from their sources at setup. They are curated continuously, so you want the
   freshest copy. Allelio warns you when your local copy gets old and prompts
   `allelio update`.
 - **Population frequencies (gnomAD) are pinned to a permanent copy.** Allele
@@ -471,7 +506,7 @@ For developers and contributors, Allelio is organized into clean modules:
 ```
 allelio/
 ├── parsers/      # File readers for 23andMe, AncestryDNA, VCF
-├── database/     # ClinVar, GWAS, gnomAD and ClinGen download, storage, and querying
+├── database/     # ClinVar, GWAS, gnomAD, ClinGen and ClinPGx download, storage, and querying
 ├── analysis/     # Variant annotation and cross-referencing
 ├── ai/           # Local LLM integration — Ollama or any OpenAI-compatible server
 │   └── safety.py # Lexical filter for unhedged diagnostic / prognostic / prescriptive language
