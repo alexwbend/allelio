@@ -33,17 +33,50 @@ class AllelioDB:
         # Enable WAL mode for better concurrent read performance
         self.cursor.execute("PRAGMA journal_mode=WAL")
     
+    def _columns(self, table: str) -> List[str]:
+        """Column names of ``table``, or [] if it does not exist."""
+        try:
+            self.cursor.execute(f"PRAGMA table_info({table})")
+            return [row[1] for row in self.cursor.fetchall()]
+        except Exception:
+            return []
+
+    def clinvar_is_allele_aware(self) -> bool:
+        """True if the clinvar table carries ref/alt alleles (schema 2).
+
+        Databases built before zygosity support keyed ClinVar by rsID alone,
+        which silently kept one arbitrary row per rsID and could not say
+        whether the user carries the annotated allele. Such a database has
+        to be rebuilt (``allelio setup`` or ``allelio update``).
+        """
+        cols = self._columns("clinvar")
+        return bool(cols) and "alt_allele" in cols
+
     def initialize(self) -> None:
-        """Create tables and indexes."""
-        # Create ClinVar table
+        """Create tables and indexes, migrating an older schema where needed."""
+        # A pre-allele-aware clinvar table cannot be upgraded in place: its rows
+        # are one-per-rsID and the allele columns cannot be recovered. Drop it;
+        # setup re-parses the ClinVar file it already has on disk.
+        if self._columns("clinvar") and not self.clinvar_is_allele_aware():
+            self.cursor.execute("DROP TABLE clinvar")
+
+        # Create ClinVar table — one row per (rsID, ref, alt). ClinVar carries
+        # several rows for one rsID when different alternate alleles at the
+        # same site have different classifications (rs334: T>A is pathogenic
+        # sickle-cell, T>G is likely benign), so the allele is part of the key.
+        # Rows whose alleles ClinVar does not give (large indels, "na") store
+        # empty strings and are matched without zygosity.
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS clinvar (
-                rsid TEXT PRIMARY KEY,
+                rsid TEXT NOT NULL,
+                ref_allele TEXT NOT NULL DEFAULT '',
+                alt_allele TEXT NOT NULL DEFAULT '',
                 gene TEXT,
                 clinical_significance TEXT,
                 conditions TEXT,
                 review_status TEXT,
-                last_evaluated TEXT
+                last_evaluated TEXT,
+                PRIMARY KEY (rsid, ref_allele, alt_allele)
             )
         """)
         
@@ -58,9 +91,14 @@ class AllelioDB:
                 mapped_gene TEXT,
                 study TEXT,
                 pubmed_id TEXT,
-                link TEXT
+                link TEXT,
+                risk_allele TEXT
             )
         """)
+        # Older gwas tables lack the risk allele; add the column (NULL until
+        # the next update re-parses the catalogue).
+        if "risk_allele" not in self._columns("gwas"):
+            self.cursor.execute("ALTER TABLE gwas ADD COLUMN risk_allele TEXT")
         
         # Create gnomAD population frequency table
         self.cursor.execute("""
@@ -106,18 +144,28 @@ class AllelioDB:
         """Bulk insert ClinVar records.
         
         Args:
-            records: List of dicts with keys: rsid, gene, clinical_significance, 
-                    conditions, review_status, last_evaluated
+            records: List of dicts with keys: rsid, gene, clinical_significance,
+                    conditions, review_status, last_evaluated, and optionally
+                    ref_allele / alt_allele (default '' = allele not recorded)
         """
         if not records:
             return
-        
+
+        rows = [
+            {
+                "ref_allele": (r.get("ref_allele") or ""),
+                "alt_allele": (r.get("alt_allele") or ""),
+                **{k: r.get(k) for k in ("rsid", "gene", "clinical_significance",
+                                         "conditions", "review_status", "last_evaluated")},
+            }
+            for r in records
+        ]
         self.cursor.executemany(
-            """INSERT OR REPLACE INTO clinvar 
-               (rsid, gene, clinical_significance, conditions, review_status, last_evaluated)
-               VALUES (:rsid, :gene, :clinical_significance, :conditions, :review_status, :last_evaluated)
+            """INSERT OR REPLACE INTO clinvar
+               (rsid, ref_allele, alt_allele, gene, clinical_significance, conditions, review_status, last_evaluated)
+               VALUES (:rsid, :ref_allele, :alt_allele, :gene, :clinical_significance, :conditions, :review_status, :last_evaluated)
             """,
-            records
+            rows
         )
         self.conn.commit()
     
@@ -125,18 +173,19 @@ class AllelioDB:
         """Bulk insert GWAS records.
         
         Args:
-            records: List of dicts with keys: rsid, trait, p_value, odds_ratio, 
-                    mapped_gene, study, pubmed_id, link
+            records: List of dicts with keys: rsid, trait, p_value, odds_ratio,
+                    mapped_gene, study, pubmed_id, link, and optionally risk_allele
         """
         if not records:
             return
-        
+
+        rows = [{"risk_allele": r.get("risk_allele"), **r} for r in records]
         self.cursor.executemany(
-            """INSERT INTO gwas 
-               (rsid, trait, p_value, odds_ratio, mapped_gene, study, pubmed_id, link)
-               VALUES (:rsid, :trait, :p_value, :odds_ratio, :mapped_gene, :study, :pubmed_id, :link)
+            """INSERT INTO gwas
+               (rsid, trait, p_value, odds_ratio, mapped_gene, study, pubmed_id, link, risk_allele)
+               VALUES (:rsid, :trait, :p_value, :odds_ratio, :mapped_gene, :study, :pubmed_id, :link, :risk_allele)
             """,
-            records
+            rows
         )
         self.conn.commit()
     
@@ -183,11 +232,10 @@ class AllelioDB:
         """
         result = {"clinvar": [], "gwas": [], "gnomad": None}
 
-        # Query ClinVar
-        self.cursor.execute("SELECT * FROM clinvar WHERE rsid = ?", (rsid,))
-        clinvar_row = self.cursor.fetchone()
-        if clinvar_row:
-            result["clinvar"] = [dict(clinvar_row)]
+        # Query ClinVar — every allele row for the rsID, in a stable order
+        order = " ORDER BY ref_allele, alt_allele" if self.clinvar_is_allele_aware() else ""
+        self.cursor.execute(f"SELECT * FROM clinvar WHERE rsid = ?{order}", (rsid,))
+        result["clinvar"] = [dict(row) for row in self.cursor.fetchall()]
 
         # Query GWAS
         self.cursor.execute("SELECT * FROM gwas WHERE rsid = ?", (rsid,))
@@ -218,6 +266,9 @@ class AllelioDB:
             return result
 
         has_gnomad = self._has_gnomad_table()
+        clinvar_order = (
+            " ORDER BY rsid, ref_allele, alt_allele" if self.clinvar_is_allele_aware() else ""
+        )
 
         # Initialize result dict with all rsids
         for rsid in rsids:
@@ -229,12 +280,12 @@ class AllelioDB:
             chunk = rsids[i:i + chunk_size]
             placeholders = ",".join("?" * len(chunk))
 
-            # Query ClinVar
-            query = f"SELECT * FROM clinvar WHERE rsid IN ({placeholders})"
+            # Query ClinVar — one row per annotated allele
+            query = f"SELECT * FROM clinvar WHERE rsid IN ({placeholders}){clinvar_order}"
             self.cursor.execute(query, chunk)
             for row in self.cursor.fetchall():
                 rsid = row["rsid"]
-                result[rsid]["clinvar"] = [dict(row)]
+                result[rsid]["clinvar"].append(dict(row))
 
             # Query GWAS
             query = f"SELECT * FROM gwas WHERE rsid IN ({placeholders})"
@@ -329,13 +380,13 @@ class AllelioDB:
         """Check whether the database has been set up with data.
 
         Returns:
-            True if the clinvar table exists and contains at least one row.
+            True if the clinvar table exists in the current (allele-aware)
+            schema and contains at least one row. A database built before
+            zygosity support reports False so the CLI and web UI point the
+            user at ``allelio setup``.
         """
         try:
-            self.cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='clinvar'"
-            )
-            if not self.cursor.fetchone():
+            if not self.clinvar_is_allele_aware():
                 return False
             self.cursor.execute("SELECT COUNT(*) FROM clinvar")
             return self.cursor.fetchone()[0] > 0

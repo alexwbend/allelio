@@ -51,6 +51,16 @@ from .prompts import build_variant_prompt, SYSTEM_PROMPT
 from .safety import check_safety, get_variant_warnings, wrap_with_disclaimer
 
 
+def _zygosity_line(result) -> str:
+    describe = getattr(result, "describe_zygosity", None)
+    if callable(describe):
+        try:
+            return describe()
+        except Exception:
+            pass
+    return "unknown"
+
+
 DEFAULT_MODEL = "llama3.1:8b"
 DEFAULT_HOST = "http://localhost:11434"
 
@@ -1026,6 +1036,7 @@ class AIEngine:
             f"- Gene: {gene}",
             f"- Chromosome: {result.chromosome or 'Unknown'}, Position: {result.position or 'Unknown'}",
             f"- Genotype: {result.genotype or 'Unknown'}",
+            f"- Zygosity: {_zygosity_line(result)}",
         ]
 
         if result.clinvar_entries:

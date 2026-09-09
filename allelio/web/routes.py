@@ -17,7 +17,7 @@ from allelio import __version__
 from allelio.parsers import parse_genotype_file
 from allelio.database.store import AllelioDB
 from allelio.database.downloader import sources_summary, provenance_of
-from allelio.analysis.lookup import analyze_variants
+from allelio.analysis.lookup import analyze_variants, AnalysisStats
 from allelio.ai.attribution import Explanation, attribution
 from allelio.ai.engine import AIEngine, REFUSED, UNREACHABLE
 from allelio.ai.safety import get_variant_warnings
@@ -117,6 +117,16 @@ async def get_status() -> Dict[str, Any]:
         "db_stats": db_stats,
         "version": __version__,
     }
+
+
+def _zygosity_label(variant) -> Optional[str]:
+    describe = getattr(variant, "describe_zygosity", None)
+    if not callable(describe):
+        return None
+    try:
+        return describe()
+    except Exception:
+        return None
 
 
 def _text_of(explanation) -> str:
@@ -245,6 +255,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         analysis_results = await loop.run_in_executor(
             None, analyze_variants, genotypes, db
         )
+        analysis_stats = getattr(analysis_results, "stats", None) or AnalysisStats()
 
         if not analysis_results:
             raise HTTPException(
@@ -292,6 +303,12 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 "chromosome": variant.chromosome,
                 "position": variant.position,
                 "genotype": variant.genotype if hasattr(variant, 'genotype') else None,
+                # How many copies of the annotated allele this person carries:
+                # a carrier and an affected genotype are not the same card.
+                "zygosity": getattr(variant, "zygosity", None),
+                "alt_copies": getattr(variant, "alt_copies", None),
+                "matched_allele": getattr(variant, "matched_allele", None),
+                "zygosity_label": _zygosity_label(variant),
                 "category": variant.category if hasattr(variant, 'category') else "Unknown",
                 "significance_rank": i + 1,
                 "explanation": _text_of(explanations.get(variant.rsid)),
@@ -313,6 +330,8 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             "summary": summary,
             "results": formatted_results,
             "total_variants": len(analysis_results),
+            "reference_genotype_sites": analysis_stats.reference_genotype_sites,
+            "zygosity_unknown_sites": analysis_stats.zygosity_unknown_sites,
             "analyzed_at": _get_timestamp(),
             # Which release of each reference source the findings were looked
             # up against. Travels with the saved analysis and into the export,
@@ -539,6 +558,13 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     total_variants = escape(str(analysis_data.get("total_variants", 0)))
     analyzed_at = escape(str(analysis_data.get("analyzed_at") or "Unknown"))
     sources = escape(str(analysis_data.get("sources") or "not recorded"))
+    set_aside = ""
+    ref_sites = analysis_data.get("reference_genotype_sites") or 0
+    if ref_sites:
+        set_aside = (
+            f"<p><strong>Set aside:</strong> {int(ref_sites):,} annotated positions where "
+            "you carry only the reference allele (not findings).</p>"
+        )
 
     # The table below stops at a hundred rows.
     rows = results[:100]
@@ -583,6 +609,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         chrom = field("chromosome")
         pos = field("position")
         genotype = field("genotype")
+        zygosity = field("zygosity_label") if result.get("zygosity_label") else field("zygosity")
         category = field("category")
         explanation = field("explanation")
 
@@ -604,6 +631,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
             <td>{chrom}</td>
             <td>{pos}</td>
             <td>{genotype}</td>
+            <td>{zygosity}</td>
             <td>{category}</td>
             <td>{explanation}{warnings}</td>
         </tr>
@@ -672,6 +700,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
             <p><strong>Total Variants Analyzed:</strong> {total_variants}</p>
             <p><strong>AI Model:</strong> {model_used}</p>
             <p><strong>Reference Data:</strong> {sources}</p>
+            {set_aside}
         </div>
         
         <h2>Executive Summary</h2>
@@ -687,6 +716,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
                     <th>Chromosome</th>
                     <th>Position</th>
                     <th>Genotype</th>
+                    <th>Zygosity</th>
                     <th>Category</th>
                     <th>Explanation</th>
                 </tr>
