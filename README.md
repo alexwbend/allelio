@@ -24,9 +24,11 @@ No programming experience is needed to use Allelio's web interface — just uplo
 ## What does it do?
 
 1. **Reads your DNA file** — supports 23andMe (.txt), AncestryDNA (.csv), and VCF formats
-2. **Looks up your variants** in two major scientific databases:
+2. **Looks up your variants** in four public scientific databases:
    - [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) — clinically significant genetic variants curated by the NIH
    - [GWAS Catalog](https://www.ebi.ac.uk/gwas/) — genome-wide association studies linking variants to traits and conditions
+   - [gnomAD](https://gnomad.broadinstitute.org/) — how common each variant is in the population, so common ones rank lower
+   - [ClinGen](https://clinicalgenome.org/) — how each gene-disease link is inherited and how well established it is, so one copy of a recessive variant is reported as carrier status
 3. **Explains findings in plain English** using a local AI model — Ollama, or any OpenAI-compatible server you already run — so you don't need a genetics degree to understand the results
 4. **Generates a report** you can save, print, or share with your doctor
 
@@ -261,8 +263,9 @@ fares on arbitrary model output.
 ClinVar and the GWAS Catalog are rolling releases, so the same DNA file can
 produce different findings a month apart. To keep every result reproducible,
 Allelio records at setup **which release of each source it was built from**
-(the release date the server reports for ClinVar and GWAS, the pinned version
-for gnomAD), the download URL, and the SHA-256 checksum of the exact file. You
+(the release date the server reports for ClinVar and GWAS, the creation date
+ClinGen stamps into its file, the pinned version for gnomAD), the download
+URL, and the SHA-256 checksum of the exact file. You
 see this in three places:
 
 - `allelio info` lists a release line per source with its checksum
@@ -316,8 +319,34 @@ complex variants; some GWAS studies report `?`), or your genotype matches it on
 neither strand, the finding is still listed but marked **zygosity unknown**,
 and the report counts those too.
 
+### Carrier or affected: inheritance from ClinGen
+
+Knowing you carry one copy is only half the story; whether one copy matters
+depends on how the condition is inherited. Allelio takes that from
+[ClinGen's gene-disease validity](https://search.clinicalgenome.org/kb/gene-validity)
+curations (a small CC0 file fetched at setup), which give each established
+gene-disease relationship a mode of inheritance and a confidence level. Every
+ClinVar-backed finding shows an **Inheritance (ClinGen)** line, and the rule
+is deliberately narrow:
+
+- **one copy** of a pathogenic allele in a gene ClinGen curates **only for
+  recessive conditions** (or one copy on a diploid X for an X-linked one) is
+  reported under **Carrier Status** and ordered one tier below affected
+  genotypes (an author choice, documented in `lookup.py`);
+- **two copies** in such a gene, or one copy where the gene has a dominant
+  curation, stays under **Health Conditions**;
+- a gene curated for **both** dominant and recessive conditions (HBB, GBA1,
+  BRCA1) reads "mixed" and is **not** demoted, because gene-level curation
+  cannot say which condition your allele causes; the note names the
+  conditions so you and the model can reason about it;
+- only Definitive, Strong and Moderate curations decide inheritance; a gene
+  with none reads "not curated" and nothing changes.
+
+"Carrier Status" used to be where benign variants landed. They now have their
+own **Benign** category.
+
 **Upgrading from 0.2.x:** the ClinVar table changed shape to hold one row per
-allele. Run `allelio setup` once (it re-indexes the files already on disk, no
+allele, and ClinGen is a new download. Run `allelio setup` once (it re-indexes the files already on disk, no
 re-download) and `allelio info` will show the database as initialized again.
 
 ---
@@ -386,9 +415,10 @@ reference-data dependency before this version's first release.
 
 Allelio splits its reference data into two layers, hosted differently on purpose.
 
-- **Clinical databases (ClinVar, GWAS Catalog) are fetched live** from their
-  sources at setup. They are curated weekly, so you want the freshest copy.
-  Allelio warns you when your local copy gets old and prompts `allelio update`.
+- **Clinical databases (ClinVar, GWAS Catalog, ClinGen) are fetched live** from
+  their sources at setup. They are curated continuously, so you want the
+  freshest copy. Allelio warns you when your local copy gets old and prompts
+  `allelio update`.
 - **Population frequencies (gnomAD) are pinned to a permanent copy.** Allele
   frequencies barely move between releases, so Allelio ships a compact extract
   (about 24 MB, trimmed to consumer-array sites) rather than making you download
@@ -441,7 +471,7 @@ For developers and contributors, Allelio is organized into clean modules:
 ```
 allelio/
 ├── parsers/      # File readers for 23andMe, AncestryDNA, VCF
-├── database/     # ClinVar and GWAS data download, storage, and querying
+├── database/     # ClinVar, GWAS, gnomAD and ClinGen download, storage, and querying
 ├── analysis/     # Variant annotation and cross-referencing
 ├── ai/           # Local LLM integration — Ollama or any OpenAI-compatible server
 │   └── safety.py # Lexical filter for unhedged diagnostic / prognostic / prescriptive language

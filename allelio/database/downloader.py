@@ -19,6 +19,7 @@ from .store import AllelioDB
 from .clinvar import parse_clinvar
 from .gwas import parse_gwas
 from .gnomad import parse_gnomad
+from .clingen import parse_clingen, clingen_release_date
 
 
 CLINVAR_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz"
@@ -62,6 +63,12 @@ DEFAULT_GNOMAD_MANIFEST = {
 # This path is release-versioned and stable, and returns a zip containing the
 # ontology-annotated associations TSV — extracted the same way as before.
 GWAS_URL = "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations_ontology-annotated-full.zip"
+
+# ClinGen gene-disease validity: which gene-disease links are established and
+# how each is inherited. One CSV, ~1 MB, CC0 1.0 (ClinGen asks for attribution
+# with the access date, which the report gives). Optional: setup continues
+# without it, and inheritance then reads "not curated".
+CLINGEN_URL = "https://search.clinicalgenome.org/kb/gene-validity/download"
 
 # How old the local ClinVar/GWAS copy may get before `info`/`analyze` nudge the
 # user to run `allelio update`. ClinVar refreshes weekly and GWAS periodically,
@@ -408,6 +415,7 @@ def setup_database(
     log: Optional[Callable] = None,
     include_gnomad: bool = True,
     force_download: bool = False,
+    include_clingen: bool = True,
 ) -> None:
     """Orchestrate full download, parse, and index of reference databases.
 
@@ -435,7 +443,7 @@ def setup_database(
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    total_steps = 8 if include_gnomad else 6
+    total_steps = (8 if include_gnomad else 6) + (2 if include_clingen else 0)
 
     # Initialize database tables
     _log(f"[1/{total_steps}] Creating database tables...")
@@ -606,6 +614,59 @@ def setup_database(
         else:
             _log(f"[7/{total_steps}] Skipping gnomAD parsing — frequency data not available.")
 
+    # ClinGen gene-disease validity (optional, small). Gives the mode of
+    # inheritance the zygosity call needs to tell a carrier from an affected
+    # genotype, and a validity classification per gene-disease pair.
+    clingen_count = 0
+    clingen_downloaded = False
+    clingen_prov: dict = {}
+    if include_clingen:
+        step_dl, step_parse = total_steps - 2, total_steps - 1
+        clingen_path = data_dir / "clingen_gene_validity.csv"
+        if not force_download and clingen_path.exists() and clingen_path.stat().st_size > 100_000:
+            _log(f"[{step_dl}/{total_steps}] ClinGen already downloaded — skipping download.")
+            clingen_downloaded = True
+            clingen_prov = read_provenance(str(clingen_path))
+        else:
+            _log(f"[{step_dl}/{total_steps}] Downloading ClinGen gene-disease validity (~1 MB)...")
+            try:
+                clingen_prov = dict(download_file(CLINGEN_URL, str(clingen_path), progress_callback, log=log) or {})
+                clingen_downloaded = True
+                _log(f"[{step_dl}/{total_steps}] ClinGen download complete.")
+            except Exception as e:
+                _log(f"       ClinGen download failed: {e}")
+                _log("       Inheritance mode will read 'not curated'. Retry later with: allelio update")
+                clingen_path.unlink(missing_ok=True)
+        if clingen_downloaded:
+            clingen_prov = clingen_prov or {}
+            clingen_prov.setdefault("url", CLINGEN_URL)
+            # The file stamps its own creation date; prefer that.
+            try:
+                stamped = clingen_release_date(str(clingen_path))
+            except OSError:
+                stamped = None
+            if stamped:
+                clingen_prov["release"] = stamped
+                clingen_prov["release_source"] = "clingen-file-created"
+                write_provenance(str(clingen_path), clingen_prov)
+            _log(f"[{step_parse}/{total_steps}] Parsing ClinGen curations...")
+            try:
+                clingen_records = list(parse_clingen(str(clingen_path)))
+                if not clingen_records:
+                    raise ValueError("no curations found in the file")
+                db.clear_table("clingen")
+                db.insert_clingen_batch(clingen_records)
+                clingen_count = len(clingen_records)
+                _log(f"[{step_parse}/{total_steps}] ClinGen complete: {clingen_count:,} gene-disease curations "
+                     f"(release {clingen_prov.get('release') or 'unknown'}).")
+            except Exception as e:
+                # Optional source: a bad file must not take setup down with it.
+                _log(f"       ClinGen file could not be parsed ({e}); skipping.")
+                clingen_downloaded = False
+                clingen_path.unlink(missing_ok=True)
+        else:
+            _log(f"[{step_parse}/{total_steps}] Skipping ClinGen parsing — not available.")
+
     # Set metadata
     _log(f"[{total_steps}/{total_steps}] Finalizing database...")
     db.set_metadata("last_update", datetime.now().isoformat())
@@ -640,9 +701,17 @@ def setup_database(
         db.set_metadata("gnomad_version", "unavailable")
         db.set_metadata("gnomad_release", "unavailable")
 
+    if include_clingen and clingen_downloaded:
+        _record_source_provenance(db, "clingen", clingen_prov)
+    else:
+        db.set_metadata("clingen_version", "unavailable")
+        db.set_metadata("clingen_release", "unavailable")
+
     parts = [f"{clinvar_count:,} ClinVar"]
     if gwas_count > 0:
         parts.append(f"{gwas_count:,} GWAS")
     if gnomad_count > 0:
         parts.append(f"{gnomad_count:,} gnomAD")
+    if clingen_count > 0:
+        parts.append(f"{clingen_count:,} ClinGen")
     _log(f"Done! Database ready with {' + '.join(parts)} records.")

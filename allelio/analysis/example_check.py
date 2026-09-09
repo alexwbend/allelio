@@ -25,6 +25,7 @@ def build_fixture_db(db_path: str):
     scripts/build_example_fixtures.py), so it behaves like the full database
     on those sites without the 2 GB download.
     """
+    from allelio.database.clingen import parse_clingen
     from allelio.database.clinvar import parse_clinvar
     from allelio.database.gnomad import parse_gnomad
     from allelio.database.gwas import parse_gwas
@@ -35,6 +36,9 @@ def build_fixture_db(db_path: str):
     db.insert_clinvar_batch(list(parse_clinvar(str(FIXTURES / "example_clinvar.tsv"))))
     db.insert_gwas_batch(list(parse_gwas(str(FIXTURES / "example_gwas.tsv"))))
     db.insert_gnomad_batch(list(parse_gnomad(str(FIXTURES / "example_gnomad.tsv.gz"))))
+    clingen = FIXTURES / "example_clingen.csv"
+    if clingen.exists():
+        db.insert_clingen_batch(list(parse_clingen(str(clingen))))
     return db
 
 
@@ -78,7 +82,7 @@ def compare(db, expected: Dict[str, Any] = None) -> List[Tuple[str, bool, str]]:
         rows.append((f"{rsid} reported", True, r.describe_zygosity()))
         if exp.get("category") is not None:
             rows.append((f"{rsid} category", r.category == exp["category"], f"{r.category} vs {exp['category']}"))
-        for field in ("zygosity", "alt_copies", "matched_allele", "allele_role", "strand_flipped"):
+        for field in ("zygosity", "alt_copies", "matched_allele", "allele_role", "strand_flipped", "inheritance"):
             if field in exp:
                 got = getattr(r, field)
                 rows.append((f"{rsid} {field}", got == exp[field], f"{got!r} vs {exp[field]!r}"))
