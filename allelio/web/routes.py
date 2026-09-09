@@ -16,6 +16,7 @@ from starlette.background import BackgroundTask
 from allelio import __version__
 from allelio.parsers import parse_genotype_file
 from allelio.database.store import AllelioDB
+from allelio.database.downloader import sources_summary, provenance_of
 from allelio.analysis.lookup import analyze_variants
 from allelio.ai.attribution import Explanation, attribution
 from allelio.ai.engine import AIEngine, REFUSED, UNREACHABLE
@@ -89,6 +90,8 @@ async def get_status() -> Dict[str, Any]:
         "clinvar_entries": 0,
         "gwas_entries": 0,
         "last_update": None,
+        "sources": None,
+        "provenance": {},
     }
 
     try:
@@ -100,6 +103,10 @@ async def get_status() -> Dict[str, Any]:
                 "clinvar_entries": stats.get("clinvar_entries", 0),
                 "gwas_entries": stats.get("gwas_entries", 0),
                 "last_update": stats.get("last_update"),
+                # Which release of each source, for the status panel and for
+                # anyone reading the API to reproduce a result.
+                "sources": sources_summary(db),
+                "provenance": stats.get("provenance", {}),
             }
     except Exception:
         pass
@@ -307,6 +314,11 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             "results": formatted_results,
             "total_variants": len(analysis_results),
             "analyzed_at": _get_timestamp(),
+            # Which release of each reference source the findings were looked
+            # up against. Travels with the saved analysis and into the export,
+            # so a report can always name the data behind it.
+            "sources": sources_summary(db),
+            "provenance": provenance_of(db),
             # Counted off the cards above, for the saved-analysis report and
             # for anything reading the payload that is not the page. "none" is
             # a run where no card was written by a model.
@@ -526,6 +538,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     results = analysis_data.get("results", [])
     total_variants = escape(str(analysis_data.get("total_variants", 0)))
     analyzed_at = escape(str(analysis_data.get("analyzed_at") or "Unknown"))
+    sources = escape(str(analysis_data.get("sources") or "not recorded"))
 
     # The table below stops at a hundred rows.
     rows = results[:100]
@@ -658,6 +671,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
             <p><strong>Analysis Date:</strong> {analyzed_at}</p>
             <p><strong>Total Variants Analyzed:</strong> {total_variants}</p>
             <p><strong>AI Model:</strong> {model_used}</p>
+            <p><strong>Reference Data:</strong> {sources}</p>
         </div>
         
         <h2>Executive Summary</h2>

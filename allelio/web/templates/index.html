@@ -1182,7 +1182,10 @@
                 const dbStatus = document.getElementById('dbStatus');
                 if (data.db_ready) {
                     dbIndicator.classList.add('connected');
-                    dbStatus.textContent = 'Database Ready';
+                    // Name the releases, not just "ready": the same file
+                    // against a different ClinVar release is a different report.
+                    const sources = (data.db_stats || {}).sources;
+                    dbStatus.textContent = sources ? 'Database Ready · ' + sources : 'Database Ready';
                 } else {
                     dbIndicator.classList.remove('connected');
                     dbStatus.textContent = 'Database Not Set Up';

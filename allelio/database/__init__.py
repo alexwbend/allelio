@@ -8,6 +8,8 @@ from .downloader import (
     setup_database,
     sha256_file,
     staleness_warning,
+    sources_summary,
+    provenance_of,
 )
 from .clinvar import parse_clinvar
 from .gwas import parse_gwas
@@ -21,6 +23,8 @@ __all__ = [
     "setup_database",
     "sha256_file",
     "staleness_warning",
+    "sources_summary",
+    "provenance_of",
     "parse_clinvar",
     "parse_gwas",
     "parse_gnomad",
