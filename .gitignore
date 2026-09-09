@@ -42,6 +42,8 @@ htmlcov/
 *.vcf.gz
 *23andme*.txt
 *ancestry*.csv
+# Exception: the synthetic, safe-to-share tutorial fixture (real rsIDs, random genotypes)
+!examples/example_23andme.txt
 
 # Large local reference-data build artifacts (never commit reference data)
 *.tsv.gz
@@ -53,6 +55,7 @@ variant_summary*.txt.gz
 
 # Generated analysis reports (root)
 allelio_report*.html
+examples/report.html
 
 # Environment variables
 .env

@@ -1,0 +1,27 @@
+# Synthetic 23andMe-format example file for Allelio
+# NOT REAL GENETIC DATA. rsIDs are real (chosen so ClinVar / GWAS / gnomAD
+# lookups all have something to find); genotypes are randomly assigned and
+# carry no information about any real person. Safe to commit and share.
+# rsid	chromosome	position	genotype
+rs429358	19	45411941	AG
+rs7412	19	45412079	AA
+rs12913832	15	28365618	CC
+rs1805007	16	89986117	AT
+rs4988235	2	136608646	AT
+rs762551	15	75041917	AC
+rs1800497	11	113270828	AG
+rs6311	13	47471478	GT
+rs1042713	5	148206440	AG
+rs1042714	5	148206473	TT
+rs3918290	1	97915614	CT
+rs1805008	16	89986144	AA
+rs1799963	11	46761055	AA
+rs76763715	1	155205634	AG
+rs1799945	6	26091179	AT
+rs28897696	17	41215920	AT
+rs334	11	5248232	GT
+rs6025	1	169519049	TT
+rs2229991	8	42408344	--
+rs4819132	10	123256215	--
+rs99999901	3	50000000	AA
+rs99999902	7	20000000	GT
