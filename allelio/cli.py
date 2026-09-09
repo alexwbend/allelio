@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from allelio.analysis.lookup import analyze_variants
+from allelio.analysis.lookup import analyze_variants, AnalysisStats
 from allelio.database import AllelioDB, setup_database, staleness_warning, sources_summary, provenance_of
 from allelio.parsers import parse_genotype_file_with_stats
 from allelio.report import generate_html_report
@@ -231,12 +231,28 @@ def analyze(
                 db=db,
                 include_benign=include_benign,
             )
+            analysis_stats = getattr(results, "stats", None) or AnalysisStats()
             # Filter to traits only if requested
             if traits_only:
                 results = [r for r in results if r.category == "Traits"]
             significant = [r for r in results if r.significance_rank <= 4]
             mode_label = "trait associations" if traits_only else "significant variants"
             progress.update(task, description=f"✓ Found {len(results)} {mode_label}")
+        # Say what was left out and why. A ClinVar entry at a position where
+        # this person carries only the reference allele is not a finding for
+        # them, and a reader should know those were seen and set aside rather
+        # than missed.
+        if analysis_stats.reference_genotype_sites:
+            console.print(
+                f"  [dim]{analysis_stats.reference_genotype_sites:,} annotated positions where "
+                "you carry only the reference allele were set aside (not findings).[/dim]"
+            )
+        if analysis_stats.zygosity_unknown_sites:
+            console.print(
+                f"  [dim]{analysis_stats.zygosity_unknown_sites:,} findings are reported without a "
+                "zygosity call (the source does not name the allele, or the genotype "
+                "does not match it).[/dim]"
+            )
     except Exception as e:
         console.print(f"\n[bold red]✗[/bold red] Analysis failed: {e}\n", style="red")
         raise click.Abort()
@@ -353,6 +369,7 @@ def analyze(
     table.add_column("Category", width=15)
     table.add_column("Significance", width=12)
     table.add_column("Genotype", width=12)
+    table.add_column("Zygosity", width=22)
     
     for result in sorted(results, key=lambda x: x.significance_rank)[:top]:
         # Extract gene name from clinvar or gwas entries
@@ -378,6 +395,7 @@ def analyze(
             result.category,
             f"{result.significance_rank}",
             result.genotype or "-",
+            _short_zygosity(result),
             style=sig_style if result.significance_rank <= 4 else "",
         )
     
@@ -397,6 +415,8 @@ def analyze(
             "total_variants": len(variants),
             "significant_variants": len(significant),
             "skipped_i_id_rows": parse_stats.i_id_rows if parse_stats else 0,
+            "reference_genotype_sites": analysis_stats.reference_genotype_sites,
+            "zygosity_unknown_sites": analysis_stats.zygosity_unknown_sites,
         }
         
         html_content = generate_html_report(
@@ -497,6 +517,25 @@ def serve(port: int, host: str):
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Server failed: {e}\n", style="red")
         raise click.Abort()
+
+
+def _short_zygosity(result) -> str:
+    """Table cell: ``het (1 copy of A)``, ``hom alt (2 copies of T)``, ``unknown``."""
+    short = {
+        "homozygous reference": "hom ref",
+        "heterozygous": "het",
+        "homozygous alternate": "hom alt",
+        "hemizygous alternate": "hemi alt",
+        "hemizygous reference": "hemi ref",
+        "no call": "no call",
+        "unknown": "unknown",
+    }.get(result.zygosity, result.zygosity)
+    if result.alt_copies is None:
+        return short
+    unit = "copy" if result.alt_copies == 1 else "copies"
+    allele = f" of {result.matched_allele}" if result.matched_allele else ""
+    flip = "*" if result.strand_flipped else ""
+    return f"{short} ({result.alt_copies} {unit}{allele}){flip}"
 
 
 @allelio.command()

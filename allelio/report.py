@@ -142,6 +142,17 @@ def _sources_html(provenance: Dict[str, Any]) -> str:
     return "\n                ".join(lines)
 
 
+def _zygosity_phrase(variant) -> str:
+    """``heterozygous (1 copy of the A allele)`` or a plain fallback."""
+    describe = getattr(variant, "describe_zygosity", None)
+    if callable(describe):
+        try:
+            return describe()
+        except Exception:
+            pass
+    return str(getattr(variant, "zygosity", None) or "unknown")
+
+
 def _format_explanation_html(text: str) -> str:
     """Convert AI explanation text to safe HTML with paragraph breaks."""
     if not text:
@@ -194,6 +205,8 @@ def generate_html_report(
     # Disclosed scope boundary, not an error — see README "Known gaps:
     # 23andMe internal IDs" and PUB-11-lite in PUBLICATION_PLAN.md.
     skipped_i_id_rows = metadata.get("skipped_i_id_rows", 0)
+    reference_genotype_sites = metadata.get("reference_genotype_sites", 0)
+    zygosity_unknown_sites = metadata.get("zygosity_unknown_sites", 0)
 
     # Which release of each source this report was computed against. A reader
     # rerunning the analysis a month later gets different findings; without
@@ -291,6 +304,10 @@ def generate_html_report(
                     <span class="value" style="font-family: monospace; font-weight: bold;">{html_escape.escape(genotype)}</span>
                 </div>
                 <div class="info-row">
+                    <span class="label">Zygosity:</span>
+                    <span class="value">{html_escape.escape(_zygosity_phrase(variant))}</span>
+                </div>
+                <div class="info-row">
                     <span class="label">Chromosome:</span>
                     <span class="value">{html_escape.escape(str(variant.chromosome or "N/A"))}</span>
                 </div>
@@ -379,6 +396,24 @@ def generate_html_report(
             f'<div class="gap-note"><strong>Known gap:</strong> '
             f'skipped {skipped_i_id_rows:,} rows with 23andMe internal (i) IDs '
             f'— not yet looked up. See README: known gaps.</div>'
+        )
+
+    # Annotated positions where this person carries only the reference allele
+    # are not findings for them. They are counted here so the omission is
+    # visible, the same way the i-ID gap is.
+    if reference_genotype_sites:
+        gap_note += (
+            f'<div class="gap-note"><strong>Set aside:</strong> '
+            f'{reference_genotype_sites:,} annotated positions where you carry only the '
+            f'reference allele. A database entry for an allele you do not have is not a '
+            f'finding, so these are not listed.</div>'
+        )
+    if zygosity_unknown_sites:
+        gap_note += (
+            f'<div class="gap-note"><strong>Zygosity unknown:</strong> '
+            f'{zygosity_unknown_sites:,} of the findings below are reported without a copy count, '
+            f'because the source does not name the allele or your genotype does not match it '
+            f'on either strand. Read those with extra care.</div>'
         )
 
     ai_note = ""
