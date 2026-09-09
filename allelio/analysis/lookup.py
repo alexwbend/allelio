@@ -428,18 +428,60 @@ def _select_clinvar_rows(
     return [], None, False
 
 
-def _gwas_call(genotype: Optional[str], entries: List[GWASEntry]) -> Optional[ZygosityCall]:
-    """Zygosity against the GWAS risk allele, if the catalogue names one.
+_COMPLEMENT = {"A": "T", "T": "A", "C": "G", "G": "C"}
+
+
+def _gwas_call(
+    genotype: Optional[str],
+    entries: List[GWASEntry],
+    site_alleles: Optional[set] = None,
+) -> Optional[ZygosityCall]:
+    """Zygosity against the GWAS risk alleles, if the catalogue names any.
 
     The GWAS Catalog gives only the risk allele (no reference), and studies do
-    not always report it on the forward strand, so a mismatch is "unknown",
-    never "0 copies". Returns the call for the first entry with a known
-    allele; None if no entry names one.
+    not always report it on the forward strand. Where ClinVar has told us the
+    site's forward-strand alleles (``site_alleles``), a risk allele that is
+    not one of them but whose complement is gets complemented, and the call
+    is flagged as read on the opposite strand; at an A/T or C/G site that
+    inference is impossible and the mismatch stays unknown.
+
+    Every entry with a risk allele is considered. The result is the first
+    carried allele (most useful), else unknown if any entry could not be
+    judged, else "no copies" only when every named allele was checked and
+    none is carried. None if no entry names an allele.
     """
+    site_alleles = {a for a in (site_alleles or set()) if a}
+    ambiguous = site_alleles in ({"A", "T"}, {"C", "G"})
+    unknown: Optional[ZygosityCall] = None
+    absent: Optional[ZygosityCall] = None
+    seen = set()
     for e in entries:
-        if e.risk_allele:
-            return call_zygosity(genotype, None, e.risk_allele)
-    return None
+        allele = (e.risk_allele or "").upper()
+        if not allele or allele in seen:
+            continue
+        seen.add(allele)
+        flipped = False
+        if (
+            site_alleles and allele not in site_alleles and not ambiguous
+            and _COMPLEMENT.get(allele) in site_alleles
+        ):
+            allele = _COMPLEMENT[allele]
+            flipped = True
+        call = call_zygosity(genotype, None, allele)
+        if flipped and call.alt_copies is not None:
+            call = ZygosityCall(
+                call.zygosity, call.alt_copies, e.risk_allele.upper(),
+                strand_flipped=True, allele_role="risk",
+            )
+        if call.alt_copies:
+            return call
+        if call.alt_copies is None:
+            unknown = unknown or call
+        else:
+            absent = absent or call
+    if unknown is not None:
+        return unknown
+    return absent
 
 
 def analyze_variants_with_stats(
@@ -517,7 +559,10 @@ def analyze_variants_with_stats(
         # their own risk allele; otherwise the site is a reference genotype.
         gwas_reference = False
         if gwas_entries and (is_reference or call is None):
-            gcall = _gwas_call(genotype, gwas_entries)
+            site_alleles = {
+                a for cv in data["clinvar"] for a in (cv.get("ref_allele"), cv.get("alt_allele")) if a
+            }
+            gcall = _gwas_call(genotype, gwas_entries, site_alleles)
             if gcall is not None and gcall.alt_copies == 0:
                 gwas_reference = True
             elif is_reference or call is None:
