@@ -71,7 +71,15 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
     # Determine if file is gzipped
     open_func = gzip.open if filepath.endswith('.gz') else open
     mode = 'rt' if filepath.endswith('.gz') else 'r'
-    
+
+    # ClinVar lists each allele once per assembly, GRCh37 then GRCh38 on
+    # adjacent lines. The VCF-style allele columns of the GRCh37 line are
+    # not always trustworthy (rs6025's GRCh37 line reads T/T where GRCh38
+    # reads C/T), so when both builds are present only the GRCh38 line is
+    # emitted; a GRCh37-only allele is emitted as is. One line of lookahead
+    # is enough because the pairs are adjacent.
+    pending = None  # (allele_id, record) held back from a GRCh37 line
+
     with open_func(path, mode, encoding='utf-8') as f:
         for line_num, line in enumerate(f, 1):
             # Skip header line
@@ -87,6 +95,7 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
             
             try:
                 # Extract fields
+                allele_id = fields[CLINVAR_COLUMNS["#AlleleID"]].strip()
                 rs_num = fields[CLINVAR_COLUMNS["RS#"]].strip()
                 gene_symbol = fields[CLINVAR_COLUMNS["GeneSymbol"]].strip()
                 clinical_sig = fields[CLINVAR_COLUMNS["ClinicalSignificance"]].strip()
@@ -119,9 +128,22 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                     "review_status": review_status if review_status else None,
                     "last_evaluated": last_evaluated if last_evaluated else None,
                 }
-                
+
+                if pending is not None and pending[0] != allele_id:
+                    # The held GRCh37 line had no GRCh38 twin: emit it.
+                    yield pending[1]
+                    pending = None
+
+                if assembly == "GRCh37":
+                    pending = (allele_id, record)
+                    continue
+                if pending is not None and pending[0] == allele_id:
+                    pending = None  # superseded by this GRCh38 line
                 yield record
                 
             except (IndexError, ValueError):
                 # Skip malformed lines
                 continue
+
+    if pending is not None:
+        yield pending[1]
