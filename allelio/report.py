@@ -110,6 +110,38 @@ def _get_frequency_html(variant) -> str:
     return freq_html
 
 
+_SOURCE_HOMEPAGES = {
+    "clinvar": ("ClinVar", "https://www.ncbi.nlm.nih.gov/clinvar"),
+    "gwas": ("GWAS Catalog", "https://www.ebi.ac.uk/gwas"),
+    "gnomad": ("gnomAD", "https://gnomad.broadinstitute.org"),
+}
+
+
+def _sources_html(provenance: Dict[str, Any]) -> str:
+    """Render the Data Sources footer lines, one per reference source.
+
+    Each line names the source, its homepage, and (when recorded at setup) the
+    release this report was built from and the SHA-256 of the exact file, so
+    the analysis can be reproduced against the same data.
+    """
+    lines = []
+    for key, (label, homepage) in _SOURCE_HOMEPAGES.items():
+        info = provenance.get(key) or {}
+        release = info.get("release")
+        if release == "unavailable":
+            detail = "not loaded"
+        elif release:
+            detail = f"release {html_escape.escape(str(release))}"
+            if info.get("release_source") == "file-mtime":
+                detail += " (from file date)"
+            if info.get("sha256"):
+                detail += f", sha256 {html_escape.escape(str(info['sha256'])[:12])}…"
+        else:
+            detail = "release unknown"
+        lines.append(f"{label}: {homepage} &mdash; {detail}<br>")
+    return "\n                ".join(lines)
+
+
 def _format_explanation_html(text: str) -> str:
     """Convert AI explanation text to safe HTML with paragraph breaks."""
     if not text:
@@ -149,6 +181,7 @@ def generate_html_report(
     # Prepare data
     generated_at = metadata.get("generated_at", datetime.now().isoformat())
     db_version = metadata.get("db_version", "Unknown")
+    provenance = metadata.get("provenance") or {}
     # Read off the cards this report is about to render, never passed in
     # beside them: a name and a count that travel separately from the pages
     # they describe are a name and a count that can describe other pages.
@@ -161,6 +194,11 @@ def generate_html_report(
     # Disclosed scope boundary, not an error — see README "Known gaps:
     # 23andMe internal IDs" and PUB-11-lite in PUBLICATION_PLAN.md.
     skipped_i_id_rows = metadata.get("skipped_i_id_rows", 0)
+
+    # Which release of each source this report was computed against. A reader
+    # rerunning the analysis a month later gets different findings; without
+    # these lines nothing in the report explains why.
+    sources_html = _sources_html(provenance)
 
     # Categorize results using actual VariantCategory values
     health_conditions = [r for r in results if r.category == "Health Conditions"]
@@ -787,9 +825,7 @@ def generate_html_report(
 
             <div class="footer-section">
                 <strong>Data Sources</strong><br>
-                ClinVar: https://www.ncbi.nlm.nih.gov/clinvar<br>
-                GWAS Catalog: https://www.ebi.ac.uk/gwas<br>
-                gnomAD: https://gnomad.broadinstitute.org<br>
+                {sources_html}
                 dbSNP: https://www.ncbi.nlm.nih.gov/snp
             </div>
 

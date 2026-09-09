@@ -321,6 +321,7 @@ class AllelioDB:
             "variant_count": clinvar_count + gwas_count,
             "gene_count": gene_count,
             "last_update": last_update,
+            "provenance": self.get_provenance(),
             "db_path": str(self.db_path)
         }
     
@@ -341,14 +342,70 @@ class AllelioDB:
         except Exception:
             return False
 
+    # Reference sources whose provenance is recorded at setup, in display order.
+    SOURCES = (
+        ("clinvar", "ClinVar"),
+        ("gwas", "GWAS Catalog"),
+        ("gnomad", "gnomAD"),
+    )
+
+    def get_provenance(self) -> Dict[str, Dict[str, Optional[str]]]:
+        """Return which release of each reference source this database holds.
+
+        Each source maps to a dict with ``label``, ``release`` (a YYYY-MM-DD
+        date for the rolling ClinVar/GWAS releases, a version tag such as
+        ``v4.1.1`` for gnomAD, ``unavailable`` when the source was not loaded,
+        or ``unknown``), ``release_source`` (how the date was learned:
+        ``http-last-modified`` from the server, ``file-mtime`` inferred from a
+        file already on disk, or None), ``url`` and ``sha256`` of the exact
+        file. Any key the metadata table does not carry is None, so callers
+        can render "unknown" rather than guess.
+        """
+        prov: Dict[str, Dict[str, Optional[str]]] = {}
+        for key, label in self.SOURCES:
+            release = self.get_metadata(f"{key}_release")
+            if release is None:
+                # Databases built before release dates were recorded stored
+                # the literal "latest" here; that is not a release, so say so.
+                legacy = self.get_metadata(f"{key}_version")
+                release = None if legacy in (None, "latest") else legacy
+            prov[key] = {
+                "label": label,
+                "release": release,
+                "release_source": self.get_metadata(f"{key}_release_source"),
+                "url": self.get_metadata(f"{key}_url"),
+                "sha256": self.get_metadata(f"{key}_sha256"),
+            }
+        return prov
+
+    def describe_sources(self) -> str:
+        """One line naming the release of every loaded source.
+
+        Example: ``ClinVar 2026-09-06 · GWAS Catalog 2026-09-04 · gnomAD v4.1.1``.
+        A source that was not loaded is omitted; one whose release is unknown
+        reads ``unknown``.
+        """
+        parts = []
+        for key, info in self.get_provenance().items():
+            release = info.get("release")
+            if release == "unavailable":
+                continue
+            parts.append(f"{info['label']} {release or 'unknown'}")
+        return " · ".join(parts) if parts else "no reference data loaded"
+
     def version(self) -> str:
         """Return a human-readable version/status string for the database.
 
+        Names the release of each reference source and when the database was
+        built, so a report can say exactly what it was computed against.
+
         Returns:
-            String describing the database version or last update time.
+            String such as ``ClinVar 2026-09-06 · GWAS Catalog 2026-09-04 ·
+            gnomAD v4.1.1 (built 2026-09-09)``.
         """
-        last_update = self.get_metadata("last_update") if self.get_metadata("last_update") else "unknown"
-        return f"Updated: {last_update}"
+        last_update = self.get_metadata("last_update")
+        built = f" (built {last_update[:10]})" if last_update else ""
+        return f"{self.describe_sources()}{built}"
 
     def days_since_update(self) -> Optional[float]:
         """Return the number of days since the last database update.

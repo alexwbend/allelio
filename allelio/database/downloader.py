@@ -2,11 +2,13 @@
 
 import hashlib
 import json
+import re
 import os
 import zipfile
 from pathlib import Path
 from typing import Optional, Callable
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 
 try:
     import httpx
@@ -99,6 +101,27 @@ def staleness_warning(db: AllelioDB, threshold_days: int = STALENESS_THRESHOLD_D
     )
 
 
+def sources_summary(db: AllelioDB) -> Optional[str]:
+    """One line naming each loaded source's release, or None if unknowable.
+
+    Advisory, like ``staleness_warning``: a DB that cannot describe itself (an
+    older schema, a test double) yields None rather than an exception, so the
+    line is simply left out of the CLI, the report, and the status endpoint.
+    """
+    try:
+        return db.describe_sources()
+    except Exception:
+        return None
+
+
+def provenance_of(db: AllelioDB) -> dict:
+    """Per-source provenance dict, or ``{}`` if the DB cannot provide one."""
+    try:
+        return dict(db.get_provenance())
+    except Exception:
+        return {}
+
+
 def sha256_file(path: str) -> str:
     """Return the hex SHA-256 digest of a file, read in 1 MB chunks."""
     h = hashlib.sha256()
@@ -106,6 +129,80 @@ def sha256_file(path: str) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _parse_http_date(value: Optional[str]) -> Optional[str]:
+    """Turn an HTTP ``Last-Modified`` header into a ``YYYY-MM-DD`` string.
+
+    Returns None when the header is missing or not an RFC 7231 date.
+    """
+    if not value:
+        return None
+    try:
+        return parsedate_to_datetime(value).date().isoformat()
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def provenance_sidecar_path(path: str) -> Path:
+    """Where ``download_file`` records what it fetched, beside the file."""
+    return Path(str(path) + ".provenance.json")
+
+
+def write_provenance(path: str, provenance: dict) -> None:
+    """Persist a download's provenance beside the file (best effort)."""
+    try:
+        provenance_sidecar_path(path).write_text(json.dumps(provenance, indent=2))
+    except OSError:
+        pass
+
+
+def read_provenance(path: str) -> dict:
+    """Recover what is known about a reference file already on disk.
+
+    Reads the sidecar written by ``download_file``. When there is none (a file
+    downloaded before sidecars existed, or copied in by hand), falls back to the
+    file's modification time and says so in ``release_source`` — a reviewer
+    should be able to tell a date the server asserted from one we inferred.
+
+    Returns:
+        Dict with keys ``url``, ``release`` (YYYY-MM-DD or None),
+        ``release_source`` (``http-last-modified`` | ``file-mtime``),
+        ``size`` and ``sha256`` (may be None if the file is missing).
+    """
+    path = Path(path)
+    sidecar = provenance_sidecar_path(str(path))
+    if sidecar.exists():
+        try:
+            data = json.loads(sidecar.read_text())
+            if isinstance(data, dict) and data.get("sha256"):
+                return data
+        except (OSError, ValueError):
+            pass
+    if not path.exists():
+        return {"url": None, "release": None, "release_source": None, "size": None, "sha256": None}
+    stat = path.stat()
+    return {
+        "url": None,
+        "release": datetime.fromtimestamp(stat.st_mtime).date().isoformat(),
+        "release_source": "file-mtime",
+        "size": stat.st_size,
+        "sha256": sha256_file(str(path)),
+    }
+
+
+# GWAS Catalog names the TSV inside its release zip with the release date, e.g.
+# ``gwas_catalog_v1.0.2-associations_e114_r2026-09-04.tsv``. That ``r`` date is
+# the catalogue's own release stamp, which beats the zip's Last-Modified.
+_GWAS_RELEASE_RE = re.compile(r"_r(\d{4}-\d{2}-\d{2})")
+
+
+def gwas_release_from_filename(name: Optional[str]) -> Optional[str]:
+    """Extract the ``YYYY-MM-DD`` release date from a GWAS Catalog file name."""
+    if not name:
+        return None
+    m = _GWAS_RELEASE_RE.search(name)
+    return m.group(1) if m else None
 
 
 def fetch_gnomad_manifest(
@@ -199,7 +296,7 @@ def download_gnomad_from_manifest(
     return False
 
 
-def download_file(url: str, dest_path: str, progress_callback: Optional[Callable] = None, log: Optional[Callable] = None, max_retries: int = 3) -> None:
+def download_file(url: str, dest_path: str, progress_callback: Optional[Callable] = None, log: Optional[Callable] = None, max_retries: int = 3) -> dict:
     """Download file from URL with progress reporting and retry logic.
 
     Args:
@@ -208,6 +305,12 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
         progress_callback: Optional callback function(downloaded_bytes, total_bytes)
         log: Optional function to print status messages
         max_retries: Number of times to retry on failure
+
+    Returns:
+        Provenance dict (``url``, ``release`` from the server's Last-Modified
+        header as YYYY-MM-DD, ``release_source``, ``size``, ``sha256``), also
+        written to a ``.provenance.json`` sidecar beside the file so a later
+        run that skips the download can still say what it has.
 
     Raises:
         ImportError: If httpx is not installed
@@ -231,6 +334,7 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
             with httpx.stream("GET", url, follow_redirects=True, timeout=timeout) as response:
                 response.raise_for_status()
                 total_bytes = int(response.headers.get("content-length", 0))
+                last_modified = _parse_http_date(response.headers.get("last-modified"))
                 total_mb = total_bytes / (1024 * 1024) if total_bytes else 0
 
                 downloaded = 0
@@ -255,7 +359,16 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
             if total_bytes > 0 and actual_size < total_bytes:
                 raise RuntimeError(f"Incomplete download: got {actual_size:,} of {total_bytes:,} bytes")
 
-            return  # Success
+            provenance = {
+                "url": url,
+                "release": last_modified,
+                "release_source": "http-last-modified" if last_modified else None,
+                "size": actual_size,
+                "sha256": sha256_file(str(dest_path)),
+                "downloaded_at": datetime.now().isoformat(timespec="seconds"),
+            }
+            write_provenance(str(dest_path), provenance)
+            return provenance  # Success
 
         except Exception as e:
             if attempt < max_retries:
@@ -266,12 +379,35 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
                 raise RuntimeError(f"Download failed after {max_retries} attempts: {e}")
 
 
+def _record_source_provenance(db: AllelioDB, source: str, prov: dict) -> None:
+    """Store one source's release date, URL, and checksum as DB metadata.
+
+    Keys are ``<source>_release``, ``<source>_release_source``, ``<source>_url``,
+    ``<source>_sha256`` and (GWAS only) ``<source>_release_file``. The legacy
+    ``<source>_version`` key is kept pointing at the release date so older
+    readers keep working.
+    """
+    prov = prov or {}
+    release = prov.get("release") or "unknown"
+    db.set_metadata(f"{source}_release", str(release))
+    db.set_metadata(f"{source}_version", str(release))
+    if prov.get("release_source"):
+        db.set_metadata(f"{source}_release_source", str(prov["release_source"]))
+    if prov.get("url"):
+        db.set_metadata(f"{source}_url", str(prov["url"]))
+    if prov.get("sha256"):
+        db.set_metadata(f"{source}_sha256", str(prov["sha256"]))
+    if prov.get("release_file"):
+        db.set_metadata(f"{source}_release_file", str(prov["release_file"]))
+
+
 def setup_database(
     db: AllelioDB,
     data_dir: Optional[str] = None,
     progress_callback: Optional[Callable] = None,
     log: Optional[Callable] = None,
     include_gnomad: bool = True,
+    force_download: bool = False,
 ) -> None:
     """Orchestrate full download, parse, and index of reference databases.
 
@@ -281,6 +417,9 @@ def setup_database(
         progress_callback: Optional callback function for progress updates
         log: Optional function to print status messages (e.g. print or console.print)
         include_gnomad: If True, download gnomAD population frequency data (~1-2 GB)
+        force_download: If True, re-fetch every source even when a copy is
+            already on disk. ``allelio update`` sets this; without it an
+            "update" only re-indexed whatever was already downloaded.
 
     Raises:
         ImportError: If httpx is not installed
@@ -304,13 +443,17 @@ def setup_database(
 
     # Download ClinVar (skip if already downloaded and >100MB)
     clinvar_path = data_dir / "variant_summary.txt.gz"
-    if clinvar_path.exists() and clinvar_path.stat().st_size > 100_000_000:
+    if not force_download and clinvar_path.exists() and clinvar_path.stat().st_size > 100_000_000:
         clinvar_mb = clinvar_path.stat().st_size / (1024 * 1024)
         _log(f"[2/{total_steps}] ClinVar already downloaded ({clinvar_mb:.0f} MB) — skipping download.")
+        clinvar_prov = read_provenance(str(clinvar_path))
     else:
         _log(f"[2/{total_steps}] Downloading ClinVar from NIH (~400 MB)... this may take a few minutes")
-        download_file(CLINVAR_URL, str(clinvar_path), progress_callback, log=log)
+        clinvar_prov = download_file(CLINVAR_URL, str(clinvar_path), progress_callback, log=log) or {}
         _log(f"[2/{total_steps}] ClinVar download complete.")
+    clinvar_prov = clinvar_prov or {}
+    clinvar_prov.setdefault("url", CLINVAR_URL)
+    _log(f"       ClinVar release: {clinvar_prov.get('release') or 'unknown'}")
 
     # Parse ClinVar
     _log(f"[3/{total_steps}] Parsing ClinVar variants... (this takes 1-2 minutes)")
@@ -333,14 +476,16 @@ def setup_database(
     gwas_path = data_dir / "gwas_associations.tsv"
     gwas_zip_path = data_dir / "gwas_associations.zip"
     gwas_downloaded = False
-    if gwas_path.exists() and gwas_path.stat().st_size > 10_000_000:
+    gwas_prov: dict = {}
+    if not force_download and gwas_path.exists() and gwas_path.stat().st_size > 10_000_000:
         gwas_mb = gwas_path.stat().st_size / (1024 * 1024)
         _log(f"[4/{total_steps}] GWAS Catalog already downloaded ({gwas_mb:.0f} MB) — skipping download.")
         gwas_downloaded = True
+        gwas_prov = read_provenance(str(gwas_path))
     else:
         _log(f"[4/{total_steps}] Downloading GWAS Catalog from EBI... this may take a few minutes")
         try:
-            download_file(GWAS_URL, str(gwas_zip_path), progress_callback, log=log)
+            gwas_prov = dict(download_file(GWAS_URL, str(gwas_zip_path), progress_callback, log=log) or {})
             # The download is a zip file — extract the TSV from it
             _log("       Extracting zip file...")
             with zipfile.ZipFile(str(gwas_zip_path), 'r') as zf:
@@ -351,6 +496,13 @@ def setup_database(
                     with zf.open(tsv_files[0]) as src, open(str(gwas_path), 'wb') as dst:
                         dst.write(src.read())
                     _log(f"       Extracted: {tsv_files[0]}")
+                    gwas_prov["release_file"] = tsv_files[0]
+                    # The catalogue stamps its own release date into the file
+                    # name; prefer that over the zip's Last-Modified header.
+                    stamped = gwas_release_from_filename(tsv_files[0])
+                    if stamped:
+                        gwas_prov["release"] = stamped
+                        gwas_prov["release_source"] = "gwas-filename"
                 else:
                     # No TSV found — maybe the zip contains the data directly
                     zf.extractall(str(data_dir))
@@ -358,10 +510,17 @@ def setup_database(
             # Clean up zip
             gwas_zip_path.unlink(missing_ok=True)
             gwas_downloaded = True
+            # The sidecar belongs beside the extracted TSV, which is the file a
+            # later run finds on disk; the zip is gone by then.
+            write_provenance(str(gwas_path), gwas_prov)
             _log(f"[4/{total_steps}] GWAS Catalog download complete.")
         except Exception as e:
             _log(f"       GWAS download failed: {e}")
             gwas_zip_path.unlink(missing_ok=True)
+    if gwas_downloaded:
+        gwas_prov = gwas_prov or {}
+        gwas_prov.setdefault("url", GWAS_URL)
+        _log(f"       GWAS Catalog release: {gwas_prov.get('release') or 'unknown'}")
 
     # Parse GWAS (if downloaded)
     gwas_count = 0
@@ -396,7 +555,7 @@ def setup_database(
         gnomad_path = data_dir / "gnomad_freq.tsv.gz"
         gnomad_manifest = fetch_gnomad_manifest(log=log)
 
-        if gnomad_path.exists() and gnomad_path.stat().st_size > 1_000_000:
+        if not force_download and gnomad_path.exists() and gnomad_path.stat().st_size > 1_000_000:
             gnomad_mb = gnomad_path.stat().st_size / (1024 * 1024)
             _log(f"[6/{total_steps}] gnomAD already downloaded ({gnomad_mb:.0f} MB) — skipping download.")
             gnomad_downloaded = True
@@ -443,18 +602,36 @@ def setup_database(
     # Set metadata
     _log(f"[{total_steps}/{total_steps}] Finalizing database...")
     db.set_metadata("last_update", datetime.now().isoformat())
-    db.set_metadata("clinvar_version", "latest")
+    # Real provenance, not the word "latest": which release of each source this
+    # database was built from, where it came from, and the checksum of the
+    # exact file. A result is only reproducible if the reader can name the
+    # ClinVar and GWAS releases behind it.
+    _record_source_provenance(db, "clinvar", clinvar_prov)
     if gwas_downloaded:
-        db.set_metadata("gwas_version", "latest")
+        _record_source_provenance(db, "gwas", gwas_prov)
     else:
         db.set_metadata("gwas_version", "unavailable")
+        db.set_metadata("gwas_release", "unavailable")
     # Provenance from the manifest, not hardcoded — so the frequency layer is
     # version-agnostic and a source/version change is a data refresh.
     if include_gnomad and gnomad_downloaded:
         db.set_metadata("gnomad_source", str(gnomad_manifest.get("source", "gnomAD")))
         db.set_metadata("gnomad_version", str(gnomad_manifest.get("version", "unknown")))
-    elif include_gnomad:
+        gnomad_sha = gnomad_manifest.get("sha256")
+        if not gnomad_sha:
+            try:
+                gnomad_sha = sha256_file(str(gnomad_path))
+            except OSError:
+                gnomad_sha = None
+        if gnomad_sha:
+            db.set_metadata("gnomad_sha256", str(gnomad_sha))
+        if gnomad_manifest.get("urls"):
+            db.set_metadata("gnomad_url", str(gnomad_manifest["urls"][0]))
+    else:
+        # Either skipped by flag or failed to download: say so, rather than
+        # leaving the key absent and the release reading "unknown".
         db.set_metadata("gnomad_version", "unavailable")
+        db.set_metadata("gnomad_release", "unavailable")
 
     parts = [f"{clinvar_count:,} ClinVar"]
     if gwas_count > 0:

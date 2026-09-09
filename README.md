@@ -227,6 +227,26 @@ Allelio's pipeline is straightforward:
 
 The reference databases are stored locally on your machine after the initial download. During analysis, Allelio makes **zero network requests** — your data stays put.
 
+### Knowing which data you ran against
+
+ClinVar and the GWAS Catalog are rolling releases, so the same DNA file can
+produce different findings a month apart. To keep every result reproducible,
+Allelio records at setup **which release of each source it was built from**
+(the release date the server reports for ClinVar and GWAS, the pinned version
+for gnomAD), the download URL, and the SHA-256 checksum of the exact file. You
+see this in three places:
+
+- `allelio info` lists a release line per source with its checksum
+- `allelio analyze` prints the reference releases before it starts, and the
+  HTML report's **Data Sources** footer repeats them
+- the web interface's status pill and its `/api/status` endpoint carry the
+  same line
+
+If a release shows as `unknown`, the database predates this feature; run
+`allelio update` once and it will be filled in. `allelio update` now genuinely
+re-downloads every source (it used to only re-index the copies already on
+disk), so a refresh moves the release dates forward.
+
 ---
 
 ## How variants are ranked
@@ -368,6 +388,8 @@ If you use Allelio in your own work, see [CITATION.cff](CITATION.cff) for how to
 **"Ollama not responding"** — Make sure the Ollama app is running, or start it with `ollama serve` in a separate terminal window.
 
 **"Model not found"** — You need to download the AI model first: `ollama pull llama3.1:8b`
+
+**A release shows as "unknown" or "(from file date)" in `allelio info`** — "unknown" means the database was built before Allelio recorded release dates; "(from file date)" means the reference file was already on disk when the database was built, so the date is the file's own timestamp rather than the one the server reported. Either way, `allelio update` re-downloads the sources and records the real release dates and checksums.
 
 **Analysis seems slow** — the lookups are instant; the AI explanations are what take the time, and how long they take depends entirely on your model and hardware. On an Apple Silicon Mac with `llama3.1:8b`, expect roughly half a minute per variant, so a default run (top 20) is on the order of ten minutes. `--no-ai` skips the explanations and returns findings in a few seconds, and the report is still complete, just without the plain-English write-ups.
 
