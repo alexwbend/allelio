@@ -114,6 +114,8 @@ _SOURCE_HOMEPAGES = {
     "clinvar": ("ClinVar", "https://www.ncbi.nlm.nih.gov/clinvar"),
     "gwas": ("GWAS Catalog", "https://www.ebi.ac.uk/gwas"),
     "gnomad": ("gnomAD", "https://gnomad.broadinstitute.org"),
+    # ClinGen asks to be credited with the access date; the release line is it.
+    "clingen": ("ClinGen gene-disease validity", "https://clinicalgenome.org"),
 }
 
 
@@ -140,6 +142,23 @@ def _sources_html(provenance: Dict[str, Any]) -> str:
             detail = "release unknown"
         lines.append(f"{label}: {homepage} &mdash; {detail}<br>")
     return "\n                ".join(lines)
+
+
+def _inheritance_row(variant) -> str:
+    """The ClinGen inheritance line, or nothing for GWAS-only cards."""
+    inheritance = getattr(variant, "inheritance", None)
+    if not inheritance or not getattr(variant, "clinvar_entries", None):
+        return ""
+    note = getattr(variant, "inheritance_note", None)
+    value = html_escape.escape(str(inheritance))
+    if note:
+        value += f' <span style="color:#6b7280;">&mdash; {html_escape.escape(str(note))}</span>'
+    return f'''
+                <div class="info-row">
+                    <span class="label">Inheritance (ClinGen):</span>
+                    <span class="value">{value}</span>
+                </div>
+'''
 
 
 def _zygosity_phrase(variant) -> str:
@@ -219,6 +238,7 @@ def generate_html_report(
     pharma = [r for r in results if r.category == "Pharmacogenomics"]
     traits = [r for r in results if r.category == "Traits"]
     carrier = [r for r in results if r.category == "Carrier Status"]
+    benign = [r for r in results if r.category == "Benign"]
     other = [r for r in results if r.category in ("Unknown",)]
 
     def generate_variant_card(variant, explanation=None):
@@ -234,7 +254,8 @@ def generate_html_report(
             "Risk Factors": "#ea580c",
             "Pharmacogenomics": "#7c3aed",
             "Traits": "#2563eb",
-            "Carrier Status": "#16a34a",
+            "Carrier Status": "#0d9488",
+            "Benign": "#16a34a",
             "Unknown": "#6b7280",
         }
         color = category_colors.get(variant.category, "#6b7280")
@@ -307,6 +328,7 @@ def generate_html_report(
                     <span class="label">Zygosity:</span>
                     <span class="value">{html_escape.escape(_zygosity_phrase(variant))}</span>
                 </div>
+{_inheritance_row(variant)}
                 <div class="info-row">
                     <span class="label">Chromosome:</span>
                     <span class="value">{html_escape.escape(str(variant.chromosome or "N/A"))}</span>
@@ -343,7 +365,8 @@ def generate_html_report(
         (risk_factors, "Risk Factors", "#ea580c", "risk-factors", "Variants associated with increased risk for certain conditions."),
         (pharma, "Pharmacogenomics", "#7c3aed", "pharmacogenomics", "Variants that may affect drug metabolism or response."),
         (traits, "Trait Associations", "#2563eb", "traits", "Variants associated with traits identified in genome-wide studies."),
-        (carrier, "Carrier Status", "#16a34a", "carrier-status", "Benign or carrier-status variants."),
+        (carrier, "Carrier Status", "#0d9488", "carrier-status", "One copy of a pathogenic allele in a gene ClinGen curates only for recessive conditions: not the affected genotype, but relevant to family planning."),
+        (benign, "Benign", "#16a34a", "benign", "Variants ClinVar classifies as benign or likely benign (shown with --include-benign)."),
     ]
 
     # Build tab navigation — only for sections that have results

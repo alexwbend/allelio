@@ -117,6 +117,22 @@ class AllelioDB:
             )
         """)
 
+        # Create ClinGen gene-disease validity table (gene-level: mode of
+        # inheritance and how well established the gene-disease link is)
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clingen (
+                gene TEXT NOT NULL,
+                hgnc_id TEXT,
+                disease TEXT,
+                mondo_id TEXT,
+                moi TEXT,
+                classification TEXT,
+                report_url TEXT,
+                classification_date TEXT,
+                PRIMARY KEY (gene, disease, moi)
+            )
+        """)
+
         # Create metadata table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS metadata (
@@ -136,6 +152,10 @@ class AllelioDB:
 
         self.cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_gnomad_rsid ON gnomad(rsid)
+        """)
+
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_clingen_gene ON clingen(gene)
         """)
 
         self.conn.commit()
@@ -218,7 +238,7 @@ class AllelioDB:
         longer carries (a withdrawn record, or one whose alleles are now read
         differently) would otherwise survive beside the new ones.
         """
-        if table not in ("clinvar", "gwas", "gnomad"):
+        if table not in ("clinvar", "gwas", "gnomad", "clingen"):
             raise ValueError(f"not a reference table: {table}")
         self.cursor.execute(f"DELETE FROM {table}")
         self.conn.commit()
@@ -233,15 +253,53 @@ class AllelioDB:
         self.cursor.execute("DELETE FROM gwas")
         self.conn.commit()
 
-    def _has_gnomad_table(self) -> bool:
-        """Check whether the gnomad table exists (backward compatibility)."""
+    def insert_clingen_batch(self, records: List[Dict[str, Any]]) -> None:
+        """Bulk insert ClinGen gene-disease validity records.
+
+        Args:
+            records: List of dicts with keys: gene, hgnc_id, disease, mondo_id,
+                    moi, classification, report_url, classification_date
+        """
+        if not records:
+            return
+        self.cursor.executemany(
+            """INSERT OR REPLACE INTO clingen
+               (gene, hgnc_id, disease, mondo_id, moi, classification, report_url, classification_date)
+               VALUES (:gene, :hgnc_id, :disease, :mondo_id, :moi, :classification, :report_url, :classification_date)
+            """,
+            records,
+        )
+        self.conn.commit()
+
+    def _has_table(self, name: str) -> bool:
         try:
             self.cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='gnomad'"
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,)
             )
             return self.cursor.fetchone() is not None
         except Exception:
             return False
+
+    def lookup_clingen_genes(self, genes: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+        """ClinGen curations for each gene symbol, ``{}`` if none / no table."""
+        result: Dict[str, List[Dict[str, Any]]] = {g: [] for g in genes if g}
+        if not result or not self._has_table("clingen"):
+            return result
+        names = list(result)
+        for i in range(0, len(names), 500):
+            chunk = names[i:i + 500]
+            placeholders = ",".join("?" * len(chunk))
+            self.cursor.execute(
+                f"SELECT * FROM clingen WHERE gene IN ({placeholders}) ORDER BY gene, classification, disease",
+                chunk,
+            )
+            for row in self.cursor.fetchall():
+                result[row["gene"]].append(dict(row))
+        return result
+
+    def _has_gnomad_table(self) -> bool:
+        """Check whether the gnomad table exists (backward compatibility)."""
+        return self._has_table("gnomad")
 
     def lookup_rsid(self, rsid: str) -> Dict[str, Any]:
         """Look up combined ClinVar, GWAS, and gnomAD data for a single rsID.
@@ -375,6 +433,14 @@ class AllelioDB:
             except Exception:
                 pass
 
+        clingen_count = 0
+        if self._has_table("clingen"):
+            try:
+                self.cursor.execute("SELECT COUNT(*) FROM clingen")
+                clingen_count = self.cursor.fetchone()[0]
+            except Exception:
+                pass
+
         # Count distinct genes across both tables
         gene_count = 0
         try:
@@ -392,6 +458,7 @@ class AllelioDB:
             "clinvar_entries": clinvar_count,
             "gwas_entries": gwas_count,
             "gnomad_entries": gnomad_count,
+            "clingen_entries": clingen_count,
             "variant_count": clinvar_count + gwas_count,
             "gene_count": gene_count,
             "last_update": last_update,
@@ -421,6 +488,7 @@ class AllelioDB:
         ("clinvar", "ClinVar"),
         ("gwas", "GWAS Catalog"),
         ("gnomad", "gnomAD"),
+        ("clingen", "ClinGen"),
     )
 
     def get_provenance(self) -> Dict[str, Dict[str, Optional[str]]]:
