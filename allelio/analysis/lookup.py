@@ -158,7 +158,7 @@ CLINGEN_ESTABLISHED = ("Definitive", "Strong", "Moderate")
 
 @dataclass
 class ClinVarEntry:
-    """ClinVar variant entry — one classified allele at one rsID."""
+    """ClinVar variant entry, one classified allele at one rsID."""
     rsid: str
     gene: Optional[str] = None
     clinical_significance: Optional[str] = None
@@ -232,7 +232,7 @@ class VariantResult:
     gnomad_entry: Optional[GnomADEntry] = None
     category: str = VariantCategory.UNKNOWN.value
     significance_rank: float = 999
-    # How many copies of the annotated allele the user carries — the
+    # How many copies of the annotated allele the user carries, the
     # difference between a carrier, an affected genotype, and an entry that
     # does not apply to this person at all. See allelio/analysis/zygosity.py.
     zygosity: str = Zygosity.UNKNOWN.value
@@ -460,7 +460,7 @@ def _select_clinvar_rows(
     an unknown zygosity, as every row was before alleles were stored.
 
     Returns:
-        (entries, call, is_reference) — the applicable entries ordered most
+        (entries, call, is_reference), the applicable entries ordered most
         significant first, the zygosity call for the first of them, and
         True when the user carries no copy of any annotated allele (nothing
         applies; the site is a reference genotype, not a finding).
@@ -620,7 +620,7 @@ def _inheritance(entries: List[ClinGenEntry]) -> Tuple[str, Optional[str]]:
     allele causes, which gene-level curation cannot say.
 
     Returns:
-        (inheritance, note) — e.g. ("autosomal recessive", "ClinGen:
+        (inheritance, note), e.g. ("autosomal recessive", "ClinGen:
         hemochromatosis type 1 (Definitive)").
     """
     from allelio.database.clingen import MOI_LABELS
@@ -832,7 +832,7 @@ def analyze_variants_with_stats(
         # Adjust significance rank based on population frequency. Not for
         # pharmacogenomic findings: the adjustment encodes "a common allele is
         # unlikely to be pathogenic", and a drug-response allele is not a
-        # pathogenicity claim — most are common by nature (VKORC1 -1639G>A is
+        # pathogenicity claim, most are common by nature (VKORC1 -1639G>A is
         # carried by a third of Europeans) and no less actionable for it.
         pharmacogenomic = category == VariantCategory.PHARMACOGENOMICS.value
         adjusted_rank = (
@@ -910,8 +910,8 @@ def analyze_variants(
 ) -> List[VariantResult]:
     """Analyze variants against reference databases and rank them for triage.
 
-    significance_rank is a prioritization heuristic for presentation order —
-    lower means "look at this one first" — built from ClinVar's categorical
+    significance_rank is a prioritization heuristic for presentation order,
+    lower means "look at this one first", built from ClinVar's categorical
     significance, review-status quality, and gnomAD population frequency. It
     is not a clinical or diagnostic score, has not been validated as one, and
     must never be reported as one.
@@ -928,7 +928,7 @@ def analyze_variants(
         include_reference: Whether to include reference-genotype sites
 
     Returns:
-        ``AnalysisResults`` — a list of VariantResult sorted by significance
+        ``AnalysisResults``, a list of VariantResult sorted by significance
         rank, with the ``AnalysisStats`` on its ``.stats`` attribute
     """
     results, stats = analyze_variants_with_stats(variants, db, include_benign, include_reference)

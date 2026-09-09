@@ -35,7 +35,7 @@ VARIANT_PROMPT_TEMPLATE = """Please explain the following genetic variant findin
 
 Please provide:
 1. A plain-English explanation of what this variant means
-2. What the user's specific genotype ({genotype}, {zygosity}) implies given the inheritance ({inheritance}) — for an autosomal recessive condition, one copy means carrier status rather than being affected and two copies is the affected genotype; for an autosomal dominant one, one copy is the relevant genotype; if the inheritance is mixed or not curated, or the zygosity is unknown, say so and do not assume either
+2. What the user's specific genotype ({genotype}, {zygosity}) implies given the inheritance ({inheritance}): for an autosomal recessive condition, one copy means carrier status rather than being affected and two copies is the affected genotype; for an autosomal dominant one, one copy is the relevant genotype; if the inheritance is mixed or not curated, or the zygosity is unknown, say so and do not assume either
 3. How the population frequency affects interpretation (e.g., common variants are less likely to cause rare diseases)
 4. Any relevant lifestyle, dietary, or environmental context from research
 5. Important caveats and limitations

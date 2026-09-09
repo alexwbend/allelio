@@ -153,7 +153,7 @@ def _pgx_rows(variant) -> str:
         return ""
     blocks = []
     for e in entries:
-        drugs = html_escape.escape(str(e.drugs or "—"))
+        drugs = html_escape.escape(str(e.drugs or "-"))
         level = html_escape.escape(str(e.level or "?"))
         cat = html_escape.escape(str(e.phenotype_category or ""))
         text = html_escape.escape(str(e.annotation_text or ""))

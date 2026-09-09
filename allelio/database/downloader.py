@@ -176,7 +176,7 @@ def read_provenance(path: str) -> dict:
 
     Reads the sidecar written by ``download_file``. When there is none (a file
     downloaded before sidecars existed, or copied in by hand), falls back to the
-    file's modification time and says so in ``release_source`` — a reviewer
+    file's modification time and says so in ``release_source``, a reviewer
     should be able to tell a date the server asserted from one we inferred.
 
     Returns:
@@ -633,7 +633,7 @@ def setup_database(
         step_parse = step_dl + 1
         clingen_path = data_dir / "clingen_gene_validity.csv"
         if not force_download and clingen_path.exists() and clingen_path.stat().st_size > 100_000:
-            _log(f"[{step_dl}/{total_steps}] ClinGen already downloaded — skipping download.")
+            _log(f"[{step_dl}/{total_steps}] ClinGen already downloaded, skipping download.")
             clingen_downloaded = True
             clingen_prov = read_provenance(str(clingen_path))
         else:
@@ -674,7 +674,7 @@ def setup_database(
                 clingen_downloaded = False
                 clingen_path.unlink(missing_ok=True)
         else:
-            _log(f"[{step_parse}/{total_steps}] Skipping ClinGen parsing — not available.")
+            _log(f"[{step_parse}/{total_steps}] Skipping ClinGen parsing, not available.")
 
     # ClinPGx clinical annotations (optional, small): variant–drug evidence
     # with the annotation text for each genotype. Only single-rsID
@@ -687,7 +687,7 @@ def setup_database(
         clinpgx_zip = data_dir / "clinpgx_clinical_annotations.zip"
         clinpgx_dir = data_dir / "clinpgx"
         if not force_download and clinpgx_zip.exists() and clinpgx_zip.stat().st_size > 100_000:
-            _log(f"[{step_dl}/{total_steps}] ClinPGx already downloaded — skipping download.")
+            _log(f"[{step_dl}/{total_steps}] ClinPGx already downloaded, skipping download.")
             clinpgx_downloaded = True
             clinpgx_prov = read_provenance(str(clinpgx_zip))
         else:
@@ -724,7 +724,7 @@ def setup_database(
                 clinpgx_downloaded = False
                 clinpgx_zip.unlink(missing_ok=True)
         else:
-            _log(f"[{step_parse}/{total_steps}] Skipping ClinPGx parsing — not available.")
+            _log(f"[{step_parse}/{total_steps}] Skipping ClinPGx parsing, not available.")
 
     # Set metadata
     _log(f"[{total_steps}/{total_steps}] Finalizing database...")

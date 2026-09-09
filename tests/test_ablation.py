@@ -34,7 +34,7 @@ def test_ablation_table_is_deterministic_and_shows_the_hidden_sites(db):
     assert rows == again
     by = {r["rsid"]: r for r in rows}
     # The two common conflicting variants are visible without the adjustment
-    # and hidden with it — the effect the paper's table is there to show.
+    # and hidden with it, the effect the paper's table is there to show.
     for rsid in ("rs429358", "rs1799945"):
         assert by[rsid]["rank_off"] < 8 and not by[rsid]["shown_by_default"]
     # A rare pathogenic allele is untouched.
