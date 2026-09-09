@@ -56,6 +56,11 @@ class ZygosityCall:
     allele: Optional[str] = None
     strand_flipped: bool = False
     note: Optional[str] = None
+    # "alternate" for a ClinVar row (ref and alt known); "risk" for a GWAS
+    # row, which names only the allele the association was reported for.
+    # That allele may be the reference allele, so "homozygous alternate"
+    # would be the wrong phrase for it.
+    allele_role: str = "alternate"
 
     @property
     def carries_allele(self) -> Optional[bool]:
@@ -73,8 +78,13 @@ class ZygosityCall:
             return "zygosity unknown" + (f" ({self.note})" if self.note else "")
         copies = self.alt_copies
         unit = "copy" if copies == 1 else "copies"
-        allele = f" of the {self.allele} allele" if self.allele else ""
         flipped = ", read on the opposite strand" if self.strand_flipped else ""
+        if self.allele_role == "risk":
+            allele = f" {self.allele}" if self.allele else ""
+            if copies == 0:
+                return f"no copies of the risk allele{allele}{flipped}"
+            return f"{copies} {unit} of the risk allele{allele}{flipped}"
+        allele = f" of the {self.allele} allele" if self.allele else ""
         return f"{z.value} ({copies} {unit}{allele}{flipped})"
 
 
@@ -109,16 +119,16 @@ def _strand_ambiguous(ref: str, alt: str) -> bool:
     return {ref, alt} in ({"A", "T"}, {"C", "G"})
 
 
-def _count(alleles: Sequence[str], alt: str) -> ZygosityCall:
+def _count(alleles: Sequence[str], alt: str, role: str = "alternate") -> ZygosityCall:
     copies = sum(1 for a in alleles if a == alt)
     if len(alleles) == 1:
         z = Zygosity.HEMIZYGOUS_ALTERNATE if copies == 1 else Zygosity.HEMIZYGOUS_REFERENCE
-        return ZygosityCall(z, copies, alt)
+        return ZygosityCall(z, copies, alt, allele_role=role)
     if copies == 0:
-        return ZygosityCall(Zygosity.HOMOZYGOUS_REFERENCE, 0, alt)
+        return ZygosityCall(Zygosity.HOMOZYGOUS_REFERENCE, 0, alt, allele_role=role)
     if copies == 1:
-        return ZygosityCall(Zygosity.HETEROZYGOUS, 1, alt)
-    return ZygosityCall(Zygosity.HOMOZYGOUS_ALTERNATE, 2, alt)
+        return ZygosityCall(Zygosity.HETEROZYGOUS, 1, alt, allele_role=role)
+    return ZygosityCall(Zygosity.HOMOZYGOUS_ALTERNATE, 2, alt, allele_role=role)
 
 
 def call_zygosity(genotype: Optional[str], ref: Optional[str], alt: Optional[str]) -> ZygosityCall:
@@ -150,20 +160,20 @@ def call_zygosity(genotype: Optional[str], ref: Optional[str], alt: Optional[str
 
     # 1. Direct match on the forward strand.
     if all(a in known for a in alleles):
-        return _count(alleles, alt)
+        return _count(alleles, alt, role="risk" if not ref else "alternate")
 
     # 1b. Only the annotated allele is known (GWAS risk alleles come this way).
     # Count it if present. If it is absent but its complement is present, a
     # strand flip cannot be ruled out, so say unknown rather than "0 copies".
     if not ref and len(alt) == 1 and alt in _COMPLEMENT:
         if alt in alleles:
-            return _count(alleles, alt)
+            return _count(alleles, alt, role="risk")
         if _COMPLEMENT[alt] in alleles:
             return ZygosityCall(
-                Zygosity.UNKNOWN, None, allele=alt,
+                Zygosity.UNKNOWN, None, allele=alt, allele_role="risk",
                 note=f"genotype {''.join(alleles)} may be on the opposite strand from the {alt} allele",
             )
-        return _count(alleles, alt)
+        return _count(alleles, alt, role="risk")
 
     # 2. Indels: 23andMe writes I/D; match by allele length.
     if all(a in ("I", "D") for a in alleles) and ref and len(ref) != len(alt):
