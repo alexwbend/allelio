@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [Unreleased] — Revival
+## [0.3.0] - 2026-09-09 — Revival
 
 **Unblocking population frequencies, and hardening the rolling downloads.** The gnomAD frequency feature shipped in 0.2.1 was inert because its data file was never published (the download 404'd). This makes it real and shores up the other data sources against upstream drift.
 
