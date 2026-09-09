@@ -223,9 +223,35 @@ Allelio's pipeline is straightforward:
 2. **Lookup** — checks each variant against the local ClinVar and GWAS databases
 3. **Analyze** — gathers clinical significance, associated traits, and biological context
 4. **Explain** — sends the findings to your local AI model for plain-English summaries
-5. **Present** — displays results in your browser or exports them as an HTML report
+5. **Check** — runs each explanation through a safety filter before you see it (below)
+6. **Present** — displays results in your browser or exports them as an HTML report
 
 The reference databases are stored locally on your machine after the initial download. During analysis, Allelio makes **zero network requests** — your data stays put.
+
+### The safety filter on AI explanations
+
+A local language model can write a confident sentence that no genetics
+professional would write. Allelio does not trust the model's tone, so every
+explanation passes through a lexical safety filter (`allelio/ai/safety.py`)
+before it reaches you. It flags three kinds of unhedged, second-person
+language and appends a visible Safety Note naming which kind it found:
+
+- **diagnostic** — "you have Lynch syndrome", "this confirms that you have…"
+- **prognostic** — "you will develop…", "guaranteed to…", "100% chance…"
+- **prescriptive** — "stop taking warfarin", "double your dose"
+
+It is built to leave the language the prompt asks for alone: hedged statements
+("you may have a higher risk"), population-level ones ("carriers have…"), and
+plain facts about your genotype ("you have two copies of the risk allele")
+pass through. The filter is a set of patterns, not a judge of accuracy. It
+cannot tell you whether an explanation is *correct*, and a determined
+paraphrase can get past it. Its scope is measured against a labelled set of
+90 sentences in `tests/fixtures/safety_sentences.json` (45 that should be
+flagged, 45 that should not); `python3 scripts/safety_eval.py` prints the
+catch rate and false-positive rate, and the test suite fails if either
+regresses. The set was written by the author and the filter tuned against it,
+so treat the numbers as a statement of intended scope rather than of how it
+fares on arbitrary model output.
 
 ### Knowing which data you ran against
 
@@ -364,6 +390,7 @@ allelio/
 ├── database/     # ClinVar and GWAS data download, storage, and querying
 ├── analysis/     # Variant annotation and cross-referencing
 ├── ai/           # Local LLM integration — Ollama or any OpenAI-compatible server
+│   └── safety.py # Lexical filter for unhedged diagnostic / prognostic / prescriptive language
 ├── web/          # FastAPI web interface (Jinja2 templates)
 ├── cli.py        # Command-line interface
 └── report.py     # HTML report generation
