@@ -227,6 +227,18 @@ class TestReindexDoesNotDuplicateGwas:
         assert db.cursor.fetchone()[0] == first
 
 
+    def test_reindex_drops_rows_the_release_no_longer_carries(self, tmp_dir, monkeypatch):
+        runner = TestSetupRecordsProvenance()
+        db, _, data_dir = runner._run(tmp_dir, monkeypatch)
+        db.insert_clinvar_batch([{"rsid": "rs_withdrawn", "ref_allele": "A", "alt_allele": "G",
+                                  "gene": "X", "clinical_significance": "Pathogenic",
+                                  "conditions": "c", "review_status": "r", "last_evaluated": ""}])
+        downloader.setup_database(db, data_dir=str(data_dir), include_gnomad=False, force_download=True)
+        assert db.lookup_rsid("rs_withdrawn")["clinvar"] == []
+        db.cursor.execute("SELECT COUNT(*) FROM clinvar")
+        assert db.cursor.fetchone()[0] == 1
+
+
 class TestLegacyDatabase:
     def test_latest_is_not_a_release(self, tmp_dir):
         db = AllelioDB(str(Path(tmp_dir) / "a.db"))

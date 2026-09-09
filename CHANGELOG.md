@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- **Rows a new ClinVar release no longer carries survived a re-index.** ClinVar and gnomAD rows are replaced by key, never deleted, so a withdrawn record (or a row whose alleles are now read differently) stayed beside the new ones. Both tables are now emptied before re-indexing.
 - **Every `allelio setup` or `allelio update` doubled the GWAS table.** GWAS rows are appended (one rsID has many associations, so there is nothing to replace on) and nothing emptied the table first, so a database updated four times held five copies of the catalogue and reported five times the associations. The table is now cleared before each re-index.
 - **A ClinVar entry was reported as a finding whether or not the person carried the allele.** Analysis never looked at the genotype: anyone with `rs1800562` on their chip, which is nearly everyone, was shown the HFE hemochromatosis pathogenic entry even when homozygous for the reference G. Positions where the person carries no copy of any annotated allele are now set aside and counted ("N annotated positions where you carry only the reference allele were set aside"), in the CLI, the HTML report, and the web export. `--include-reference` on the analysis API keeps them for inspection.
 - **ClinVar's 2024 review-status wording scored zero stars.** "criteria provided, conflicting classifications" (renamed from "…interpretations") was not in the star map, so every conflicting variant lost its one star. Added.
