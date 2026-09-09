@@ -210,6 +210,16 @@ class AllelioDB:
         )
         self.conn.commit()
 
+    def clear_gwas(self) -> None:
+        """Empty the gwas table before a re-index.
+
+        GWAS rows are plain inserts (one rsID has many associations, so there
+        is no natural key to replace on). Without this, every setup or update
+        appended a second copy of the whole catalogue on top of the first.
+        """
+        self.cursor.execute("DELETE FROM gwas")
+        self.conn.commit()
+
     def _has_gnomad_table(self) -> bool:
         """Check whether the gnomad table exists (backward compatibility)."""
         try:

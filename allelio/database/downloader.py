@@ -526,6 +526,9 @@ def setup_database(
     gwas_count = 0
     if gwas_downloaded:
         _log(f"[5/{total_steps}] Parsing GWAS associations...")
+        # Start from empty: GWAS rows are appended, not replaced, so a
+        # re-index on top of the old rows doubled the table every time.
+        db.clear_gwas()
         gwas_records = []
         for record in parse_gwas(str(gwas_path)):
             gwas_records.append(record)

@@ -214,6 +214,19 @@ class TestSetupRecordsProvenance:
         assert again.get_metadata("clinvar_release") == "2026-09-06"
 
 
+class TestReindexDoesNotDuplicateGwas:
+    def test_second_setup_keeps_one_copy(self, tmp_dir, monkeypatch):
+        runner = TestSetupRecordsProvenance()
+        db, _, data_dir = runner._run(tmp_dir, monkeypatch)
+        db.cursor.execute("SELECT COUNT(*) FROM gwas")
+        first = db.cursor.fetchone()[0]
+        assert first == 1
+        # Same database, same on-disk files: an update must not append.
+        downloader.setup_database(db, data_dir=str(data_dir), include_gnomad=False, force_download=True)
+        db.cursor.execute("SELECT COUNT(*) FROM gwas")
+        assert db.cursor.fetchone()[0] == first
+
+
 class TestLegacyDatabase:
     def test_latest_is_not_a_release(self, tmp_dir):
         db = AllelioDB(str(Path(tmp_dir) / "a.db"))
