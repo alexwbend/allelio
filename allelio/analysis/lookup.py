@@ -16,6 +16,8 @@ REVIEW_STATUS_STARS = {
     "criteria provided, multiple submitters, no conflicts": 2,
     "criteria provided, multiple submitters": 2,
     "criteria provided, conflicting interpretations": 1,
+    # ClinVar renamed "interpretations" to "classifications" in 2024.
+    "criteria provided, conflicting classifications": 1,
     "criteria provided, single submitter": 1,
     "no assertion for the individual variant": 0,
     "no assertion criteria provided": 0,
@@ -489,6 +491,7 @@ def analyze_variants_with_stats(
     db: AllelioDB,
     include_benign: bool = False,
     include_reference: bool = False,
+    frequency_adjustment: bool = True,
 ) -> Tuple[List[VariantResult], AnalysisStats]:
     """Like ``analyze_variants`` but also returns what was left out and why.
 
@@ -499,6 +502,10 @@ def analyze_variants_with_stats(
         include_reference: Whether to include annotated sites where the user
             carries no copy of the annotated allele (never findings; off by
             default and counted in the stats instead)
+        frequency_adjustment: Apply the gnomAD allele-frequency adjustment to
+            the rank (the default). Off, the rank is ClinVar significance
+            weighted by review stars only; used by scripts/ablation_frequency.py
+            to show what the adjustment changes.
 
     Returns:
         (results sorted by significance rank, AnalysisStats)
@@ -609,7 +616,10 @@ def analyze_variants_with_stats(
             )
 
         # Adjust significance rank based on population frequency
-        adjusted_rank = _calculate_frequency_adjustment(sig_rank, gnomad_entry)
+        adjusted_rank = (
+            _calculate_frequency_adjustment(sig_rank, gnomad_entry)
+            if frequency_adjustment else sig_rank
+        )
 
         # Skip benign variants unless requested
         if not include_benign and adjusted_rank >= 8:
@@ -642,8 +652,9 @@ def analyze_variants_with_stats(
 
         results.append(result)
 
-    # Sort by significance rank (lower = more significant)
-    results.sort(key=lambda x: x.significance_rank)
+    # Sort by significance rank (lower = more significant); ties by rsID so
+    # the order is the same on every run and every machine.
+    results.sort(key=lambda x: (x.significance_rank, x.rsid))
 
     return results, stats
 
