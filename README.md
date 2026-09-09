@@ -61,15 +61,39 @@ We take this seriously, and you'll see reminders throughout the tool.
 
 ### Install Allelio
 
-Open a terminal (Terminal on Mac, Command Prompt or PowerShell on Windows) and run:
+Allelio isn't on PyPI yet, so you install it from GitHub. Open a terminal
+(Terminal on Mac, Command Prompt or PowerShell on Windows) and run:
 
 ```bash
-pip install allelio
+python3 -m venv allelio-env
+source allelio-env/bin/activate    # Windows: allelio-env\Scripts\activate
+pip install git+https://github.com/alexwbend/allelio.git
+```
+
+The virtual environment isn't optional bureaucracy: recent Pythons (Homebrew,
+Debian, Ubuntu) refuse a plain `pip install` outside one with an
+`externally-managed-environment` error. You'll need to `activate` it again in
+each new terminal before running `allelio`.
+
+Prefer a checkout, so you also get the example file, the tests, and the paper?
+
+```bash
+git clone https://github.com/alexwbend/allelio.git
+cd allelio
+python3 -m venv .venv && source .venv/bin/activate
+pip install .
+```
+
+Check it landed:
+
+```bash
+allelio --version
 ```
 
 ### Set up the databases (one time only)
 
-This downloads the ClinVar and GWAS reference databases (~500 MB total). You only need to do this once:
+This downloads the ClinVar and GWAS reference databases and builds a local
+index. You only need to do this once:
 
 ```bash
 allelio setup
@@ -79,6 +103,14 @@ Setup also fetches a small gnomAD allele-frequency file (about 24 MB) that lets
 Allelio downgrade common variants so genuinely rare findings stand out. See
 [Where the reference data lives](#where-the-reference-data-lives) below for how
 that file is hosted.
+
+**What it costs you.** About 540 MB downloaded (ClinVar ~440 MB, GWAS ~70 MB
+compressed, gnomAD ~24 MB) and roughly **2 GB left on disk** under
+`~/.allelio/data`: the built database plus the raw downloads, which Allelio
+keeps so `allelio update` doesn't have to re-fetch what hasn't changed. Budget
+15 to 30 minutes, and more if NIH's FTP is having a slow day; it's one long
+wait, not a hung command, and it prints progress every 10%. Run it once and you
+never wait again.
 
 ### Launch the web interface
 
@@ -91,7 +123,12 @@ Then open your browser to **http://localhost:8080**. You'll see a clean interfac
 ### Or use the command line
 
 Don't have a DNA file handy? [`examples/`](examples/) has a small synthetic
-one you can run right away — see [`examples/README.md`](examples/README.md).
+one you can run right away — see [`examples/README.md`](examples/README.md). If
+you installed straight from GitHub rather than cloning, grab just that file:
+
+```bash
+curl -O https://raw.githubusercontent.com/alexwbend/allelio/main/examples/example_23andme.txt
+```
 
 If you prefer the terminal:
 
@@ -307,7 +344,7 @@ allelio/
 ├── database/     # ClinVar and GWAS data download, storage, and querying
 ├── analysis/     # Variant annotation and cross-referencing
 ├── ai/           # Local LLM integration — Ollama or any OpenAI-compatible server
-├── web/          # Flask-based web interface
+├── web/          # FastAPI web interface (Jinja2 templates)
 ├── cli.py        # Command-line interface
 └── report.py     # HTML report generation
 ```
@@ -332,7 +369,7 @@ If you use Allelio in your own work, see [CITATION.cff](CITATION.cff) for how to
 
 **"Model not found"** — You need to download the AI model first: `ollama pull llama3.1:8b`
 
-**Analysis seems slow** — AI explanations take about 10 seconds each. The default analyzes 20 variants (~3 minutes). Use `--no-ai` for instant results without explanations.
+**Analysis seems slow** — the lookups are instant; the AI explanations are what take the time, and how long they take depends entirely on your model and hardware. On an Apple Silicon Mac with `llama3.1:8b`, expect roughly half a minute per variant, so a default run (top 20) is on the order of ten minutes. `--no-ai` skips the explanations and returns findings in a few seconds, and the report is still complete, just without the plain-English write-ups.
 
 ---
 
