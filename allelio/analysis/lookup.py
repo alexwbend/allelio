@@ -55,6 +55,9 @@ SIGNIFICANCE_RANKS = {
     "likely pathogenic": 2,
     "pathogenic/likely pathogenic": 2,
     "risk factor": 3,
+    # ClinVar's "drug response" is an actionable classification (dosing,
+    # efficacy, toxicity), ranked with risk factors. Author choice.
+    "drug response": 3,
     "association": 4,
     "protective": 5,
     "conflicting data": 6,
@@ -180,12 +183,13 @@ class VariantResult:
     matched_allele: Optional[str] = None
     strand_flipped: bool = False
     zygosity_note: Optional[str] = None
+    allele_role: str = "alternate"
 
     def describe_zygosity(self) -> str:
         """Report phrase, e.g. ``heterozygous (1 copy of the A allele)``."""
         return ZygosityCall(
             Zygosity(self.zygosity), self.alt_copies, self.matched_allele,
-            self.strand_flipped, self.zygosity_note,
+            self.strand_flipped, self.zygosity_note, self.allele_role,
         ).describe()
 
 
@@ -245,6 +249,10 @@ def _determine_category(clinvar_entry: Optional[ClinVarEntry], gwas_entries: Lis
         # Check for health conditions (pathogenic/likely pathogenic)
         if any(x in sig for x in ["pathogenic", "likely pathogenic"]):
             return VariantCategory.HEALTH_CONDITIONS.value
+
+        # ClinVar's own pharmacogenomic classification
+        if "drug response" in sig:
+            return VariantCategory.PHARMACOGENOMICS.value
 
         # Check for risk factors
         if any(x in sig for x in ["risk factor", "risk_factor", "association"]):
@@ -389,8 +397,14 @@ def _select_clinvar_rows(
     carried: List[Tuple[ClinVarEntry, ZygosityCall]] = []
     unknown: List[Tuple[ClinVarEntry, ZygosityCall]] = []
     absent: List[Tuple[ClinVarEntry, ZygosityCall]] = []
-    for cv in rows:
-        entry = _clinvar_entry(cv)
+    entries = [_clinvar_entry(cv) for cv in rows]
+    # A row whose ref equals its alt is a haplotype-level record that names no
+    # allele of its own. Where the same rsID also has allele-specific rows,
+    # those are the ones to judge by; the degenerate row is dropped so it
+    # cannot resurface as a "zygosity unknown" finding beside them.
+    if any(e.ref_allele and e.alt_allele and e.ref_allele != e.alt_allele for e in entries):
+        entries = [e for e in entries if not (e.ref_allele and e.ref_allele == e.alt_allele)]
+    for entry in entries:
         call = call_zygosity(genotype, entry.ref_allele, entry.alt_allele)
         if call.alt_copies is None:
             unknown.append((entry, call))
@@ -523,6 +537,7 @@ def analyze_variants_with_stats(
             clinvar_entries = []
         elif gwas_reference:
             gwas_entries = []
+        clinvar_entry = clinvar_entries[0] if clinvar_entries else None
 
         # Determine category
         category = _determine_category(clinvar_entry, gwas_entries)
@@ -577,6 +592,7 @@ def analyze_variants_with_stats(
             matched_allele=call.allele,
             strand_flipped=call.strand_flipped,
             zygosity_note=call.note,
+            allele_role=call.allele_role,
         )
 
         results.append(result)

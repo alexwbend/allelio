@@ -123,8 +123,11 @@ Then open your browser to **http://localhost:8080**. You'll see a clean interfac
 ### Or use the command line
 
 Don't have a DNA file handy? [`examples/`](examples/) has a small synthetic
-one you can run right away — see [`examples/README.md`](examples/README.md). If
-you installed straight from GitHub rather than cloning, grab just that file:
+one you can run right away, with a file that says exactly what Allelio must
+find in it (`examples/expected_findings.json`, checked by the test suite and
+by `python3 scripts/check_example.py` against your own database) — see
+[`examples/README.md`](examples/README.md). If you installed straight from
+GitHub rather than cloning, grab just that file:
 
 ```bash
 curl -O https://raw.githubusercontent.com/alexwbend/allelio/main/examples/example_23andme.txt
@@ -327,8 +330,8 @@ or diagnostic score** — it is meant to surface the findings most worth a
 closer look, nothing more.
 
 The rank starts from ClinVar's clinical significance (pathogenic ranks
-highest, then likely pathogenic, risk factor, association, and so on down to
-benign), then two adjustments are applied:
+highest, then likely pathogenic, then risk factor and drug response together,
+then association, and so on down to benign), then two adjustments are applied:
 
 1. **Review quality.** ClinVar's [review-status star
    system](https://www.ncbi.nlm.nih.gov/clinvar/docs/review_status/) (0–4
