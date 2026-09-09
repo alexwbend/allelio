@@ -20,6 +20,7 @@ from .clinvar import parse_clinvar
 from .gwas import parse_gwas
 from .gnomad import parse_gnomad
 from .clingen import parse_clingen, clingen_release_date
+from .clinpgx import parse_clinpgx, clinpgx_release_date, extract_bundle
 
 
 CLINVAR_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz"
@@ -69,6 +70,12 @@ GWAS_URL = "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalo
 # with the access date, which the report gives). Optional: setup continues
 # without it, and inheritance then reads "not curated".
 CLINGEN_URL = "https://search.clinicalgenome.org/kb/gene-validity/download"
+
+# ClinPGx (formerly PharmGKB) clinical annotations: variant–drug evidence with
+# per-genotype text. One zip, ~1.2 MB. License CC BY-SA 4.0 + no selling:
+# fetched from ClinPGx at setup and never redistributed by Allelio (in
+# particular, never placed on the permaweb). Optional and non-blocking.
+CLINPGX_URL = "https://api.clinpgx.org/v1/download/file/data/clinicalAnnotations.zip"
 
 # How old the local ClinVar/GWAS copy may get before `info`/`analyze` nudge the
 # user to run `allelio update`. ClinVar refreshes weekly and GWAS periodically,
@@ -416,6 +423,7 @@ def setup_database(
     include_gnomad: bool = True,
     force_download: bool = False,
     include_clingen: bool = True,
+    include_clinpgx: bool = True,
 ) -> None:
     """Orchestrate full download, parse, and index of reference databases.
 
@@ -443,7 +451,7 @@ def setup_database(
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    total_steps = (8 if include_gnomad else 6) + (2 if include_clingen else 0)
+    total_steps = (8 if include_gnomad else 6) + (2 if include_clingen else 0) + (2 if include_clinpgx else 0)
 
     # Initialize database tables
     _log(f"[1/{total_steps}] Creating database tables...")
@@ -621,7 +629,8 @@ def setup_database(
     clingen_downloaded = False
     clingen_prov: dict = {}
     if include_clingen:
-        step_dl, step_parse = total_steps - 2, total_steps - 1
+        step_dl = total_steps - (4 if include_clinpgx else 2)
+        step_parse = step_dl + 1
         clingen_path = data_dir / "clingen_gene_validity.csv"
         if not force_download and clingen_path.exists() and clingen_path.stat().st_size > 100_000:
             _log(f"[{step_dl}/{total_steps}] ClinGen already downloaded — skipping download.")
@@ -667,6 +676,56 @@ def setup_database(
         else:
             _log(f"[{step_parse}/{total_steps}] Skipping ClinGen parsing — not available.")
 
+    # ClinPGx clinical annotations (optional, small): variant–drug evidence
+    # with the annotation text for each genotype. Only single-rsID
+    # annotations are kept (see allelio/database/clinpgx.py).
+    clinpgx_count = 0
+    clinpgx_downloaded = False
+    clinpgx_prov: dict = {}
+    if include_clinpgx:
+        step_dl, step_parse = total_steps - 2, total_steps - 1
+        clinpgx_zip = data_dir / "clinpgx_clinical_annotations.zip"
+        clinpgx_dir = data_dir / "clinpgx"
+        if not force_download and clinpgx_zip.exists() and clinpgx_zip.stat().st_size > 100_000:
+            _log(f"[{step_dl}/{total_steps}] ClinPGx already downloaded — skipping download.")
+            clinpgx_downloaded = True
+            clinpgx_prov = read_provenance(str(clinpgx_zip))
+        else:
+            _log(f"[{step_dl}/{total_steps}] Downloading ClinPGx clinical annotations (~1 MB)...")
+            try:
+                clinpgx_prov = dict(download_file(CLINPGX_URL, str(clinpgx_zip), progress_callback, log=log) or {})
+                clinpgx_downloaded = True
+                _log(f"[{step_dl}/{total_steps}] ClinPGx download complete.")
+            except Exception as e:
+                _log(f"       ClinPGx download failed: {e}")
+                _log("       Pharmacogenomic annotations will not be available. Retry later with: allelio update")
+                clinpgx_zip.unlink(missing_ok=True)
+        if clinpgx_downloaded:
+            clinpgx_prov = clinpgx_prov or {}
+            clinpgx_prov.setdefault("url", CLINPGX_URL)
+            _log(f"[{step_parse}/{total_steps}] Parsing ClinPGx annotations...")
+            try:
+                extract_bundle(str(clinpgx_zip), str(clinpgx_dir))
+                stamped = clinpgx_release_date(str(clinpgx_dir))
+                if stamped:
+                    clinpgx_prov["release"] = stamped
+                    clinpgx_prov["release_source"] = "clinpgx-created-marker"
+                    write_provenance(str(clinpgx_zip), clinpgx_prov)
+                records = list(parse_clinpgx(str(clinpgx_dir)))
+                if not records:
+                    raise ValueError("no single-rsID annotations found in the bundle")
+                db.clear_table("clinpgx")
+                db.insert_clinpgx_batch(records)
+                clinpgx_count = len({r["annotation_id"] for r in records})
+                _log(f"[{step_parse}/{total_steps}] ClinPGx complete: {clinpgx_count:,} single-rsID annotations, "
+                     f"{len(records):,} genotype rows (release {clinpgx_prov.get('release') or 'unknown'}).")
+            except Exception as e:
+                _log(f"       ClinPGx bundle could not be parsed ({e}); skipping.")
+                clinpgx_downloaded = False
+                clinpgx_zip.unlink(missing_ok=True)
+        else:
+            _log(f"[{step_parse}/{total_steps}] Skipping ClinPGx parsing — not available.")
+
     # Set metadata
     _log(f"[{total_steps}/{total_steps}] Finalizing database...")
     db.set_metadata("last_update", datetime.now().isoformat())
@@ -707,6 +766,12 @@ def setup_database(
         db.set_metadata("clingen_version", "unavailable")
         db.set_metadata("clingen_release", "unavailable")
 
+    if include_clinpgx and clinpgx_downloaded:
+        _record_source_provenance(db, "clinpgx", clinpgx_prov)
+    else:
+        db.set_metadata("clinpgx_version", "unavailable")
+        db.set_metadata("clinpgx_release", "unavailable")
+
     parts = [f"{clinvar_count:,} ClinVar"]
     if gwas_count > 0:
         parts.append(f"{gwas_count:,} GWAS")
@@ -714,4 +779,6 @@ def setup_database(
         parts.append(f"{gnomad_count:,} gnomAD")
     if clingen_count > 0:
         parts.append(f"{clingen_count:,} ClinGen")
+    if clinpgx_count > 0:
+        parts.append(f"{clinpgx_count:,} ClinPGx")
     _log(f"Done! Database ready with {' + '.join(parts)} records.")

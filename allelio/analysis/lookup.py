@@ -5,7 +5,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
 
 from allelio.database.store import AllelioDB
-from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity
+from allelio.database.clinpgx import level_rank as pgx_level_rank
+from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, genotype_alleles
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -137,6 +138,18 @@ class VariantCategory(str, Enum):
 # choice, no external precedent for the size.
 CARRIER_RANK_SHIFT = 1.0
 
+# ClinPGx level of evidence → presentation rank. 1A/1B (guideline- or
+# label-backed, or strongly replicated) rank with risk factors and ClinVar's
+# drug response; 2A/2B a tier below; 3 and 4 with conflicting/uncertain
+# evidence. Author choices, sized to the existing tiers; ClinPGx's levels are
+# the citation for the ordering, not the numbers.
+PGX_LEVEL_RANKS = {"1A": 3.0, "1B": 3.0, "2A": 4.0, "2B": 4.0, "3": 6.0, "4": 7.0}
+
+# Annotations below this level are not reported by default: level 3 is
+# "low evidence" (a single study, or conflicting ones) and there are
+# thousands of them, so a real file would drown in single-study drug notes.
+PGX_DEFAULT_MIN_LEVEL = "2B"
+
 # ClinGen classifications that count as an established gene-disease link when
 # deciding the mode of inheritance. Limited / Disputed / Refuted / "No Known
 # Disease Relationship" do not decide it.
@@ -180,6 +193,23 @@ class ClinGenEntry:
 
 
 @dataclass
+class PGxEntry:
+    """One ClinPGx clinical annotation, with the text for this genotype."""
+    rsid: str
+    annotation_id: str
+    gene: Optional[str] = None
+    level: Optional[str] = None
+    phenotype_category: Optional[str] = None
+    drugs: Optional[str] = None
+    phenotypes: Optional[str] = None
+    url: Optional[str] = None
+    genotype: Optional[str] = None
+    annotation_text: Optional[str] = None
+    allele_function: Optional[str] = None
+    strand_flipped: bool = False
+
+
+@dataclass
 class GnomADEntry:
     """gnomAD population frequency entry."""
     rsid: str
@@ -217,6 +247,14 @@ class VariantResult:
     clingen_entries: List[ClinGenEntry] = field(default_factory=list)
     inheritance: str = "not curated"
     inheritance_note: Optional[str] = None
+    # ClinPGx annotations whose genotype row matches this person's genotype,
+    # best level of evidence first.
+    pgx_entries: List[PGxEntry] = field(default_factory=list)
+
+    @property
+    def pgx_level(self) -> Optional[str]:
+        """Best ClinPGx level of evidence among the matched annotations."""
+        return self.pgx_entries[0].level if self.pgx_entries else None
 
     def describe_zygosity(self) -> str:
         """Report phrase, e.g. ``heterozygous (1 copy of the A allele)``."""
@@ -517,6 +555,62 @@ def _gwas_call(
     return absent
 
 
+_PGX_COMPLEMENT = {"A": "T", "T": "A", "C": "G", "G": "C"}
+
+
+def _match_pgx(
+    genotype: Optional[str],
+    rows: List[Dict[str, Any]],
+    site_alleles: Optional[set] = None,
+    min_level: str = PGX_DEFAULT_MIN_LEVEL,
+) -> List[PGxEntry]:
+    """The ClinPGx rows whose genotype is this person's genotype.
+
+    ClinPGx writes genotypes as two forward-strand letters ("CT"); order does
+    not matter. If the person's letters are not among those the annotation
+    uses on either allele but their complements are, and the site is not
+    A/T or C/G (where a flip is undetectable), the complement is used and
+    the entry flagged. Rows below ``min_level`` are dropped. Best level first.
+    """
+    alleles = genotype_alleles(genotype)
+    if len(alleles) != 2 or not rows:
+        return []
+    key = "".join(sorted(alleles))
+    max_rank = pgx_level_rank(min_level)
+    usable = [r for r in rows if pgx_level_rank(r.get("level")) <= max_rank]
+    if not usable:
+        return []
+    by_genotype: Dict[str, List[Dict[str, Any]]] = {}
+    letters = set()
+    for r in usable:
+        g = (r.get("genotype") or "").upper()
+        if len(g) == 2 and g.isalpha():
+            by_genotype.setdefault("".join(sorted(g)), []).append(r)
+            letters.update(g)
+    flipped = False
+    matched = by_genotype.get(key)
+    if matched is None:
+        site = {a for a in (site_alleles or set()) if a} or letters
+        ambiguous = site in ({"A", "T"}, {"C", "G"})
+        comp = "".join(sorted(_PGX_COMPLEMENT.get(a, a) for a in alleles))
+        if not ambiguous and comp in by_genotype and not any(a in letters for a in alleles):
+            matched, flipped = by_genotype[comp], True
+    if not matched:
+        return []
+    entries = [
+        PGxEntry(
+            rsid=r.get("rsid"), annotation_id=r.get("annotation_id"), gene=r.get("gene"),
+            level=r.get("level"), phenotype_category=r.get("phenotype_category"),
+            drugs=r.get("drugs"), phenotypes=r.get("phenotypes"), url=r.get("url"),
+            genotype=r.get("genotype"), annotation_text=r.get("annotation_text"),
+            allele_function=r.get("allele_function"), strand_flipped=flipped,
+        )
+        for r in matched
+    ]
+    entries.sort(key=lambda e: (pgx_level_rank(e.level), e.drugs or ""))
+    return entries
+
+
 def _inheritance(entries: List[ClinGenEntry]) -> Tuple[str, Optional[str]]:
     """Summarise ClinGen's curations for a gene as one inheritance phrase.
 
@@ -576,6 +670,7 @@ def analyze_variants_with_stats(
     include_benign: bool = False,
     include_reference: bool = False,
     frequency_adjustment: bool = True,
+    pgx_min_level: str = PGX_DEFAULT_MIN_LEVEL,
 ) -> Tuple[List[VariantResult], AnalysisStats]:
     """Like ``analyze_variants`` but also returns what was left out and why.
 
@@ -624,11 +719,18 @@ def analyze_variants_with_stats(
     except Exception:
         clingen_by_gene = {}
 
+    # ClinPGx rows for every rsID (a site can be PGx-only)
+    try:
+        pgx_by_rsid = db.lookup_clinpgx(rsids)
+    except Exception:
+        pgx_by_rsid = {}
+
     # Build results
     results = []
 
     for rsid, data in lookup_results.items():
-        if not data["clinvar"] and not data["gwas"]:
+        pgx_rows = pgx_by_rsid.get(rsid) or []
+        if not data["clinvar"] and not data["gwas"] and not pgx_rows:
             continue
         stats.annotated_sites += 1
 
@@ -670,8 +772,15 @@ def analyze_variants_with_stats(
             elif is_reference or call is None:
                 call = gcall if gcall is not None else call
 
+        # ClinPGx: the annotation rows written for this person's genotype
+        site_alleles_pgx = {
+            a for cv in data["clinvar"] for a in (cv.get("ref_allele"), cv.get("alt_allele")) if a
+        }
+        pgx_entries = _match_pgx(genotype, pgx_rows, site_alleles_pgx, pgx_min_level)
+
         site_is_reference = (
             (is_reference or not clinvar_entries) and (gwas_reference or not gwas_entries)
+            and not pgx_entries
         )
         if site_is_reference:
             stats.reference_genotype_sites += 1
@@ -697,6 +806,16 @@ def analyze_variants_with_stats(
             # For GWAS-only variants, use a default rank
             sig_rank = float(SIGNIFICANCE_RANKS.get("association", 4))
 
+        # A ClinPGx annotation for this genotype: rank by its best level, and
+        # file the site under Pharmacogenomics unless ClinVar already calls
+        # it a health condition or risk factor (those stay where they are;
+        # the drug notes travel with the card).
+        if pgx_entries:
+            pgx_rank = PGX_LEVEL_RANKS.get(pgx_entries[0].level or "", 7.0)
+            sig_rank = min(sig_rank, pgx_rank)
+            if category not in (VariantCategory.HEALTH_CONDITIONS.value, VariantCategory.RISK_FACTORS.value):
+                category = VariantCategory.PHARMACOGENOMICS.value
+
         # Create gnomAD entry if data available
         gnomad_entry = None
         if data.get("gnomad"):
@@ -710,10 +829,15 @@ def analyze_variants_with_stats(
                 nhomalt=gn.get("nhomalt"),
             )
 
-        # Adjust significance rank based on population frequency
+        # Adjust significance rank based on population frequency. Not for
+        # pharmacogenomic findings: the adjustment encodes "a common allele is
+        # unlikely to be pathogenic", and a drug-response allele is not a
+        # pathogenicity claim — most are common by nature (VKORC1 -1639G>A is
+        # carried by a third of Europeans) and no less actionable for it.
+        pharmacogenomic = category == VariantCategory.PHARMACOGENOMICS.value
         adjusted_rank = (
             _calculate_frequency_adjustment(sig_rank, gnomad_entry)
-            if frequency_adjustment else sig_rank
+            if frequency_adjustment and not pharmacogenomic else sig_rank
         )
 
         # Skip benign variants unless requested
@@ -766,6 +890,7 @@ def analyze_variants_with_stats(
             clingen_entries=clingen_entries,
             inheritance=inheritance,
             inheritance_note=inheritance_note,
+            pgx_entries=pgx_entries,
         )
 
         results.append(result)
