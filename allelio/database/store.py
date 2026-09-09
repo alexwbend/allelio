@@ -210,6 +210,19 @@ class AllelioDB:
         )
         self.conn.commit()
 
+    def clear_table(self, table: str) -> None:
+        """Empty one of the reference tables before a re-index.
+
+        Rows are keyed by (rsid, alleles) for ClinVar and by rsid for gnomAD,
+        so a re-index replaces what it re-emits, but a row the new release no
+        longer carries (a withdrawn record, or one whose alleles are now read
+        differently) would otherwise survive beside the new ones.
+        """
+        if table not in ("clinvar", "gwas", "gnomad"):
+            raise ValueError(f"not a reference table: {table}")
+        self.cursor.execute(f"DELETE FROM {table}")
+        self.conn.commit()
+
     def clear_gwas(self) -> None:
         """Empty the gwas table before a re-index.
 
