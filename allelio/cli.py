@@ -14,7 +14,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from allelio.analysis.lookup import analyze_variants
-from allelio.database import AllelioDB, setup_database, staleness_warning
+from allelio.database import AllelioDB, setup_database, staleness_warning, sources_summary, provenance_of
 from allelio.parsers import parse_genotype_file_with_stats
 from allelio.report import generate_html_report
 
@@ -147,6 +147,12 @@ def analyze(
     stale = staleness_warning(db)
     if stale:
         console.print(f"  [bold yellow]⚠[/bold yellow] {escape(stale)}\n")
+
+    # Name the releases up front: a finding is only reproducible against the
+    # exact ClinVar and GWAS releases it was computed from.
+    sources = sources_summary(db)
+    if sources:
+        console.print(f"  [dim]Reference data: {escape(sources)}[/dim]\n")
 
     # Settle the model before anything is read. Construction only parses and
     # resolves the address, and the listing call costs one request — both are
@@ -386,6 +392,7 @@ def analyze(
         metadata = {
             "generated_at": __import__("datetime").datetime.now().isoformat(),
             "db_version": db.version(),
+            "provenance": provenance_of(db),
             "file_analyzed": Path(file).name,
             "total_variants": len(variants),
             "significant_variants": len(significant),
@@ -505,9 +512,12 @@ def update():
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         db = AllelioDB(db_path)
 
-        setup_database(db, log=lambda msg: console.print(f"  {msg}"))
+        # Force the fetch: without it, "update" only re-indexed the copies
+        # already on disk and the release dates never moved.
+        setup_database(db, log=lambda msg: console.print(f"  {msg}"), force_download=True)
 
         console.print("\n[bold green]✓[/bold green] Databases updated successfully\n")
+        console.print(f"  [dim]Reference data: {escape(sources_summary(db) or 'unknown')}[/dim]\n")
     except Exception as e:
         console.print(f"\n[bold red]✗[/bold red] Update failed: {e}\n", style="red")
         raise click.Abort()
@@ -530,7 +540,25 @@ def info(file: Optional[str]):
         if db.is_initialized():
             info_table = Table(show_header=False)
             info_table.add_row("Database Status", "[bold green]✓ Initialized[/bold green]")
-            info_table.add_row("Database Version", db.version())
+            last_update = db.get_metadata("last_update")
+            info_table.add_row("Database Built", last_update[:19].replace("T", " ") if last_update else "[dim]Unknown[/dim]")
+
+            # One row per reference source: which release, and the checksum of
+            # the exact file it was built from. "unknown" means the database
+            # predates provenance recording — rerun `allelio update` to fix.
+            for info in provenance_of(db).values():
+                release = info.get("release")
+                if release == "unavailable":
+                    value = "[dim]Not loaded[/dim]"
+                elif release:
+                    value = release
+                    if info.get("release_source") == "file-mtime":
+                        value += " [dim](from file date)[/dim]"
+                    if info.get("sha256"):
+                        value += f" [dim]sha256 {info['sha256'][:12]}…[/dim]"
+                else:
+                    value = "[dim]Unknown — run allelio update[/dim]"
+                info_table.add_row(f"{info['label']} Release", value)
 
             # Freshness: green when recent, yellow with a nudge when stale.
             age_days = db.days_since_update()

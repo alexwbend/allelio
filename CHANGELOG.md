@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- **Reference-data provenance.** Every database now records which release of ClinVar and the GWAS Catalog it was built from (the release date the server reports at download), the download URL, and the SHA-256 of the exact file, alongside the gnomAD version and checksum already taken from the manifest. `allelio info` shows a release line per source, `allelio analyze` prints the releases before it starts, the HTML report's Data Sources footer names them, and the web status pill and `/api/status` carry the same line. Previously the metadata table stored the literal word "latest", which is not a release: two runs a month apart could differ with nothing in the output to explain why. A `.provenance.json` sidecar beside each downloaded file lets a later run that skips the download still say what it has; a file that predates the sidecar falls back to its own timestamp and is labelled "(from file date)".
 - **gnomAD frequency data via a JSON manifest** — the downloader now resolves the compact frequency file through `data/gnomad_manifest.json` (source, version, checksum, and one-or-more URLs) instead of a hardcoded release URL. A version bump or re-host is a data refresh, not a code change. Primary hosting is the permaweb (Arweave via Permavault — content-addressed, never 404s; gnomAD is CC0), with a GitHub release as a mirror.
 - **Checksum verification** — a downloaded frequency file is verified against the manifest's SHA-256; a mismatch is rejected and the next URL is tried. A manifest without a checksum downloads but skips the check with a warning rather than blocking.
 - **Consumer-array trimming in `scripts/build_gnomad_freq.py`** — a new `--array-sites` option trims the extract to the rsIDs a chip actually reports (23andMe / AncestryDNA), dropping the shipped file from hundreds of MB to a few MB. The script now prints the file's SHA-256 and a ready-to-paste manifest.
@@ -20,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- **`allelio update` now actually re-downloads.** It only re-indexed whatever was already on disk, because setup skips any source whose file is present, so the "run `allelio update`" advice in the staleness banner never refreshed anything. Update now forces the fetch for every source.
+- **Package version string** in `allelio/__init__.py` said 0.2.0 while `pyproject.toml` said 0.2.1; they now agree.
 - **The web interface was broken for anyone who installed the package.** `allelio/web/templates/index.html` wasn't declared as package data, so a wheel install shipped without it and every page load of `allelio serve` returned a 500. Invisible from a source checkout, which is why it survived this long. Found by the clean-install smoke test (PUB-4).
 - **`python3 -m allelio` now works.** The README offers it as the fallback when the console script isn't on PATH, but the package had no `__main__.py`, so the advice failed with "cannot be directly executed".
 
