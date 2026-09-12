@@ -6,7 +6,8 @@ from enum import Enum
 
 from allelio.database.store import AllelioDB
 from allelio.database.clinpgx import level_rank as pgx_level_rank
-from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, genotype_alleles
+from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, genotype_alleles, call_vcf_zygosity
+from allelio.parsers.base import VCFEvidence
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -450,7 +451,8 @@ def _rank_clinvar(entry: ClinVarEntry) -> float:
 
 
 def _select_clinvar_rows(
-    genotype: Optional[str], rows: List[Dict[str, Any]]
+    genotype: Optional[str], rows: List[Dict[str, Any]],
+    vcf_evidence: Optional[VCFEvidence] = None,
 ) -> Tuple[List[ClinVarEntry], Optional[ZygosityCall], bool]:
     """Pick the ClinVar rows that apply to this genotype.
 
@@ -476,7 +478,9 @@ def _select_clinvar_rows(
     if any(e.ref_allele and e.alt_allele and e.ref_allele != e.alt_allele for e in entries):
         entries = [e for e in entries if not (e.ref_allele and e.ref_allele == e.alt_allele)]
     for entry in entries:
-        call = call_zygosity(genotype, entry.ref_allele, entry.alt_allele)
+        call = (call_vcf_zygosity(vcf_evidence, entry.ref_allele, entry.alt_allele)
+                if vcf_evidence is not None
+                else call_zygosity(genotype, entry.ref_allele, entry.alt_allele))
         if call.alt_copies is None:
             unknown.append((entry, call))
         elif call.alt_copies > 0:
@@ -740,8 +744,19 @@ def analyze_variants_with_stats(
         position = getattr(original_variant, 'position', None)
         genotype = getattr(original_variant, 'genotype', None)
 
+        vcf_evidence = getattr(original_variant, 'vcf_evidence', None)
+        # Do not let non-SNP sequences reach legacy SNP/GWAS/PGx matching as
+        # concatenated bases. Their complete alleles remain in source evidence.
+        if vcf_evidence is not None and any(
+            a not in {"A", "C", "G", "T"}
+            for a in (vcf_evidence.reference,) + vcf_evidence.alternates
+        ):
+            genotype = "--"
+
         # ClinVar rows that apply to this genotype (allele-aware)
-        clinvar_entries, call, is_reference = _select_clinvar_rows(genotype, data["clinvar"])
+        clinvar_entries, call, is_reference = _select_clinvar_rows(
+            genotype, data["clinvar"], vcf_evidence
+        )
         clinvar_entry = clinvar_entries[0] if clinvar_entries else None
 
         # Create GWAS entries

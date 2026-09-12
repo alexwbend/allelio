@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Use structured VCF evidence for ClinVar SNP copy counts, including two
+  different alternate alleles at a multiallelic site. VCF reference mismatches
+  no longer trigger consumer-array strand inference. Non-SNP VCF records
+  remain unknown pending build-aware normalization and cannot enter legacy
+  GWAS/PGx matching as flattened SNP genotypes.
+
 - Preserve haploid VCF genotypes as one allele rather than duplicating them,
   so haploid SNVs reach zygosity interpretation with the correct copy count.
 - Skip malformed VCF headers without crashing on unset column indices.

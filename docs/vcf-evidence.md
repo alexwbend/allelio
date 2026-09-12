@@ -20,9 +20,16 @@ does not establish phase relationships between different records.
 The parser selects the first sample. Missing/partial GT calls, unsupported
 ploidy, and records without identifiers are still skipped. Evidence preservation
 does not add coordinate lookup, reference normalization, cross-build matching,
-quality filtering, or general indel/structural-variant interpretation. The legacy
-analysis still uses its genotype string; do not use it to infer multibase allele
-boundaries. Haploid multibase alleles use `--` in the legacy display to avoid being read as
+quality filtering, or general indel/structural-variant interpretation. ClinVar SNP matching uses explicit VCF alleles and indices, requires the same
+reference allele and a declared target alternate, and never complements a VCF
+call to force a match. Multiallelic SNPs can carry two different alternates;
+each annotated alternate is counted independently. Non-SNP records and
+reference mismatches have unknown ClinVar zygosity. This is allele compatibility,
+not verification that the source and input coordinates/builds match.
+
+GWAS and pharmacogenomic matching still use the legacy SNP path. Non-SNP VCF
+records are withheld from that path so flattened sequences cannot look like SNP
+genotypes; no new GWAS/PGx interpretation is claimed here. Haploid multibase alleles use `--` in the legacy display to avoid being read as
 two SNP alleles. Full source alleles remain available in the evidence object.
 
 ## Reproducible development checks
