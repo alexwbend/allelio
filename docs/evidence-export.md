@@ -9,7 +9,10 @@ original input file.
 The top-level `schema_version` is `1.0`. Consumers must check the major version,
 accept additive fields, and treat missing/null values as unavailable. A major
 version change indicates incompatible field changes. JSON numbers are finite;
-non-finite source numbers become null. The document contains:
+non-finite source numbers become null. A JSON Schema (2020-12) for the document
+ships with the package, and `allelio validate-evidence evidence.json` checks a
+file against it plus the reference and count rules a schema cannot express; see
+[evidence schema](evidence-schema.md). The document contains:
 
 - `software`, `generated_at`, `configuration`, `provenance`: software version,
   UTC time, analysis filters, and reference-source versions available locally.

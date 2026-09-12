@@ -1,0 +1,222 @@
+{
+  "schema_version": "2.0",
+  "software": {
+    "name": "Allelio",
+    "version": "0.3.0"
+  },
+  "generated_at": "2026-09-12T00:00:00+00:00",
+  "configuration": {
+    "include_benign": false,
+    "detailed_trace": false
+  },
+  "provenance": {
+    "clinvar": {
+      "label": "ClinVar",
+      "release": null,
+      "release_source": null,
+      "url": null,
+      "sha256": null
+    }
+  },
+  "inputs": [
+    {
+      "input_id": "input-1",
+      "rsid": "rs1",
+      "chromosome": "1",
+      "position": 100,
+      "genotype": "AG",
+      "vcf_evidence": null,
+      "source_line": 2
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "finding-1",
+      "input_ids": [
+        "input-1"
+      ],
+      "candidate_ids": [
+        "candidate-1"
+      ],
+      "rsid": "rs1",
+      "chromosome": "1",
+      "position": 100,
+      "genotype": "AG",
+      "category": "Health Conditions",
+      "significance_rank": 0.6,
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "G",
+      "strand_flipped": false,
+      "zygosity_note": null,
+      "allele_role": "alternate",
+      "clinvar_entries": [
+        {
+          "rsid": "rs1",
+          "gene": "GENE",
+          "clinical_significance": "Pathogenic",
+          "classification_type": "germline",
+          "conditions": "Cond",
+          "condition_ids": "MONDO:MONDO:0000001",
+          "review_status": "practice guideline",
+          "review_stars": 4,
+          "ref_allele": "A",
+          "alt_allele": "G",
+          "assembly": "GRCh38",
+          "chromosome": "1",
+          "position_vcf": 100,
+          "allele_id": "1",
+          "variation_id": "2",
+          "hgnc_id": "HGNC:1",
+          "allele_match": "carried",
+          "allele_match_note": "1 copy of G",
+          "display_rank": 0.6,
+          "inheritance": null
+        }
+      ],
+      "gwas_entries": [],
+      "gnomad_entry": null,
+      "gnomad_entries": [],
+      "clingen_entries": [],
+      "inheritance": "not curated",
+      "inheritance_note": null,
+      "inheritance_resolution": null,
+      "pgx_entries": []
+    }
+  ],
+  "gene_groups": [
+    {
+      "key": "HGNC:1",
+      "hgnc_id": "HGNC:1",
+      "gene": "GENE",
+      "symbols": [
+        "GENE"
+      ],
+      "indices": [
+        0
+      ],
+      "count": 1,
+      "function": "A sourced function summary is not available in this release.",
+      "function_source": null,
+      "function_version": null,
+      "note": "",
+      "finding_ids": [
+        "finding-1"
+      ]
+    }
+  ],
+  "analysis_stats": {
+    "annotated_sites": 1,
+    "reference_genotype_sites": 0,
+    "zygosity_unknown_sites": 0,
+    "benign_sites": 0,
+    "vcf_filter_failed_sites": 0,
+    "dispositions": {
+      "rs1": "reported"
+    },
+    "duplicate_rows": 0,
+    "conflicting_input_sites": 0
+  },
+  "coverage": {
+    "scope": "parsed_inputs_only",
+    "total_rows": 1,
+    "accounted_rows": 1,
+    "counts": {
+      "reported": 1
+    },
+    "rows": [
+      {
+        "line": 2,
+        "input_id": "input-1",
+        "rsid": "rs1",
+        "status": "reported"
+      }
+    ],
+    "returned_findings": 1,
+    "complete": true,
+    "limitations": "Rows absent from the input cannot be counted."
+  },
+  "limitations": [
+    "Research and education only; not a clinical interpretation."
+  ],
+  "matching": {
+    "schema": "candidate-trace/1",
+    "candidate_count": 2,
+    "counts": {
+      "rejected": 1,
+      "retained": 1
+    },
+    "by_source": {
+      "clinvar": {
+        "retained": 1
+      },
+      "gnomad": {
+        "rejected": 1
+      }
+    },
+    "sites_with_candidates": 1,
+    "listed_candidate_count": 2,
+    "detailed": false,
+    "paths": {
+      "clinvar": "traced"
+    },
+    "sites": [
+      {
+        "rsid": "rs1",
+        "input_ids": [
+          "input-1"
+        ],
+        "finding_id": "finding-1",
+        "disposition": "reported",
+        "candidate_count": 2,
+        "counts": {
+          "rejected": 1,
+          "retained": 1
+        },
+        "candidate_ids": [
+          "candidate-1",
+          "candidate-2"
+        ],
+        "candidates_listed": true
+      }
+    ],
+    "candidates": [
+      {
+        "candidate_id": "candidate-1",
+        "rsid": "rs1",
+        "source": "clinvar",
+        "identity": {
+          "allele_id": "1",
+          "assembly": "GRCh38",
+          "chromosome": "1",
+          "position_vcf": 100,
+          "ref_allele": "A",
+          "alt_allele": "G"
+        },
+        "decision": "retained",
+        "stage": "allele",
+        "reason": "allele_carried",
+        "note": "1 copy of G",
+        "finding_id": "finding-1"
+      },
+      {
+        "candidate_id": "candidate-2",
+        "rsid": "rs1",
+        "source": "gnomad",
+        "identity": {
+          "assembly": "GRCh37",
+          "ref_allele": "A",
+          "alt_allele": "G"
+        },
+        "decision": "rejected",
+        "stage": "frequency",
+        "reason": "frequency_build_mismatch",
+        "note": "GRCh37 record",
+        "finding_id": null
+      }
+    ],
+    "limitations": [
+      "Candidate counts are over reference records considered."
+    ]
+  }
+}

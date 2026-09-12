@@ -84,6 +84,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- A machine-readable JSON Schema (2020-12) for the evidence JSON ships in
+  the package (`allelio/schemas/evidence-1.0.json`, one file per minor
+  version, available from an installed wheel via `allelio.schema`). It
+  describes inputs, findings, every source record type, gene groups,
+  provenance, configuration, coverage, and the matching trace, with
+  required, optional, and null semantics stated per field; within a major
+  version fields are only added and unknown properties must be ignored.
+  `allelio validate-evidence FILE` (and `allelio.schema.validate_evidence`)
+  runs the schema plus the checks it cannot express: document-local
+  references resolve, ids are well formed and ordered, only retained
+  candidates support a finding, and coverage and candidate counts are
+  conserved. Errors name the JSON location and what was expected. Synthetic
+  valid and invalid fixtures, real CLI and web exports, empty results, and
+  a database without recorded releases are validated in tests, and the
+  schema's presence in a built wheel is checked (`docs/evidence-schema.md`).
+
 - Candidate-level matching trace in the evidence JSON (`matching`): one
   decision per reference record considered, retained, rejected, or
   unresolved, with the stage, a structured reason code, the identity the

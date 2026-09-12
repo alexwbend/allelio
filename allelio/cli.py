@@ -789,6 +789,26 @@ def info(file: Optional[str]):
         raise click.Abort()
 
 
+@allelio.command("validate-evidence")
+@click.argument("file", type=click.Path(exists=True, dir_okay=False))
+def validate_evidence_command(file: str):
+    """Check an evidence JSON file against the shipped schema.
+
+    Reports every structural violation (JSON Schema 2020-12) and every
+    broken document-local reference or unconserved count, one per line, and
+    exits non-zero if there are any. Reads only the file named.
+    """
+    from allelio.schema import DEFAULT_SCHEMA_VERSION, validate_evidence_file
+
+    errors = validate_evidence_file(file)
+    if errors:
+        console.print(f"[bold red]✗[/bold red] {escape(file)}: {len(errors)} problem(s) against schema {DEFAULT_SCHEMA_VERSION}")
+        for line in errors:
+            console.print(f"  {escape(line)}")
+        raise SystemExit(1)
+    console.print(f"[bold green]✓[/bold green] {escape(file)} is valid evidence JSON (schema {DEFAULT_SCHEMA_VERSION})")
+
+
 main = allelio
 
 if __name__ == "__main__":
