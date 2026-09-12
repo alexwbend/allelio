@@ -168,6 +168,12 @@ class ClinVarEntry:
     review_stars: int = 0
     ref_allele: Optional[str] = None
     alt_allele: Optional[str] = None
+    assembly: Optional[str] = None
+    chromosome: Optional[str] = None
+    position_vcf: Optional[int] = None
+    allele_id: Optional[str] = None
+    variation_id: Optional[str] = None
+    hgnc_id: Optional[str] = None
 
 
 @dataclass
@@ -437,6 +443,9 @@ def _clinvar_entry(cv_data: Dict[str, Any]) -> ClinVarEntry:
         review_stars=_get_review_stars(review_status),
         ref_allele=cv_data.get("ref_allele") or None,
         alt_allele=cv_data.get("alt_allele") or None,
+        **{key: cv_data.get(key) for key in (
+            "assembly", "chromosome", "position_vcf", "allele_id", "variation_id", "hgnc_id"
+        )},
     )
 
 
