@@ -7,7 +7,7 @@ This module provides:
 """
 
 import gzip
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -53,6 +53,25 @@ class Variant:
     position: int
     genotype: str
     vcf_evidence: Optional[VCFEvidence] = None
+    source_line: Optional[int] = field(default=None, compare=False)
+
+
+class ParseAudit:
+    """One disposition per nonblank, nonheader input row."""
+    def __init__(self):
+        self.rows = []
+
+    def row(self, line):
+        record = {"line": line, "status": "malformed_row"}
+        self.rows.append(record)
+        return record
+
+
+class ParsedVariants(list):
+    """List-compatible parser result carrying row accounting."""
+    def __init__(self, variants, audit):
+        super().__init__(variants)
+        self.audit = audit
 
 
 def detect_format(filepath: str) -> str:
@@ -172,9 +191,8 @@ def parse_genotype_file_with_stats(filepath: str) -> Tuple[List[Variant], Option
     """Like parse_genotype_file, but also reports 23andMe i-ID row counts.
 
     Only the 23andMe format carries the internal `i`-prefixed identifiers
-    this counts (see twentythree.ParseStats and PUB-11-lite in
-    PUBLICATION_PLAN.md); AncestryDNA and VCF have no such gap, so their
-    stats are None.
+    this counts (see twentythree.ParseStats); other formats return None.
+    All formats also carry row dispositions on the returned list.audit.
 
     Args:
         filepath: Path to the genotype file (can be gzipped)

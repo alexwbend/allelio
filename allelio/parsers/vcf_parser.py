@@ -15,7 +15,7 @@ Format specification:
 import gzip
 from typing import List, Generator, Optional, Tuple
 
-from .base import Variant, VCFEvidence
+from .base import ParseAudit, ParsedVariants, Variant, VCFEvidence
 
 
 def _parse_gt_field(gt_str: str, ref: str, alt: str) -> Optional[str]:
@@ -70,7 +70,7 @@ def _parse_gt_field(gt_str: str, ref: str, alt: str) -> Optional[str]:
         return None
 
 
-def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
+def _parse_vcf_lines(filepath: str, audit=None) -> Generator[Variant, None, None]:
     """Generate Variant objects from a VCF format file.
     
     Args:
@@ -89,11 +89,11 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
         gt_index = None
         reference_declaration = None
         
-        for line in f:
-            line = line.rstrip('\n')
+        for line_number, line in enumerate(f, 1):
+            line = line.rstrip('\r\n')
             
             # Skip empty lines
-            if not line:
+            if not line.strip():
                 continue
             
             # Skip meta-info lines
@@ -128,6 +128,8 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
             if line.startswith('#'):
                 continue
             
+            entry = audit.row(line_number) if audit is not None else {}
+
             # Parse data line
             if header_line is None:
                 continue
@@ -139,7 +141,13 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
             
             try:
                 chromosome = parts[chrom_index]
-                position = int(parts[pos_index])
+                try:
+                    position = int(parts[pos_index])
+                    if position <= 0:
+                        raise ValueError('Nonpositive position')
+                except ValueError:
+                    entry['status'] = 'invalid_position'
+                    continue
                 rsid = parts[id_index]
                 ref = parts[ref_index]
                 alt = parts[alt_index]
@@ -147,7 +155,8 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                 sample_data = parts[sample_column_index]
                 
                 # Skip if no rsid
-                if rsid == '.':
+                if rsid in ('.', ''):
+                    entry['status'] = 'unsupported_identifier'
                     continue
                 
                 # Parse FORMAT to find GT index
@@ -155,11 +164,13 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                 try:
                     gt_index = format_parts.index('GT')
                 except ValueError:
+                    entry['status'] = 'missing_genotype'
                     continue
                 
                 # Parse sample GT field
                 sample_parts = sample_data.split(':')
                 if gt_index >= len(sample_parts):
+                    entry["status"] = "missing_genotype"
                     continue
                 
                 gt_str = sample_parts[gt_index]
@@ -167,6 +178,7 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                 
                 # Skip no-calls
                 if genotype is None:
+                    entry['status'] = 'no_call' if '.' in gt_str else 'unsupported_genotype'
                     continue
                 
                 fields = dict(zip(format_parts, sample_parts))
@@ -187,6 +199,7 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                     depth=available(fields.get('DP')),
                     genotype_filter=available(fields.get('FT')),
                 )
+                entry.update(status='parsed', rsid=rsid)
                 # Yield valid variant
                 yield Variant(
                     rsid=rsid,
@@ -194,6 +207,7 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                     position=position,
                     genotype=genotype,
                     vcf_evidence=evidence,
+                    source_line=line_number,
                 )
             
             except (ValueError, IndexError):
@@ -209,4 +223,5 @@ def parse_vcf(filepath: str) -> List[Variant]:
     Returns:
         List of Variant objects parsed from the file
     """
-    return list(_parse_vcf_lines(filepath))
+    audit = ParseAudit()
+    return ParsedVariants(_parse_vcf_lines(filepath, audit=audit), audit)
