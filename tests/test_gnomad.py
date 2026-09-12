@@ -170,10 +170,11 @@ class TestGnomADDatabase:
         ]
         db.insert_gnomad_batch(records)
 
-        result = db.lookup_rsid("rs429358")
-        assert result["gnomad"] is not None
-        assert result["gnomad"]["allele_frequency"] == pytest.approx(0.0523)
-        assert result["gnomad"]["af_popmax"] == pytest.approx(0.0789)
+        [row] = db.lookup_rsid("rs429358")["gnomad"]
+        assert row["allele_frequency"] == pytest.approx(0.0523)
+        assert row["af_popmax"] == pytest.approx(0.0789)
+        # No identity given: stored as an rsID-only record, not a guessed allele
+        assert (row["ref_allele"], row["alt_allele"], row["assembly"]) == ("", "", None)
 
     def test_lookup_missing_gnomad(self, tmp_dir):
         """Test that missing gnomAD entries return None."""
@@ -182,7 +183,7 @@ class TestGnomADDatabase:
         db.initialize()
 
         result = db.lookup_rsid("rs999999")
-        assert result["gnomad"] is None
+        assert result["gnomad"] == []
 
     def test_batch_lookup_includes_gnomad(self, tmp_dir):
         """Test batch lookup returns gnomAD data alongside ClinVar/GWAS."""
@@ -202,10 +203,9 @@ class TestGnomADDatabase:
 
         results = db.lookup_rsids_batch(["rs429358", "rs7412", "rs999"])
 
-        assert results["rs429358"]["gnomad"] is not None
-        assert results["rs429358"]["gnomad"]["allele_frequency"] == pytest.approx(0.05)
-        assert results["rs7412"]["gnomad"] is not None
-        assert results["rs999"]["gnomad"] is None
+        assert results["rs429358"]["gnomad"][0]["allele_frequency"] == pytest.approx(0.05)
+        assert len(results["rs7412"]["gnomad"]) == 1
+        assert results["rs999"]["gnomad"] == []
 
     def test_gnomad_stats(self, tmp_dir):
         """Test that get_stats includes gnomAD count."""
@@ -247,15 +247,20 @@ class TestGnomADDatabase:
         """)
         db.conn.commit()
 
-        # Should not crash, gnomad should be None
+        # Should not crash, gnomad should be empty
         result = db.lookup_rsid("rs123")
-        assert result["gnomad"] is None
+        assert result["gnomad"] == []
 
         batch = db.lookup_rsids_batch(["rs123"])
-        assert batch["rs123"]["gnomad"] is None
+        assert batch["rs123"]["gnomad"] == []
 
 
 # ── Frequency Adjustment Tests ────────────────────────────────────────
+
+
+def _matched(**kwargs):
+    """A frequency record verified as the matched allele's (see test_frequency_identity.py)."""
+    return GnomADEntry(identity="matched", **kwargs)
 
 
 class TestFrequencyAdjustment:
@@ -263,31 +268,31 @@ class TestFrequencyAdjustment:
 
     def test_common_variant_downgraded(self):
         """Common variants (>5% AF) get a large rank increase."""
-        entry = GnomADEntry(rsid="rs1", allele_frequency=0.30)
+        entry = _matched(rsid="rs1", allele_frequency=0.30)
         adjusted = _calculate_frequency_adjustment(1.0, entry)
         assert adjusted == pytest.approx(4.0)  # 1.0 + 3.0
 
     def test_moderate_variant_downgraded(self):
         """Moderately common variants (1-5%) get moderate rank increase."""
-        entry = GnomADEntry(rsid="rs1", allele_frequency=0.03)
+        entry = _matched(rsid="rs1", allele_frequency=0.03)
         adjusted = _calculate_frequency_adjustment(1.0, entry)
         assert adjusted == pytest.approx(2.5)  # 1.0 + 1.5
 
     def test_uncommon_variant_small_downgrade(self):
         """Uncommon variants (0.1-1%) get small rank increase."""
-        entry = GnomADEntry(rsid="rs1", allele_frequency=0.005)
+        entry = _matched(rsid="rs1", allele_frequency=0.005)
         adjusted = _calculate_frequency_adjustment(1.0, entry)
         assert adjusted == pytest.approx(1.5)  # 1.0 + 0.5
 
     def test_rare_variant_unchanged(self):
         """Rare variants (<0.1%) keep their original rank."""
-        entry = GnomADEntry(rsid="rs1", allele_frequency=0.0001)
+        entry = _matched(rsid="rs1", allele_frequency=0.0001)
         adjusted = _calculate_frequency_adjustment(1.0, entry)
         assert adjusted == pytest.approx(1.0)  # unchanged
 
     def test_very_rare_variant_unchanged(self):
         """Very rare variants (<0.001%) keep their original rank."""
-        entry = GnomADEntry(rsid="rs1", allele_frequency=0.000001)
+        entry = _matched(rsid="rs1", allele_frequency=0.000001)
         adjusted = _calculate_frequency_adjustment(2.0, entry)
         assert adjusted == pytest.approx(2.0)
 
@@ -298,20 +303,20 @@ class TestFrequencyAdjustment:
 
     def test_no_frequency_unchanged(self):
         """Variants with gnomAD entry but no AF keep their original rank."""
-        entry = GnomADEntry(rsid="rs1", allele_frequency=None)
+        entry = _matched(rsid="rs1", allele_frequency=None)
         adjusted = _calculate_frequency_adjustment(1.0, entry)
         assert adjusted == pytest.approx(1.0)
 
     def test_rank_capped_at_9_9(self):
         """Adjustment should never push rank past 9.9."""
-        entry = GnomADEntry(rsid="rs1", allele_frequency=0.50)
+        entry = _matched(rsid="rs1", allele_frequency=0.50)
         adjusted = _calculate_frequency_adjustment(8.0, entry)
         assert adjusted == pytest.approx(9.9)  # capped, not 11.0
 
     def test_borderline_5_percent(self):
         """Test boundary at exactly 5%."""
-        entry_above = GnomADEntry(rsid="rs1", allele_frequency=0.051)
-        entry_below = GnomADEntry(rsid="rs2", allele_frequency=0.049)
+        entry_above = _matched(rsid="rs1", allele_frequency=0.051)
+        entry_below = _matched(rsid="rs2", allele_frequency=0.049)
 
         adj_above = _calculate_frequency_adjustment(1.0, entry_above)
         adj_below = _calculate_frequency_adjustment(1.0, entry_below)

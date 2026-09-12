@@ -30,7 +30,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   so haploid SNVs reach zygosity interpretation with the correct copy count.
 - Skip malformed VCF headers without crashing on unset column indices.
 
+### Changed
+
+- ClinVar context survives import and reporting. The importer reads the
+  header of `variant_summary.txt` and keeps origin, RCV accessions,
+  submitter count, variant type and name, and the separate somatic
+  clinical impact and oncogenicity assertions with their review statuses
+  and dates; `classification_type` records whether the classification is
+  the post-2024 aggregate germline one, from a pre-split file that mixed
+  origins, or unknown (legacy database), never assumed. Records are keyed
+  by `(rsid, ref, alt, chromosome, allele_id)`, so pseudoautosomal X/Y
+  pairs and distinct records for one allele are kept instead of silently
+  overwritten (701 such keys in the 2026-09-03 release); the table
+  migrates in place without inventing metadata. Every ClinVar entry keeps
+  the source classification, its allele match (`allele_match`,
+  `allele_match_note`), and Allelio's `display_rank` as separate fields.
+  The report, web card, AI prompt, fallback text, and evidence JSON show
+  the same context; the prompt is told not to merge records or present a
+  somatic assertion as germline. Field mapping in `docs/clinvar-fields.md`,
+  with synthetic fixtures in both file layouts.
+
+- Population frequencies are matched by assembly, coordinate, and allele
+  before they count. gnomAD rows are keyed by `(rsid, ref, alt)` with
+  chromosome, position, assembly, and source version, so the alternate
+  alleles of a multiallelic site coexist; a record is labelled `matched`
+  only when it agrees with the ClinVar record the genotype matched (or
+  declared VCF evidence), and only a matched record may adjust the display
+  rank or be described as the person's allele frequency. Other records stay
+  visible as context with the reason (`unverified`, `build_mismatch`,
+  `position_mismatch`, `other_allele`, `alleles_swapped`,
+  `orientation_reversed`); the report, prompt, and evidence JSON say so.
+  The extract format gains per-allele rows and an assembly header (format
+  2, `scripts/build_gnomad_freq.py`), the build script splits multiallelic
+  INFO values per allele instead of keeping the first, and the rsID-only
+  table migrates in place. The published format 1 extract now reads as
+  unverified context, so the display adjustment is inert until a format 2
+  extract is published with its provenance, checksum, and CC0 terms in the
+  manifest (`docs/population-frequency.md`).
+
+- Inheritance is resolved for the condition each ClinVar assertion names, not
+  for the whole gene: ClinVar's `PhenotypeIDS` identifiers are stored
+  (`condition_ids`) and matched to ClinGen curations by MONDO identifier,
+  never by name (`mondo-exact` mapping, version 1.0, recorded on every
+  resolution). Carrier Status now requires a resolved recessive (or diploid
+  X-linked) condition; an assertion naming conditions inherited differently
+  reads "conflicting", one without identifiers or naming an uncurated
+  condition reads "unresolved" with the reason, and the gene-level summary is
+  kept separately. Findings and ClinVar entries carry the full
+  `inheritance_resolution` in web payloads and evidence JSON; the CLI table
+  shows an Inheritance column. Databases built before the column migrate in
+  place and read "identifiers not stored" until `allelio update`. Synthetic
+  challenge fixtures cover each path (`docs/inheritance.md`).
+
 ### Added
+
+- A machine-readable JSON Schema (2020-12) for the evidence JSON ships in
+  the package (`allelio/schemas/evidence-1.0.json`, one file per minor
+  version, available from an installed wheel via `allelio.schema`). It
+  describes inputs, findings, every source record type, gene groups,
+  provenance, configuration, coverage, and the matching trace, with
+  required, optional, and null semantics stated per field; within a major
+  version fields are only added and unknown properties must be ignored.
+  `allelio validate-evidence FILE` (and `allelio.schema.validate_evidence`)
+  runs the schema plus the checks it cannot express: document-local
+  references resolve, ids are well formed and ordered, only retained
+  candidates support a finding, and coverage and candidate counts are
+  conserved. Errors name the JSON location and what was expected. Synthetic
+  valid and invalid fixtures, real CLI and web exports, empty results, and
+  a database without recorded releases are validated in tests, and the
+  schema's presence in a built wheel is checked (`docs/evidence-schema.md`).
+
+- Candidate-level matching trace in the evidence JSON (`matching`): one
+  decision per reference record considered, retained, rejected, or
+  unresolved, with the stage, a structured reason code, the identity the
+  source gave the record, and a document-local `candidate_id`; findings
+  link to their supporting candidates and sites to their candidates.
+  Decisions are recorded by the matching functions themselves for ClinVar,
+  GWAS, ClinPGx, gnomAD, and ClinGen (at condition level). Candidate counts
+  are kept apart from input-row coverage and finding counts. Candidates at
+  reference-genotype sites are counted by default and listed with
+  `--detailed-trace`. No AI text enters the trace (`docs/matching-trace.md`).
 
 - Gene groups in CLI, web, and HTML reports, with distinct-finding counts,
   source-backed function descriptions where available, and individual details.
@@ -162,3 +241,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - No telemetry, tracking, or analytics
 - No user accounts or cloud storage
 - Genetic data is never persisted by Allelio beyond the analysis session
+
+## Cloud-work audit hardening
+
+Correct incomplete inheritance resolution, frequency identity and database
+upgrade handling, optional ClinVar header mapping, candidate-trace omissions,
+and evidence validation. Prevent incomplete frequency extracts from replacing
+a release. See `docs/cloud-work-audit.md` for findings, behavior changes and
+the outstanding format-2 data release.

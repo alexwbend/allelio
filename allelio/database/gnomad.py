@@ -1,10 +1,20 @@
 """gnomAD population frequency database parser.
 
-Parses gnomAD allele frequency data from TSV or VCF formats
+Parses the compact frequency extract ``scripts/build_gnomad_freq.py`` writes
 and yields records ready for batch insertion into SQLite.
+
+Two layouts exist. Format 1 (the extract published for 0.3.0) keys rows by
+rsID alone and carries no allele: at a multiallelic site it silently kept the
+first alternate allele's frequency, and nothing in it says which build or
+position it describes. Format 2 adds chromosome, position, REF and ALT per
+row, one row per alternate allele, and declares the assembly and source
+release in its ``##`` header. Records from a format 1 file keep empty allele
+fields so they can be shown as unverified context, never as the matched
+allele's frequency.
 """
 
 import gzip
+import re
 from typing import Generator, Dict, Any, Optional
 from pathlib import Path
 
@@ -27,6 +37,10 @@ GNOMAD_TSV_COLUMNS = {
 # Mapping of common gnomAD header variations to our field names
 HEADER_ALIASES = {
     "rsid": ["rsid", "rs_id", "rsID", "snp", "SNP", "variant_id"],
+    "chromosome": ["chrom", "chromosome", "chr", "CHROM"],
+    "position": ["pos", "position", "POS"],
+    "ref_allele": ["ref", "ref_allele", "REF", "reference_allele"],
+    "alt_allele": ["alt", "alt_allele", "ALT", "alternate_allele"],
     "allele_frequency": ["allele_frequency", "AF", "af", "freq", "frequency", "global_af"],
     "af_popmax": ["af_popmax", "AF_popmax", "popmax_af", "AF_POPMAX",
                   "af_grpmax", "AF_grpmax", "grpmax_af", "AF_GRPMAX"],
@@ -64,6 +78,48 @@ def _safe_int(value: str) -> Optional[int]:
         return None
 
 
+# Header lines the build script writes; the values travel into every record
+# and into the database metadata so a report can say which assembly and
+# release a frequency came from.
+_HEADER_KEYS = {
+    "format": re.compile(r"^##\s*Format:\s*(\d+)", re.I),
+    "assembly": re.compile(r"^##\s*Assembly:\s*(\S+)", re.I),
+    "source_version": re.compile(r"^##\s*Source:\s*gnomAD\s*(v?[\d.]+)", re.I),
+}
+
+
+def _open(filepath: str):
+    is_gzipped = filepath.endswith(".gz") or filepath.endswith(".bgz")
+    return (gzip.open if is_gzipped else open)(Path(filepath), "rt" if is_gzipped else "r", encoding="utf-8")
+
+
+def gnomad_file_header(filepath: str) -> Dict[str, Optional[str]]:
+    """What the ``##`` preamble declares: format, assembly, source_version.
+
+    A format 1 file declares no assembly; the keys are then None, and the
+    format reads "1". Reading stops at the first non-comment line.
+    """
+    found: Dict[str, Optional[str]] = {key: None for key in _HEADER_KEYS}
+    with _open(filepath) as f:
+        for line in f:
+            if not line.startswith("##"):
+                break
+            for key, pattern in _HEADER_KEYS.items():
+                m = pattern.match(line)
+                if m and found[key] is None:
+                    found[key] = m.group(1)
+    found["format"] = found["format"] or "1"
+    return found
+
+
+def _text(fields, index: Optional[int]) -> str:
+    """A column as text, '' when absent or a placeholder."""
+    if index is None or index >= len(fields):
+        return ""
+    value = fields[index].strip()
+    return "" if value in ("-", ".", "NA") else value
+
+
 def _detect_column_indices(header_fields: list) -> Dict[str, Optional[int]]:
     """Map header fields to our expected column names using aliases.
 
@@ -97,19 +153,16 @@ def parse_gnomad(filepath: str) -> Generator[Dict[str, Any], None, None]:
 
     Yields:
         Dict with keys matching the gnomad database table schema:
-        rsid, allele_frequency, af_popmax, ac, an, nhomalt,
-        af_afr, af_eas, af_fin, af_nfe, af_sas
+        rsid, chromosome, position, ref_allele, alt_allele, assembly,
+        source_version, allele_frequency, af_popmax, ac, an, nhomalt,
+        af_afr, af_eas, af_fin, af_nfe, af_sas. Identity fields are ''/None
+        for a format 1 file.
     """
-    path = Path(filepath)
-
-    # Determine if file is gzipped
-    is_gzipped = filepath.endswith(".gz") or filepath.endswith(".bgz")
-    open_func = gzip.open if is_gzipped else open
-    mode = "rt" if is_gzipped else "r"
-
+    header = gnomad_file_header(filepath)
+    assembly, source_version = header["assembly"], header["source_version"]
     column_indices = None
 
-    with open_func(path, mode, encoding="utf-8") as f:
+    with _open(filepath) as f:
         for line_num, line in enumerate(f, 1):
             line = line.rstrip("\n")
 
@@ -135,6 +188,10 @@ def parse_gnomad(filepath: str) -> Generator[Dict[str, Any], None, None]:
                     # No header detected — assume standard column order
                     column_indices = {
                         "rsid": 0,
+                        "chromosome": None,
+                        "position": None,
+                        "ref_allele": None,
+                        "alt_allele": None,
                         "allele_frequency": 1,
                         "af_popmax": 2,
                         "ac": 3,
@@ -170,8 +227,16 @@ def parse_gnomad(filepath: str) -> Generator[Dict[str, Any], None, None]:
                 # Build record
                 record = {
                     "rsid": rsid,
+                    "chromosome": _text(fields, column_indices.get("chromosome")),
+                    "position": _safe_int(_text(fields, column_indices.get("position"))),
+                    "ref_allele": _text(fields, column_indices.get("ref_allele")).upper(),
+                    "alt_allele": _text(fields, column_indices.get("alt_allele")).upper(),
+                    "assembly": assembly,
+                    "source_version": source_version,
                     "allele_frequency": af_value,
                 }
+                if record["chromosome"].startswith("chr"):
+                    record["chromosome"] = record["chromosome"][3:]
 
                 # Extract optional fields
                 for field_name in ["af_popmax", "af_afr", "af_eas", "af_fin", "af_nfe", "af_sas"]:

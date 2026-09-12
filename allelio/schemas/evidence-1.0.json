@@ -1,0 +1,1452 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/alexwbend/allelio/schemas/evidence-1.0.json",
+  "title": "Allelio structured evidence export",
+  "description": "Schema for the evidence JSON written by `allelio analyze --json-output` and the web Export Evidence JSON action, schema_version 1.x. Dialect: JSON Schema 2020-12. Compatibility: within a major version fields are only added, so objects allow additional properties and consumers must ignore unknown ones; a missing or null value means unavailable, never zero or false. input_id, finding_id and candidate_id are local to one document and are not VRS IDs or normalised genomic identifiers. AI-generated text is never part of this document. Cross-document references and conserved counts are checked by allelio.schema.validate_evidence, which JSON Schema alone cannot express.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "software",
+    "generated_at",
+    "configuration",
+    "provenance",
+    "inputs",
+    "findings",
+    "gene_groups",
+    "coverage",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$",
+      "description": "Major.minor. Consumers check the major version."
+    },
+    "software": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "const": "Allelio"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC, ISO 8601."
+    },
+    "configuration": {
+      "type": "object",
+      "properties": {
+        "include_benign": {
+          "type": "boolean"
+        },
+        "include_reference": {
+          "type": "boolean"
+        },
+        "traits_only": {
+          "type": "boolean"
+        },
+        "frequency_adjustment": {
+          "type": "boolean"
+        },
+        "detailed_trace": {
+          "type": "boolean"
+        }
+      },
+      "description": "Analysis options in force. Unknown options may appear; absent means default."
+    },
+    "provenance": {
+      "type": "object",
+      "description": "One entry per reference source, keyed by source id (clinvar, gwas, gnomad, clingen, clinpgx). All values null on a database built before provenance was recorded; release 'unavailable' means the source was not loaded.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "release": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "release_source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Any key absent from the source's metadata is null."
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/input"
+      },
+      "description": "Every parsed observation, in input order."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      },
+      "description": "Every returned finding, in display order; not limited by the AI explanation cap."
+    },
+    "gene_groups": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/gene_group"
+      }
+    },
+    "analysis_stats": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "annotated_sites": {
+          "type": "integer"
+        },
+        "reference_genotype_sites": {
+          "type": "integer"
+        },
+        "zygosity_unknown_sites": {
+          "type": "integer"
+        },
+        "benign_sites": {
+          "type": "integer"
+        },
+        "vcf_filter_failed_sites": {
+          "type": "integer"
+        },
+        "duplicate_rows": {
+          "type": "integer"
+        },
+        "conflicting_input_sites": {
+          "type": "integer"
+        },
+        "dispositions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Final disposition per input identifier (rsID or unsupported id)."
+        }
+      },
+      "description": "Site counts of what was set aside. Null when no analysis statistics were available."
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "matching": {
+      "$ref": "#/$defs/matching"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "input_id": {
+          "type": "string",
+          "pattern": "^input-[1-9][0-9]*$",
+          "description": "Document-local; input-N in input order."
+        },
+        "rsid": {
+          "type": "string"
+        },
+        "chromosome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "genotype": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "1-based line in the source file when the parser recorded it."
+        },
+        "vcf_evidence": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "reference": {
+              "type": "string"
+            },
+            "alternates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "allele_indices": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "alleles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phased": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "reference_declaration": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "phase_set": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "quality": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "filter_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "genotype_quality": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "depth": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "genotype_filter": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "reference",
+            "alternates",
+            "allele_indices",
+            "alleles"
+          ],
+          "description": "Original VCF record evidence. reference_declaration is the raw header value, not a certified assembly."
+        }
+      },
+      "required": [
+        "input_id",
+        "rsid"
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "pattern": "^finding-[1-9][0-9]*$",
+          "description": "Document-local; finding-N in display order."
+        },
+        "input_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^input-[1-9][0-9]*$",
+            "description": ""
+          },
+          "description": "Observations sharing this finding's rsID. Sharing an rsID does not verify build or allele equivalence."
+        },
+        "candidate_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^candidate-[1-9][0-9]*$",
+            "description": ""
+          },
+          "description": "Retained matching candidates that support this finding; empty when the trace is absent."
+        },
+        "rsid": {
+          "type": "string"
+        },
+        "chromosome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "genotype": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "category": {
+          "type": "string"
+        },
+        "significance_rank": {
+          "type": "number",
+          "description": "Display priority only; lower shows first. Not a clinical score."
+        },
+        "zygosity": {
+          "type": "string"
+        },
+        "alt_copies": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "matched_allele": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "strand_flipped": {
+          "type": "boolean"
+        },
+        "zygosity_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "allele_role": {
+          "type": "string",
+          "enum": [
+            "alternate",
+            "risk"
+          ]
+        },
+        "clinvar_entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clinvar_entry"
+          }
+        },
+        "gwas_entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gwas_entry"
+          }
+        },
+        "gnomad_entry": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/gnomad_entry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The matched frequency record, or the only record at the site flagged as context, or null."
+        },
+        "gnomad_entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gnomad_entry"
+          },
+          "description": "Every frequency record at the rsID with its identity verdict."
+        },
+        "clingen_entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clingen_entry"
+          }
+        },
+        "inheritance": {
+          "type": "string"
+        },
+        "inheritance_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inheritance_resolution": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/inheritance_resolution"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pgx_entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pgx_entry"
+          }
+        }
+      },
+      "required": [
+        "finding_id",
+        "input_ids",
+        "rsid",
+        "category",
+        "significance_rank",
+        "zygosity",
+        "clinvar_entries",
+        "gwas_entries",
+        "inheritance"
+      ]
+    },
+    "clinvar_entry": {
+      "type": "object",
+      "properties": {
+        "rsid": {
+          "type": "string"
+        },
+        "gene": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "clinical_significance": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Source classification verbatim. See classification_type."
+        },
+        "classification_type": {
+          "type": "string",
+          "enum": [
+            "germline",
+            "unsplit",
+            "unknown"
+          ],
+          "description": "germline: aggregate germline classification (post-2024 file); unsplit: pre-split file mixing origins; unknown: legacy database."
+        },
+        "conditions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "condition_ids": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "ClinVar PhenotypeIDS verbatim; '' when ClinVar gives none, null when not stored."
+        },
+        "review_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review_stars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "last_evaluated": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref_allele": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "alt_allele": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assembly": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "chromosome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position_vcf": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "allele_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hgnc_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin_simple": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rcv_accessions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "number_submitters": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "variant_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "somatic_clinical_impact": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "somatic_review_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "somatic_last_evaluated": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "oncogenicity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "oncogenicity_review_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "oncogenicity_last_evaluated": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "allele_match": {
+          "type": "string",
+          "enum": [
+            "carried",
+            "unknown",
+            "absent"
+          ],
+          "description": "Whether this person carries the record's allele; separate from the classification."
+        },
+        "allele_match_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "display_rank": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Allelio's presentation rank for this row; separate from the classification."
+        },
+        "inheritance": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/inheritance_resolution"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "rsid",
+        "clinical_significance",
+        "classification_type",
+        "allele_match"
+      ]
+    },
+    "gwas_entry": {
+      "type": "object",
+      "properties": {
+        "rsid": {
+          "type": "string"
+        },
+        "trait": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "p_value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "odds_ratio": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mapped_gene": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "study": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pubmed_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "risk_allele": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rsid"
+      ]
+    },
+    "gnomad_entry": {
+      "type": "object",
+      "properties": {
+        "rsid": {
+          "type": "string"
+        },
+        "allele_frequency": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "af_popmax": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ac": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "an": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "nhomalt": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "af_afr": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "af_eas": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "af_fin": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "af_nfe": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "af_sas": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "chromosome": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ref_allele": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "alt_allele": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assembly": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity": {
+          "type": "string",
+          "enum": [
+            "matched",
+            "unverified",
+            "build_mismatch",
+            "position_mismatch",
+            "other_allele",
+            "alleles_swapped",
+            "orientation_reversed",
+            "allele_mismatch"
+          ],
+          "description": "Only 'matched' means the frequency describes the matched allele or affected ranking."
+        },
+        "identity_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "rsid",
+        "identity"
+      ]
+    },
+    "clingen_entry": {
+      "type": "object",
+      "properties": {
+        "gene": {
+          "type": "string"
+        },
+        "disease": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "moi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "classification": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "report_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mondo_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "gene"
+      ]
+    },
+    "condition_ref": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mondo_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identifiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "identifiers"
+      ]
+    },
+    "inheritance_resolution": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "resolved",
+            "conflicting",
+            "unmapped",
+            "no_identifiers",
+            "identifiers_not_stored",
+            "not_established",
+            "not_curated"
+          ]
+        },
+        "inheritance": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "condition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "condition_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "matched": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clingen_entry"
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition_ref"
+          }
+        },
+        "unmatched_condition_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "gene_inheritance": {
+          "type": "string"
+        },
+        "gene_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mapping": {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "method",
+            "version"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "inheritance",
+        "matched",
+        "conditions",
+        "gene_inheritance",
+        "mapping"
+      ]
+    },
+    "pgx_entry": {
+      "type": "object",
+      "properties": {
+        "rsid": {
+          "type": "string"
+        },
+        "annotation_id": {
+          "type": "string"
+        },
+        "gene": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phenotype_category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "drugs": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "phenotypes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "genotype": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "annotation_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "allele_function": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "strand_flipped": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rsid",
+        "annotation_id"
+      ]
+    },
+    "gene_group": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "hgnc_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gene": {
+          "type": "string"
+        },
+        "symbols": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "indices": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "count": {
+          "type": "integer"
+        },
+        "function": {
+          "type": "string"
+        },
+        "function_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "function_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "finding_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^finding-[1-9][0-9]*$",
+            "description": ""
+          }
+        }
+      },
+      "required": [
+        "key",
+        "gene",
+        "indices",
+        "count",
+        "finding_ids"
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "input_data_rows",
+            "parsed_inputs_only"
+          ]
+        },
+        "total_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "accounted_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "input_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Absent or null for rows excluded at parsing."
+              },
+              "rsid": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "returned_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "limitations": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "total_rows",
+        "accounted_rows",
+        "counts",
+        "rows",
+        "returned_findings",
+        "complete"
+      ],
+      "description": "Conserved input-row accounting. Counts are over input rows, never a negative test."
+    },
+    "matching": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "candidate-trace/1"
+        },
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "by_source": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "sites_with_candidates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "listed_candidate_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "detailed": {
+          "type": "boolean"
+        },
+        "paths": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rsid": {
+                "type": "string"
+              },
+              "input_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^input-[1-9][0-9]*$",
+                  "description": ""
+                }
+              },
+              "finding_id": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^finding-[1-9][0-9]*$",
+                    "description": ""
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "disposition": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "candidate_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "counts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "candidate_ids": {
+                "oneOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^candidate-[1-9][0-9]*$",
+                      "description": ""
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Null when the site's candidates are counted but not listed."
+              },
+              "candidates_listed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "rsid",
+              "input_ids",
+              "candidate_count",
+              "counts",
+              "candidates_listed"
+            ]
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "candidate_id": {
+                "type": "string",
+                "pattern": "^candidate-[1-9][0-9]*$",
+                "description": "Document-local; candidate-N in decision order."
+              },
+              "rsid": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "clinvar",
+                  "gwas",
+                  "clinpgx",
+                  "gnomad",
+                  "clingen"
+                ]
+              },
+              "identity": {
+                "type": "object",
+                "description": "Whatever identity the source gave the record."
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "retained",
+                  "rejected",
+                  "unresolved"
+                ]
+              },
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "filter",
+                  "identity",
+                  "allele",
+                  "applicability",
+                  "level",
+                  "frequency",
+                  "condition"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "pattern": "^[a-z0-9_]+$"
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finding_id": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^finding-[1-9][0-9]*$",
+                    "description": ""
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "candidate_id",
+              "rsid",
+              "source",
+              "identity",
+              "decision",
+              "stage",
+              "reason"
+            ]
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "schema",
+        "candidate_count",
+        "counts",
+        "by_source",
+        "sites_with_candidates",
+        "listed_candidate_count",
+        "detailed",
+        "paths",
+        "sites",
+        "candidates"
+      ],
+      "description": "Candidate-level matching trace. Counts are over reference records, not rows or findings."
+    }
+  }
+}

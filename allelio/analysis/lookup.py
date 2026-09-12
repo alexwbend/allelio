@@ -1,6 +1,6 @@
 """Variant lookup and analysis engine."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
 
@@ -9,8 +9,17 @@ from allelio.database.clinpgx import level_rank as pgx_level_rank
 from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, genotype_alleles, call_vcf_zygosity
 from allelio.parsers.base import VCFEvidence
 from allelio.analysis.identity import vcf_identity_reason
-from allelio.analysis.frequency import valid_frequency
+from allelio.analysis.frequency import (
+    AlleleAnchor, MATCHED as FREQUENCY_MATCHED, UNVERIFIED as FREQUENCY_UNVERIFIED,
+    frequency_identity, valid_frequency,
+)
+from allelio.analysis.identity import declared_build, chromosome_name
+from allelio.analysis import trace as tr
+from allelio.analysis.trace import MatchTrace
 from allelio.analysis.quality import vcf_filter_reason
+from allelio.analysis.inheritance import (
+    ClinGenEntry, InheritanceResolution, is_carrier, resolve_inheritance,
+)
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -116,8 +125,9 @@ class VariantCategory(str, Enum):
     RISK_FACTORS = "Risk Factors"
     PHARMACOGENOMICS = "Pharmacogenomics"
     TRAITS = "Traits"
-    # One copy of a pathogenic allele in a gene ClinGen curates only for
-    # recessive conditions (or one copy on a diploid X for an X-linked one).
+    # One copy of a pathogenic allele whose ClinVar condition ClinGen curates
+    # as recessive (or X-linked, on a diploid genotype). Decided per
+    # assertion by MONDO identifier; see allelio/analysis/inheritance.py.
     CARRIER_STATUS = "Carrier Status"
     BENIGN = "Benign"
     UNKNOWN = "Unknown"
@@ -141,11 +151,6 @@ PGX_LEVEL_RANKS = {"1A": 3.0, "1B": 3.0, "2A": 4.0, "2B": 4.0, "3": 6.0, "4": 7.
 # thousands of them, so a real file would drown in single-study drug notes.
 PGX_DEFAULT_MIN_LEVEL = "2B"
 
-# ClinGen classifications that count as an established gene-disease link when
-# deciding the mode of inheritance. Limited / Disputed / Refuted / "No Known
-# Disease Relationship" do not decide it.
-CLINGEN_ESTABLISHED = ("Definitive", "Strong", "Moderate")
-
 
 @dataclass
 class ClinVarEntry:
@@ -164,6 +169,84 @@ class ClinVarEntry:
     allele_id: Optional[str] = None
     variation_id: Optional[str] = None
     hgnc_id: Optional[str] = None
+    # ClinVar PhenotypeIDS, parallel to ``conditions``; None when the database
+    # predates the column. See allelio/analysis/inheritance.py.
+    condition_ids: Optional[str] = None
+    # How this assertion's own conditions are inherited, per ClinGen. Set for
+    # every applicable assertion once the result's gene is known.
+    inheritance: Optional[InheritanceResolution] = None
+    # What ``clinical_significance`` is: "germline" (the aggregate germline
+    # classification of a post-2024 file), "unsplit" (an older file that
+    # mixed germline and somatic in one column), or "unknown" (legacy
+    # database). Never assumed. See docs/clinvar-fields.md.
+    classification_type: str = "unknown"
+    # Context ClinVar gives for reading the classification, verbatim; None
+    # is unknown or not asserted, never "germline by default".
+    origin: Optional[str] = None
+    origin_simple: Optional[str] = None
+    rcv_accessions: Optional[str] = None
+    number_submitters: Optional[int] = None
+    variant_type: Optional[str] = None
+    name: Optional[str] = None
+    somatic_clinical_impact: Optional[str] = None
+    somatic_review_status: Optional[str] = None
+    somatic_last_evaluated: Optional[str] = None
+    oncogenicity: Optional[str] = None
+    oncogenicity_review_status: Optional[str] = None
+    oncogenicity_last_evaluated: Optional[str] = None
+    # Three things a reader must not conflate, kept apart: the source
+    # classification above, whether this person carries the allele it is
+    # about (``allele_match``: "carried", "unknown", "absent", with the copy
+    # count or the reason), and Allelio's own display rank for the row.
+    allele_match: str = "unknown"
+    allele_match_note: Optional[str] = None
+    display_rank: Optional[float] = None
+
+    @property
+    def rcv_list(self) -> List[str]:
+        """The per-condition record accessions this row aggregates."""
+        return [a for a in (self.rcv_accessions or "").split("|") if a]
+
+    def context_phrases(self) -> List[str]:
+        """Short phrases saying what kind of classification this is and its context.
+
+        The same phrases feed the HTML report, the web card, the AI prompt,
+        the fallback text, and (as fields) the evidence JSON. Absent context
+        reads as unknown; a somatic or oncogenicity assertion is named
+        separately from the germline one, never folded into it.
+        """
+        phrases: List[str] = []
+        if self.classification_type == "germline":
+            phrases.append("germline classification (aggregate across the listed conditions)")
+        elif self.classification_type == "unsplit":
+            phrases.append("classification from a pre-2024 ClinVar file that mixed germline and somatic assertions")
+        else:
+            phrases.append("classification type unknown (database predates context columns; run allelio update)")
+        if self.origin_simple or self.origin:
+            origin = self.origin_simple or self.origin
+            detail = f" ({self.origin})" if self.origin and self.origin != origin else ""
+            phrases.append(f"origin: {origin}{detail}")
+        elif self.classification_type != "unknown":
+            phrases.append("origin: not provided")
+        if self.somatic_clinical_impact:
+            status = f"; {self.somatic_review_status}" if self.somatic_review_status else ""
+            date = f"; {self.somatic_last_evaluated}" if self.somatic_last_evaluated else ""
+            phrases.append(f"somatic clinical impact: {self.somatic_clinical_impact}{status}{date}")
+        if self.oncogenicity:
+            status = f"; {self.oncogenicity_review_status}" if self.oncogenicity_review_status else ""
+            date = f"; {self.oncogenicity_last_evaluated}" if self.oncogenicity_last_evaluated else ""
+            phrases.append(f"oncogenicity: {self.oncogenicity}{status}{date}")
+        rcvs = self.rcv_list
+        if rcvs or self.number_submitters is not None:
+            parts = []
+            if rcvs:
+                parts.append(f"{len(rcvs)} condition record{'s' if len(rcvs) != 1 else ''} (RCV)")
+            if self.number_submitters is not None:
+                parts.append(f"{self.number_submitters} submitter{'s' if self.number_submitters != 1 else ''}")
+            phrases.append("aggregates " + ", ".join(parts) + "; per-condition classifications are not in this source file")
+        if self.inheritance is not None:
+            phrases.append("this assertion's condition inheritance: " + self.inheritance.inheritance)
+        return phrases
 
 
 @dataclass
@@ -177,16 +260,6 @@ class GWASEntry:
     study: Optional[str] = None
     pubmed_id: Optional[str] = None
     risk_allele: Optional[str] = None
-
-
-@dataclass
-class ClinGenEntry:
-    """One ClinGen gene-disease validity curation."""
-    gene: str
-    disease: Optional[str] = None
-    moi: Optional[str] = None
-    classification: Optional[str] = None
-    report_url: Optional[str] = None
 
 
 @dataclass
@@ -208,13 +281,37 @@ class PGxEntry:
 
 @dataclass
 class GnomADEntry:
-    """gnomAD population frequency entry."""
+    """One gnomAD frequency record, and whether it describes the matched allele.
+
+    ``identity`` is ``matched`` only when the record's assembly, chromosome,
+    position, REF and ALT agree with a checked source identity for the
+    allele the person carries (see allelio/analysis/frequency.py). Every
+    other value keeps the record inspectable as context without implying
+    that the frequency belongs to this allele; ``identity_note`` says why.
+    """
     rsid: str
     allele_frequency: Optional[float] = None
     af_popmax: Optional[float] = None
     ac: Optional[int] = None
     an: Optional[int] = None
     nhomalt: Optional[int] = None
+    af_afr: Optional[float] = None
+    af_eas: Optional[float] = None
+    af_fin: Optional[float] = None
+    af_nfe: Optional[float] = None
+    af_sas: Optional[float] = None
+    chromosome: Optional[str] = None
+    position: Optional[int] = None
+    ref_allele: Optional[str] = None
+    alt_allele: Optional[str] = None
+    assembly: Optional[str] = None
+    source_version: Optional[str] = None
+    identity: str = FREQUENCY_UNVERIFIED
+    identity_note: Optional[str] = None
+
+    @property
+    def describes_matched_allele(self) -> bool:
+        return self.identity == FREQUENCY_MATCHED
 
 
 @dataclass
@@ -226,7 +323,12 @@ class VariantResult:
     genotype: Optional[str] = None
     clinvar_entries: List[ClinVarEntry] = field(default_factory=list)
     gwas_entries: List[GWASEntry] = field(default_factory=list)
+    # The frequency record for the matched allele when exactly one agrees
+    # with its checked identity; otherwise the single record at the rsID,
+    # flagged as context (``identity`` says why it was not applied), or
+    # None. Every record at the rsID is in ``gnomad_entries``.
     gnomad_entry: Optional[GnomADEntry] = None
+    gnomad_entries: List[GnomADEntry] = field(default_factory=list)
     category: str = VariantCategory.UNKNOWN.value
     significance_rank: float = 999
     # How many copies of the annotated allele the user carries, the
@@ -238,12 +340,16 @@ class VariantResult:
     strand_flipped: bool = False
     zygosity_note: Optional[str] = None
     allele_role: str = "alternate"
-    # ClinGen's curations for the gene, and what they say about inheritance:
-    # "autosomal recessive", "autosomal dominant", "X-linked", "mixed
-    # (dominant and recessive conditions)", or "not curated".
+    # ClinGen's curations for the gene, and the inheritance of the condition
+    # the primary ClinVar assertion is about: "autosomal recessive",
+    # "autosomal dominant", "X-linked", or an unresolved phrase that says
+    # why ("conflicting (...)", "unresolved (...)", "not curated"). The full
+    # resolution, with the matched curations, the mapping that produced it,
+    # and the gene-level summary kept separately, is ``inheritance_resolution``.
     clingen_entries: List[ClinGenEntry] = field(default_factory=list)
     inheritance: str = "not curated"
     inheritance_note: Optional[str] = None
+    inheritance_resolution: Optional[InheritanceResolution] = None
     # ClinPGx annotations whose genotype row matches this person's genotype,
     # best level of evidence first.
     pgx_entries: List[PGxEntry] = field(default_factory=list)
@@ -298,6 +404,10 @@ class AnalysisStats:
     dispositions: Dict[str, str] = field(default_factory=dict)
     duplicate_rows: int = 0
     conflicting_input_sites: int = 0
+    # One decision per candidate source record considered, with its reason;
+    # see allelio/analysis/trace.py. Counted separately from input rows and
+    # from returned findings.
+    trace: MatchTrace = field(default_factory=MatchTrace)
 
 
 def _determine_category(clinvar_entry: Optional[ClinVarEntry], gwas_entries: List[GWASEntry]) -> str:
@@ -394,10 +504,15 @@ def _calculate_frequency_adjustment(
     """Apply an optional display penalty; never change source classifications.
 
     Valid frequencies above the configured tiers increase the numeric rank
-    (lower display priority). Missing/invalid values leave it unchanged.
+    (lower display priority). Missing/invalid values leave it unchanged, and
+    so does a record whose allele identity is not verified as the matched
+    allele's: a frequency for a different allele, build, or position, or
+    for no recorded allele at all, must not move the rank.
     The cap never improves a rank already at or beyond the cap.
     """
     if gnomad_entry is None or not valid_frequency(gnomad_entry.allele_frequency):
+        return base_rank
+    if not gnomad_entry.describes_matched_allele:
         return base_rank
 
     af = gnomad_entry.allele_frequency
@@ -422,13 +537,19 @@ def _clinvar_entry(cv_data: Dict[str, Any]) -> ClinVarEntry:
         rsid=cv_data.get("rsid"),
         gene=cv_data.get("gene"),
         clinical_significance=cv_data.get("clinical_significance"),
+        classification_type=cv_data.get("classification_type") or "unknown",
         conditions=cv_data.get("conditions"),
         review_status=review_status,
         review_stars=_get_review_stars(review_status),
         ref_allele=cv_data.get("ref_allele") or None,
         alt_allele=cv_data.get("alt_allele") or None,
+        chromosome=cv_data.get("chromosome") or None,
+        allele_id=cv_data.get("allele_id") or None,
         **{key: cv_data.get(key) for key in (
-            "assembly", "chromosome", "position_vcf", "allele_id", "variation_id", "hgnc_id"
+            "assembly", "position_vcf", "variation_id", "hgnc_id", "condition_ids",
+            "origin", "origin_simple", "rcv_accessions", "number_submitters", "variant_type", "name",
+            "somatic_clinical_impact", "somatic_review_status", "somatic_last_evaluated",
+            "oncogenicity", "oncogenicity_review_status", "oncogenicity_last_evaluated",
         )},
     )
 
@@ -447,6 +568,7 @@ def _select_clinvar_rows(
     genotype: Optional[str], rows: List[Dict[str, Any]],
     vcf_evidence: Optional[VCFEvidence] = None,
     chromosome: Optional[str] = None, position: Optional[int] = None,
+    trace: Optional[MatchTrace] = None, rsid: Optional[str] = None,
 ) -> Tuple[List[ClinVarEntry], Optional[ZygosityCall], bool]:
     """Pick the ClinVar rows that apply to this genotype.
 
@@ -470,6 +592,11 @@ def _select_clinvar_rows(
     # those are the ones to judge by; the degenerate row is dropped so it
     # cannot resurface as a "zygosity unknown" finding beside them.
     if any(e.ref_allele and e.alt_allele and e.ref_allele != e.alt_allele for e in entries):
+        for e in entries:
+            if e.ref_allele and e.ref_allele == e.alt_allele and trace is not None:
+                trace.add(rsid or e.rsid, "clinvar", tr.source_identity("clinvar", e), tr.REJECTED,
+                          tr.STAGE_APPLICABILITY, "haplotype_row_superseded",
+                          "record names no allele of its own; allele-specific records at this site decide")
         entries = [e for e in entries if not (e.ref_allele and e.ref_allele == e.alt_allele)]
     for entry in entries:
         if vcf_evidence is not None:
@@ -478,12 +605,38 @@ def _select_clinvar_rows(
                     if reason else call_vcf_zygosity(vcf_evidence, entry.ref_allele, entry.alt_allele))
         else:
             call = call_zygosity(genotype, entry.ref_allele, entry.alt_allele)
+        entry.display_rank = _rank_clinvar(entry)
         if call.alt_copies is None:
+            entry.allele_match, entry.allele_match_note = "unknown", call.note or "allele not recorded"
             unknown.append((entry, call))
         elif call.alt_copies > 0:
+            entry.allele_match = "carried"
+            entry.allele_match_note = f"{call.alt_copies} {'copy' if call.alt_copies == 1 else 'copies'} of {call.allele}" + (
+                " (genotype read on the opposite strand)" if call.strand_flipped else "")
             carried.append((entry, call))
         else:
+            entry.allele_match, entry.allele_match_note = "absent", f"no copy of {call.allele}"
             absent.append((entry, call))
+
+    if trace is not None:
+        for entry, call in carried:
+            trace.add(rsid or entry.rsid, "clinvar", tr.source_identity("clinvar", entry), tr.RETAINED,
+                      tr.STAGE_ALLELE, "allele_carried", entry.allele_match_note)
+        for entry, call in unknown:
+            code = tr.reason_from_note(call.note)
+            stage = tr.STAGE_IDENTITY if code in (
+                "vcf_build_undeclared", "source_identity_unavailable", "build_mismatch",
+                "chromosome_unsupported", "mitochondrial_unsupported", "chromosome_mismatch",
+                "position_mismatch",
+            ) else tr.STAGE_ALLELE
+            note = call.note
+            if carried:
+                note = f"{call.note}; not shown: an allele-specific record at this site was matched"
+            trace.add(rsid or entry.rsid, "clinvar", tr.source_identity("clinvar", entry), tr.UNRESOLVED,
+                      stage, code, note)
+        for entry, call in absent:
+            trace.add(rsid or entry.rsid, "clinvar", tr.source_identity("clinvar", entry), tr.REJECTED,
+                      tr.STAGE_ALLELE, "allele_absent", entry.allele_match_note)
 
     if carried:
         carried.sort(key=lambda ec: _rank_clinvar(ec[0]))
@@ -507,6 +660,7 @@ def _gwas_call(
     genotype: Optional[str],
     entries: List[GWASEntry],
     site_alleles: Optional[set] = None,
+    trace: Optional[MatchTrace] = None, rsid: Optional[str] = None,
 ) -> Optional[ZygosityCall]:
     """Zygosity against the GWAS risk alleles, if the catalogue names any.
 
@@ -526,31 +680,48 @@ def _gwas_call(
     ambiguous = site_alleles in ({"A", "T"}, {"C", "G"})
     unknown: Optional[ZygosityCall] = None
     absent: Optional[ZygosityCall] = None
-    seen = set()
+    carried: Optional[ZygosityCall] = None
+    calls: Dict[str, ZygosityCall] = {}
     for e in entries:
         allele = (e.risk_allele or "").upper()
-        if not allele or allele in seen:
+        if not allele:
+            if trace is not None:
+                trace.add(rsid or e.rsid, "gwas", tr.source_identity("gwas", e), tr.UNRESOLVED,
+                          tr.STAGE_ALLELE, "risk_allele_not_recorded", "the catalogue names no risk allele")
             continue
-        seen.add(allele)
-        flipped = False
-        if (
-            site_alleles and allele not in site_alleles and not ambiguous
-            and _COMPLEMENT.get(allele) in site_alleles
-        ):
-            allele = _COMPLEMENT[allele]
-            flipped = True
-        call = call_zygosity(genotype, None, allele)
-        if flipped and call.alt_copies is not None:
-            call = ZygosityCall(
-                call.zygosity, call.alt_copies, e.risk_allele.upper(),
-                strand_flipped=True, allele_role="risk",
-            )
-        if call.alt_copies:
-            return call
-        if call.alt_copies is None:
-            unknown = unknown or call
-        else:
-            absent = absent or call
+        call = calls.get(allele)
+        if call is None:
+            forward, flipped = allele, False
+            if (
+                site_alleles and allele not in site_alleles and not ambiguous
+                and _COMPLEMENT.get(allele) in site_alleles
+            ):
+                forward, flipped = _COMPLEMENT[allele], True
+            call = call_zygosity(genotype, None, forward)
+            if flipped and call.alt_copies is not None:
+                call = ZygosityCall(
+                    call.zygosity, call.alt_copies, allele, strand_flipped=True, allele_role="risk",
+                )
+            calls[allele] = call
+            if call.alt_copies:
+                carried = carried or call
+            elif call.alt_copies is None:
+                unknown = unknown or call
+            else:
+                absent = absent or call
+        if trace is not None:
+            flip = " (risk allele read on the opposite strand)" if call.strand_flipped else ""
+            if call.alt_copies:
+                trace.add(rsid or e.rsid, "gwas", tr.source_identity("gwas", e), tr.RETAINED, tr.STAGE_ALLELE,
+                          "risk_allele_carried", f"{call.alt_copies} of risk allele {allele}{flip}")
+            elif call.alt_copies is None:
+                trace.add(rsid or e.rsid, "gwas", tr.source_identity("gwas", e), tr.UNRESOLVED, tr.STAGE_ALLELE,
+                          tr.reason_from_note(call.note), call.note)
+            else:
+                trace.add(rsid or e.rsid, "gwas", tr.source_identity("gwas", e), tr.REJECTED, tr.STAGE_ALLELE,
+                          "risk_allele_absent", f"no copy of risk allele {allele}{flip}")
+    if carried is not None:
+        return carried
     if unknown is not None:
         return unknown
     return absent
@@ -564,6 +735,7 @@ def _match_pgx(
     rows: List[Dict[str, Any]],
     site_alleles: Optional[set] = None,
     min_level: str = PGX_DEFAULT_MIN_LEVEL,
+    trace: Optional[MatchTrace] = None, rsid: Optional[str] = None,
 ) -> List[PGxEntry]:
     """The ClinPGx rows whose genotype is this person's genotype.
 
@@ -574,11 +746,27 @@ def _match_pgx(
     the entry flagged. Rows below ``min_level`` are dropped. Best level first.
     """
     alleles = genotype_alleles(genotype)
-    if len(alleles) != 2 or not rows:
+    if not rows:
+        return []
+
+    def decide(r, decision, stage, reason, note=None):
+        if trace is not None:
+            trace.add(rsid or r.get("rsid"), "clinpgx", tr.source_identity("clinpgx", r), decision, stage, reason, note)
+
+    if len(alleles) != 2:
+        for r in rows:
+            decide(r, tr.UNRESOLVED, tr.STAGE_ALLELE, "genotype_unavailable",
+                   "no diploid SNP genotype to match the annotation's genotype against")
         return []
     key = "".join(sorted(alleles))
     max_rank = pgx_level_rank(min_level)
-    usable = [r for r in rows if pgx_level_rank(r.get("level")) <= max_rank]
+    usable = []
+    for r in rows:
+        if pgx_level_rank(r.get("level")) <= max_rank:
+            usable.append(r)
+        else:
+            decide(r, tr.REJECTED, tr.STAGE_LEVEL, "pgx_below_min_level",
+                   f"level {r.get('level')} is below the reporting threshold {min_level}")
     if not usable:
         return []
     by_genotype: Dict[str, List[Dict[str, Any]]] = {}
@@ -596,6 +784,14 @@ def _match_pgx(
         comp = "".join(sorted(_PGX_COMPLEMENT.get(a, a) for a in alleles))
         if not ambiguous and comp in by_genotype and not any(a in letters for a in alleles):
             matched, flipped = by_genotype[comp], True
+    for r in usable:
+        if matched and r in matched:
+            decide(r, tr.RETAINED, tr.STAGE_APPLICABILITY, "pgx_genotype_matched",
+                   f"annotation written for genotype {r.get('genotype')}"
+                   + (" (genotype read on the opposite strand)" if flipped else ""))
+        else:
+            decide(r, tr.REJECTED, tr.STAGE_APPLICABILITY, "pgx_other_genotype",
+                   f"annotation is for genotype {r.get('genotype')}, not {key}")
     if not matched:
         return []
     entries = [
@@ -612,57 +808,72 @@ def _match_pgx(
     return entries
 
 
-def _inheritance(entries: List[ClinGenEntry]) -> Tuple[str, Optional[str]]:
-    """Summarise ClinGen's curations for a gene as one inheritance phrase.
+def _allele_anchor(
+    clinvar_rows: List[Dict[str, Any]], matched_allele: Optional[str],
+    vcf_evidence: Optional[VCFEvidence], chromosome: Optional[str], position: Optional[int],
+) -> Optional[AlleleAnchor]:
+    """The checked identity of the matched allele, or None.
 
-    Only established curations (see CLINGEN_ESTABLISHED) decide it. A gene
-    curated for both dominant and recessive conditions reads "mixed": with
-    one copy, whether that is carrier status depends on which condition the
-    allele causes, which gene-level curation cannot say.
-
-    Returns:
-        (inheritance, note), e.g. ("autosomal recessive", "ClinGen:
-        hemochromatosis type 1 (Definitive)").
+    Preferred anchor: a ClinVar row at the rsID with full source identity
+    whose ALT is the matched allele (the row the genotype matched), with
+    the row's own REF. Otherwise, declared VCF evidence for the site.
+    Consumer-array rows declare no build, so a GWAS- or PGx-only finding
+    from one has no anchor and its frequency stays unverified.
     """
-    from allelio.database.clingen import MOI_LABELS
-
-    established = [e for e in entries if (e.classification or "") in CLINGEN_ESTABLISHED]
-    if not entries:
-        return "not curated", None
-    if not established:
-        return "not established", (
-            "ClinGen lists no established gene-disease relationship for this gene ("
-            + "; ".join(f"{e.disease}: {e.classification}" for e in entries[:3]) + ")"
-        )
-    mois = {e.moi for e in established if e.moi}
-    note = "ClinGen: " + "; ".join(
-        f"{e.disease} ({MOI_LABELS.get(e.moi, e.moi or '?')}, {e.classification})" for e in established[:4]
-    )
-    if mois == {"AR"}:
-        return "autosomal recessive", note
-    if mois == {"AD"}:
-        return "autosomal dominant", note
-    if mois == {"XL"}:
-        return "X-linked", note
-    if mois == {"SD"}:
-        return "semidominant", note
-    if mois == {"MT"}:
-        return "mitochondrial", note
-    if "AR" in mois and ("AD" in mois or "SD" in mois or "XL" in mois):
-        return "mixed (dominant and recessive conditions)", note
-    return ", ".join(sorted(MOI_LABELS.get(m, m) for m in mois)) or "undetermined", note
+    allele = (matched_allele or "").upper()
+    if not allele:
+        return None
+    identified = [
+        row for row in clinvar_rows
+        if row.get("assembly") and row.get("chromosome") and row.get("position_vcf") and row.get("ref_allele")
+    ]
+    if chromosome_name(chromosome):
+        identified = [row for row in identified
+                      if chromosome_name(row["chromosome"]) == chromosome_name(chromosome)]
+    for role in ("alt_allele", "ref_allele"):
+        candidates = [row for row in identified if (row.get(role) or "").upper() == allele]
+        anchors = {AlleleAnchor(row["assembly"], str(row["chromosome"]), int(row["position_vcf"]),
+                               row["ref_allele"].upper(), allele, "the matched ClinVar record")
+                   for row in candidates}
+        if anchors:
+            # A duplicate source record may agree, but differing coordinates
+            # must not be resolved by whichever row sorted first.
+            return next(iter(anchors)) if len(anchors) == 1 else None
+    if vcf_evidence is not None:
+        build = declared_build(vcf_evidence.reference_declaration)
+        if build and chromosome and isinstance(position, int) and vcf_evidence.reference:
+            return AlleleAnchor(build, str(chromosome), position, vcf_evidence.reference.upper(),
+                                allele, "the declared VCF record")
+    return None
 
 
-def _carrier(inheritance: str, call: ZygosityCall, genotype: Optional[str]) -> bool:
-    """One copy of the allele where inheritance says one copy is a carrier."""
-    if call.alt_copies != 1:
-        return False
-    if inheritance == "autosomal recessive":
-        return True
-    if inheritance == "X-linked":
-        # A single-letter genotype is hemizygous (one X): affected, not carrier.
-        return len(genotype or "") == 2
-    return False
+def _gnomad_entries(rsid: str, rows: List[Dict[str, Any]], anchor: Optional[AlleleAnchor]):
+    """Every frequency record at the rsID, each checked against the anchor.
+
+    Returns (entries, selected): ``selected`` is the one matched record, or
+    the only record when nothing matched (kept as flagged context), or None.
+    """
+    entries: List[GnomADEntry] = []
+    for gn in rows:
+        identity, note = frequency_identity(gn, anchor)
+        entries.append(GnomADEntry(
+            rsid=gn.get("rsid", rsid),
+            **{k: gn.get(k) for k in (
+                "allele_frequency", "af_popmax", "ac", "an", "nhomalt",
+                "af_afr", "af_eas", "af_fin", "af_nfe", "af_sas",
+                "position", "assembly", "source_version",
+            )},
+            chromosome=gn.get("chromosome") or None,
+            ref_allele=gn.get("ref_allele") or None,
+            alt_allele=gn.get("alt_allele") or None,
+            identity=identity, identity_note=note,
+        ))
+    matched = [e for e in entries if e.describes_matched_allele]
+    if len(matched) == 1:
+        return entries, matched[0]
+    if not matched and len(entries) == 1:
+        return entries, entries[0]
+    return entries, None
 
 
 def analyze_variants_with_stats(
@@ -722,7 +933,7 @@ def analyze_variants_with_stats(
     genes = {
         cv.get("gene") for data in lookup_results.values() for cv in data["clinvar"] if cv.get("gene")
     }
-    genes = {g for name in genes for g in name.split(";") if g}
+    genes = {g.strip() for name in genes for g in name.split(";") if g.strip()}
     clingen_by_gene = {}
     try:
         clingen_by_gene = db.lookup_clingen_genes(sorted(genes))
@@ -752,25 +963,42 @@ def analyze_variants_with_stats(
         genotype = getattr(original_variant, 'genotype', None)
 
         vcf_evidence = getattr(original_variant, 'vcf_evidence', None)
-        if vcf_filter_reason(vcf_evidence):
+        trace = stats.trace
+        filter_reason = vcf_filter_reason(vcf_evidence)
+        if filter_reason:
             # Do not let rejected genotypes enter any source-specific matcher.
+            # Every candidate at the site is rejected at the filter stage.
             if annotated:
                 stats.vcf_filter_failed_sites += 1
+            for source, rows in (("clinvar", data["clinvar"]), ("gwas", data["gwas"]),
+                                 ("clinpgx", pgx_rows), ("gnomad", data.get("gnomad") or [])):
+                for row in rows:
+                    trace.add(rsid, source, tr.source_identity(source, row), tr.REJECTED, tr.STAGE_FILTER,
+                              "vcf_filter_failed", filter_reason)
             stats.dispositions[rsid] = "failed_filter"
             continue
         if not annotated:
+            for row in data.get("gnomad") or []:
+                trace.add(rsid, "gnomad", tr.source_identity("gnomad", row), tr.UNRESOLVED,
+                          tr.STAGE_FREQUENCY, "frequency_identity_unverified",
+                          "no applicable annotation supplies a matched allele")
             continue
         # Do not let non-SNP sequences reach legacy SNP/GWAS/PGx matching as
         # concatenated bases. Their complete alleles remain in source evidence.
-        if vcf_evidence is not None and any(
+        non_snp = vcf_evidence is not None and any(
             a not in {"A", "C", "G", "T"}
             for a in (vcf_evidence.reference,) + vcf_evidence.alternates
-        ):
+        )
+        if non_snp:
             genotype = "--"
+            for source, rows in (("gwas", data["gwas"]), ("clinpgx", pgx_rows)):
+                for row in rows:
+                    trace.add(rsid, source, tr.source_identity(source, row), tr.UNRESOLVED, tr.STAGE_ALLELE,
+                              "non_snp_unsupported", "VCF non-SNP record requires build-aware normalization")
 
         # ClinVar rows that apply to this genotype (allele-aware)
         clinvar_entries, call, is_reference = _select_clinvar_rows(
-            genotype, data["clinvar"], vcf_evidence, chromosome, position
+            genotype, data["clinvar"], vcf_evidence, chromosome, position, trace=trace, rsid=rsid
         )
         clinvar_entry = clinvar_entries[0] if clinvar_entries else None
 
@@ -792,11 +1020,14 @@ def analyze_variants_with_stats(
         # not a ClinVar finding for them. If GWAS rows remain, judge those on
         # their own risk allele; otherwise the site is a reference genotype.
         gwas_reference = False
+        gwas_judged = False
         if gwas_entries and (is_reference or call is None):
+            gwas_judged = True
             site_alleles = {
                 a for cv in data["clinvar"] for a in (cv.get("ref_allele"), cv.get("alt_allele")) if a
             }
-            gcall = _gwas_call(genotype, gwas_entries, site_alleles)
+            gcall = _gwas_call(genotype, gwas_entries, site_alleles,
+                               trace=None if non_snp else trace, rsid=rsid)
             if gcall is not None and gcall.alt_copies == 0:
                 gwas_reference = True
             elif is_reference or call is None:
@@ -806,7 +1037,8 @@ def analyze_variants_with_stats(
         site_alleles_pgx = {
             a for cv in data["clinvar"] for a in (cv.get("ref_allele"), cv.get("alt_allele")) if a
         }
-        pgx_entries = _match_pgx(genotype, pgx_rows, site_alleles_pgx, pgx_min_level)
+        pgx_entries = _match_pgx(genotype, pgx_rows, site_alleles_pgx, pgx_min_level,
+                                 trace=None if non_snp else trace, rsid=rsid)
 
         site_is_reference = (
             (is_reference or not clinvar_entries) and (gwas_reference or not gwas_entries)
@@ -816,6 +1048,10 @@ def analyze_variants_with_stats(
             stats.reference_genotype_sites += 1
             if not include_reference:
                 stats.dispositions[rsid] = "reference_or_no_applicable_annotation"
+                for row in data.get("gnomad") or []:
+                    trace.add(rsid, "gnomad", tr.source_identity("gnomad", row), tr.UNRESOLVED,
+                              tr.STAGE_FREQUENCY, "frequency_identity_unverified",
+                              "no carried annotated allele; frequency retained only in the candidate trace")
                 continue
             if call is None:
                 call = ZygosityCall(Zygosity.HOMOZYGOUS_REFERENCE, 0)
@@ -824,6 +1060,18 @@ def analyze_variants_with_stats(
             clinvar_entries = []
         elif gwas_reference:
             gwas_entries = []
+        if gwas_entries and not gwas_judged and call is not None and call.alt_copies:
+            # ClinVar decided the genotype; the associations ride along on the
+            # ClinVar call and were not judged against their own risk allele.
+            for e in gwas_entries:
+                trace.add(rsid, "gwas", tr.source_identity("gwas", e), tr.RETAINED, tr.STAGE_APPLICABILITY,
+                          "reported_with_clinvar_match",
+                          "association shown with the ClinVar allele match; risk allele not judged separately")
+        if gwas_entries and not gwas_judged and (call is None or not call.alt_copies) and not non_snp:
+            for e in gwas_entries:
+                trace.add(rsid, "gwas", tr.source_identity("gwas", e), tr.UNRESOLVED,
+                          tr.STAGE_APPLICABILITY, "reported_with_unresolved_clinvar",
+                          "association shown as context; ClinVar allele and GWAS risk allele unresolved")
         clinvar_entry = clinvar_entries[0] if clinvar_entries else None
 
         # Determine category
@@ -847,18 +1095,41 @@ def analyze_variants_with_stats(
             if category not in (VariantCategory.HEALTH_CONDITIONS.value, VariantCategory.RISK_FACTORS.value):
                 category = VariantCategory.PHARMACOGENOMICS.value
 
-        # Create gnomAD entry if data available
-        gnomad_entry = None
-        if data.get("gnomad"):
-            gn = data["gnomad"]
-            gnomad_entry = GnomADEntry(
-                rsid=gn.get("rsid", rsid),
-                allele_frequency=gn.get("allele_frequency"),
-                af_popmax=gn.get("af_popmax"),
-                ac=gn.get("ac"),
-                an=gn.get("an"),
-                nhomalt=gn.get("nhomalt"),
-            )
+        # Frequency records at the rsID, checked against the identity of the
+        # allele the person carries; only a verified match may rank or be
+        # described as this allele's frequency.
+        matched_allele = call.allele if call is not None else None
+        if call is not None and call.strand_flipped and call.allele_role == "risk":
+            # A flipped GWAS call keeps the catalogue's name for the allele;
+            # the forward-strand base is what the site's records are keyed on.
+            matched_allele = _COMPLEMENT.get(matched_allele or "", matched_allele)
+        # Only a carried allele can anchor a frequency. Unknown ClinVar calls
+        # retain their ALT for explanation, but have not verified identity.
+        anchor = None
+        if call is not None and call.alt_copies is not None and call.alt_copies > 0:
+            anchor_rows = [row for row in data["clinvar"] if any(
+                e.allele_match == "carried" and e.alt_allele == matched_allele
+                and (e.allele_id or "") == (row.get("allele_id") or "")
+                and (e.chromosome or "") == (row.get("chromosome") or "")
+                for e in clinvar_entries
+            )]
+            # A GWAS reference-allele call may use site context, provided
+            # the source identity agrees with any declared VCF record.
+            if call.allele_role == "risk":
+                anchor_rows = [row for row in data["clinvar"] if vcf_evidence is None
+                               or not vcf_identity_reason(vcf_evidence, chromosome, position, _clinvar_entry(row))]
+            anchor = _allele_anchor(anchor_rows, matched_allele, vcf_evidence, chromosome, position)
+        gnomad_entries, gnomad_entry = _gnomad_entries(rsid, data.get("gnomad") or [], anchor)
+        for e in gnomad_entries:
+            if e.describes_matched_allele:
+                trace.add(rsid, "gnomad", tr.source_identity("gnomad", e), tr.RETAINED, tr.STAGE_FREQUENCY,
+                          "frequency_identity_matched", e.identity_note)
+            elif e.identity == FREQUENCY_UNVERIFIED:
+                trace.add(rsid, "gnomad", tr.source_identity("gnomad", e), tr.UNRESOLVED, tr.STAGE_FREQUENCY,
+                          "frequency_identity_unverified", e.identity_note)
+            else:
+                trace.add(rsid, "gnomad", tr.source_identity("gnomad", e), tr.REJECTED, tr.STAGE_FREQUENCY,
+                          f"frequency_{e.identity}", e.identity_note)
 
         # This optional frequency display penalty is not applied to PGx:
         # allele commonness does not determine drug-response applicability.
@@ -879,23 +1150,84 @@ def analyze_variants_with_stats(
         if call.alt_copies is None and call.zygosity != Zygosity.NO_CALL:
             stats.zygosity_unknown_sites += 1
 
-        # Inheritance from ClinGen, and the carrier rule: one copy of a
-        # pathogenic allele in a recessive-only gene is carrier status, ordered
-        # a tier below the affected genotype.
+        # Inheritance from ClinGen, resolved against the condition each
+        # applicable assertion names rather than the gene as a whole, and the
+        # carrier rule: one copy of a pathogenic allele for a condition ClinGen
+        # curates as recessive is carrier status, ordered a tier below the
+        # affected genotype. An unresolved or conflicting condition never is.
         clingen_entries: List[ClinGenEntry] = []
         inheritance, inheritance_note = "not curated", None
-        if clinvar_entry and clinvar_entry.gene:
-            # ClinVar can list several overlapping genes ("MC1R;TUBB3"); the
-            # first is the one the record is about, and a curation for a
-            # neighbouring gene says nothing about this allele.
-            for g in clinvar_entry.gene.split(";")[:1]:
-                for row in clingen_by_gene.get(g, []):
-                    clingen_entries.append(ClinGenEntry(
-                        gene=row.get("gene"), disease=row.get("disease"), moi=row.get("moi"),
-                        classification=row.get("classification"), report_url=row.get("report_url"),
-                    ))
-            inheritance, inheritance_note = _inheritance(clingen_entries)
-            if category == VariantCategory.HEALTH_CONDITIONS.value and _carrier(inheritance, call, genotype):
+        resolution: Optional[InheritanceResolution] = None
+        if clinvar_entry:
+            curation_assessments = {}
+            for entry in clinvar_entries:
+                entry_curations = []
+                for gene in (entry.gene or "").split(";"):
+                    for row in clingen_by_gene.get(gene.strip(), []):
+                        curation = ClinGenEntry(**{k: row.get(k) for k in (
+                            "gene", "disease", "moi", "classification", "report_url", "mondo_id")})
+                        entry_curations.append(curation)
+                entry.inheritance = resolve_inheritance(
+                    entry.conditions, entry.condition_ids, entry_curations
+                )
+                for curation in entry_curations:
+                    key = (curation.gene, curation.disease, curation.mondo_id, curation.moi, curation.classification)
+                    record = curation_assessments.setdefault(key, [curation, []])
+                    record[1].append({
+                        "assertion": tr.source_identity("clinvar", entry),
+                        "condition_ids": entry.condition_ids,
+                        "resolution_status": entry.inheritance.status,
+                        "condition_matched": curation in entry.inheritance.matched,
+                        "allele_match": entry.allele_match,
+                    })
+                if entry is clinvar_entry:
+                    clingen_entries = entry_curations
+            resolution = clinvar_entry.inheritance
+            for curation, assessments in curation_assessments.values():
+                identity = tr.source_identity("clingen", curation)
+                identity["assertions"] = assessments
+                matched = [item for item in assessments if item["condition_matched"]]
+                if matched:
+                    carried = any(item["allele_match"] == "carried" for item in matched)
+                    decision = tr.RETAINED if carried else tr.UNRESOLVED
+                    reason = "condition_matched_by_mondo" if carried else "condition_matched_allele_unresolved"
+                    note = f"{curation.mondo_id} is named by {len(matched)} assertion(s); all resolutions are recorded"
+                elif any(item["resolution_status"] in ("no_identifiers", "identifiers_not_stored") for item in assessments):
+                    decision, reason = tr.UNRESOLVED, "assertion_has_no_condition_identifiers"
+                    note = "condition applicability cannot be decided without the assertion's identifiers"
+                else:
+                    decision, reason = tr.REJECTED, "condition_not_named_by_assertion"
+                    note = f"{curation.mondo_id or 'no MONDO id'} is not named by any applicable assertion"
+                trace.add(rsid, "clingen", identity, decision, tr.STAGE_CONDITION, reason, note)
+            health_assertions = [entry for entry in clinvar_entries
+                                 if _determine_category(entry, []) == VariantCategory.HEALTH_CONDITIONS.value]
+            if len(health_assertions) > 1 and any(
+                entry.inheritance.status != "resolved" or entry.inheritance.inheritance != resolution.inheritance
+                for entry in health_assertions
+            ):
+                modes = sorted({entry.inheritance.inheritance for entry in health_assertions
+                                if entry.inheritance.status == "resolved"})
+                phrase = ("conflicting (applicable assertions differ: " + ", ".join(modes) + ")"
+                          if len(modes) > 1 else "unresolved (applicable assertions lack a shared inheritance result)")
+                resolution = replace(
+                    resolution, status="conflicting" if len(modes) > 1 else "undetermined",
+                    inheritance=phrase, condition=None, condition_id=None,
+                    note="; ".join(f"ClinVar record {entry.allele_id or '?'} ({entry.gene or 'unknown gene'}): "
+                                   f"{entry.inheritance.inheritance}; {entry.inheritance.note or 'no curation'}"
+                                   for entry in health_assertions),
+                    matched=[curation for entry in health_assertions for curation in entry.inheritance.matched],
+                    conditions=[condition for entry in health_assertions for condition in entry.inheritance.conditions],
+                    unmatched_condition_ids=sorted({identifier for entry in health_assertions
+                                                    for identifier in entry.inheritance.unmatched_condition_ids}),
+                )
+            inheritance, inheritance_note = resolution.inheritance, resolution.note
+            if category == VariantCategory.HEALTH_CONDITIONS.value and is_carrier(
+                resolution, call.alt_copies, genotype
+            ) and all(
+                entry.allele_match == "carried" and is_carrier(entry.inheritance, call.alt_copies, genotype)
+                for entry in clinvar_entries
+                if _determine_category(entry, []) == VariantCategory.HEALTH_CONDITIONS.value
+            ):
                 category = VariantCategory.CARRIER_STATUS.value
                 adjusted_rank = min(adjusted_rank + CARRIER_RANK_SHIFT, MAX_ADJUSTED_RANK)
 
@@ -908,6 +1240,7 @@ def analyze_variants_with_stats(
             clinvar_entries=clinvar_entries,
             gwas_entries=gwas_entries,
             gnomad_entry=gnomad_entry,
+            gnomad_entries=gnomad_entries,
             category=category,
             significance_rank=adjusted_rank,
             zygosity=call.zygosity.value,
@@ -919,6 +1252,7 @@ def analyze_variants_with_stats(
             clingen_entries=clingen_entries,
             inheritance=inheritance,
             inheritance_note=inheritance_note,
+            inheritance_resolution=resolution,
             pgx_entries=pgx_entries,
         )
 

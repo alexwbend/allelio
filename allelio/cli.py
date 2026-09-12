@@ -116,6 +116,9 @@ def setup(no_gnomad: bool):
 )
 @click.option("--json-output", type=click.Path(dir_okay=False), default=None,
               help="Also save a versioned structured evidence JSON file.")
+@click.option("--detailed-trace", is_flag=True, default=False,
+              help="In the evidence JSON, list every candidate source record, including those at "
+                   "reference-genotype sites (large on whole-array files); by default they are counted only.")
 def analyze(
     file: str,
     output: str,
@@ -125,6 +128,7 @@ def analyze(
     top: int,
     traits_only: bool,
     json_output: Optional[str] = None,
+    detailed_trace: bool = False,
 ):
     """Analyze a genotype file for significant variants.
     
@@ -388,7 +392,8 @@ def analyze(
     table.add_column("Significance", width=12)
     table.add_column("Genotype", width=12)
     table.add_column("Zygosity", width=22)
-    
+    table.add_column("Inheritance", width=22)
+
     for result in sorted(results, key=lambda x: x.significance_rank)[:top]:
         gene = gene_label(result) or "-"
 
@@ -409,6 +414,7 @@ def analyze(
             f"{result.significance_rank}",
             result.genotype or "-",
             _short_zygosity(result),
+            _short_inheritance(result),
             style=sig_style if result.significance_rank <= 4 else "",
         )
     
@@ -433,8 +439,9 @@ def analyze(
             write_evidence_export(build_evidence_export(
                 results, variants, provenance_of(db),
                 {"include_benign": include_benign, "include_reference": False,
-                 "traits_only": traits_only, "frequency_adjustment": True},
-                analysis_stats,
+                 "traits_only": traits_only, "frequency_adjustment": True,
+                 "detailed_trace": detailed_trace},
+                analysis_stats, detailed_trace=detailed_trace,
             ), json_output)
         except Exception as exc:
             raise click.ClickException(f"Failed to write evidence JSON: {exc}") from exc
@@ -558,6 +565,23 @@ def serve(port: int, host: str):
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Server failed: {e}\n", style="red")
         raise click.Abort()
+
+
+def _short_inheritance(result) -> str:
+    """Table cell: the condition-level phrase, or ``-`` for GWAS-only rows.
+
+    ``AR`` / ``AD`` / ``XL`` read as in the HTML report; an unresolved or
+    conflicting condition shows its status so the reader knows the carrier
+    rule did not apply. Full provenance is in the report and the JSON.
+    """
+    if not getattr(result, "clinvar_entries", None):
+        return "-"
+    phrase = getattr(result, "inheritance", None) or "not curated"
+    return {
+        "autosomal recessive": "AR (recessive)",
+        "autosomal dominant": "AD (dominant)",
+        "X-linked": "XL (X-linked)",
+    }.get(phrase, phrase.split(" (")[0])
 
 
 def _short_zygosity(result) -> str:
@@ -763,6 +787,26 @@ def info(file: Optional[str]):
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Failed to get info: {e}\n", style="red")
         raise click.Abort()
+
+
+@allelio.command("validate-evidence")
+@click.argument("file", type=click.Path(exists=True, dir_okay=False))
+def validate_evidence_command(file: str):
+    """Check an evidence JSON file against the shipped schema.
+
+    Reports every structural violation (JSON Schema 2020-12) and every
+    broken document-local reference or unconserved count, one per line, and
+    exits non-zero if there are any. Reads only the file named.
+    """
+    from allelio.schema import DEFAULT_SCHEMA_VERSION, validate_evidence_file
+
+    errors = validate_evidence_file(file)
+    if errors:
+        console.print(f"[bold red]✗[/bold red] {escape(file)}: {len(errors)} problem(s) against schema {DEFAULT_SCHEMA_VERSION}")
+        for line in errors:
+            console.print(f"  {escape(line)}")
+        raise SystemExit(1)
+    console.print(f"[bold green]✓[/bold green] {escape(file)} is valid evidence JSON (schema {DEFAULT_SCHEMA_VERSION})")
 
 
 main = allelio

@@ -14,8 +14,8 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "T",
-      "why": "BRCA1 pathogenic (expert panel), one copy; ClinGen curates BRCA1 for a dominant (cancer predisposition) and a recessive (Fanconi anemia) condition, so one copy is not demoted to carrier status",
-      "inheritance": "mixed (dominant and recessive conditions)"
+      "why": "BRCA1 pathogenic G>T (expert panel), one copy. The assertion includes the dominant ClinGen curation but also several unmapped MONDO conditions; aggregate inheritance remains unresolved under exact identifier matching. The gene-level mixed summary remains context.",
+      "inheritance": "unresolved (conditions not curated by ClinGen)"
     },
     "rs113993960": {
       "reported": true,
@@ -23,8 +23,8 @@
       "zygosity": "homozygous alternate",
       "alt_copies": 2,
       "matched_allele": "A",
-      "inheritance": "autosomal recessive",
-      "why": "CFTR F508del (ATCT>A), written DD in 23andMe's I/D notation and matched by allele length: two copies, the affected genotype for cystic fibrosis (ClinGen: autosomal recessive, Definitive)"
+      "inheritance": "unresolved (conditions not curated by ClinGen)",
+      "why": "CFTR F508del (ATCT>A), written DD in 23andMe's I/D notation and matched by allele length: two copies, the affected genotype for cystic fibrosis (ClinGen: autosomal recessive, Definitive). Audit correction: additional named MONDO conditions have no exact ClinGen mapping, so the aggregate inheritance remains unresolved; individual matched curations remain visible as context."
     },
     "rs1799963": {
       "reported": true,
@@ -40,8 +40,8 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "C",
-      "why": "GBA1 N370S, one copy. ClinGen curates GBA1 for Gaucher disease (recessive) and Parkinson disease (dominant), so gene-level inheritance is mixed and the site stays a health condition with that note",
-      "inheritance": "mixed (dominant and recessive conditions)"
+      "why": "GBA1 N370S, one copy. The assertion names Gaucher disease (MONDO:0018150, recessive) and Parkinson disease (MONDO:0005180, dominant), both ClinGen curations, so the condition-level resolution is conflicting and the site stays a health condition, never a carrier label",
+      "inheritance": "conflicting (matched conditions differ: autosomal dominant, autosomal recessive)"
     },
     "rs334": {
       "reported": true,
@@ -49,17 +49,17 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "A",
-      "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported",
-      "inheritance": "mixed (dominant and recessive conditions)"
+      "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported. The assertion names beta-thalassemia HBB/LCRB (recessive) and dominant beta-thalassemia, both ClinGen curations, so inheritance is conflicting, not carrier status",
+      "inheritance": "conflicting (matched conditions differ: autosomal dominant, autosomal recessive)"
     },
     "rs1800562": {
       "reported": true,
-      "category": "Carrier Status",
+      "category": "Health Conditions",
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "A",
-      "inheritance": "autosomal recessive",
-      "why": "HFE C282Y, one copy. ClinGen curates HFE only for a recessive condition (hemochromatosis type 1, Definitive), so one copy is carrier status, ordered a tier below the affected genotype"
+      "inheritance": "unresolved (conditions not curated by ClinGen)",
+      "why": "HFE C282Y, one copy. The assertion includes recessive hemochromatosis type 1 but also unmapped MONDO conditions. Their relationships are not inferred, so this aggregate remains unresolved and does not receive a definitive carrier label."
     },
     "rs3918290": {
       "reported": true,
@@ -111,8 +111,8 @@
       "zygosity": "homozygous alternate",
       "alt_copies": 2,
       "matched_allele": "T",
-      "why": "MC1R R160W, conflicting classification, two copies; ClinVar lists the gene as MC1R;TUBB3 and only the first gene is consulted for inheritance (TUBB3's dominant curation is about a different condition)",
-      "inheritance": "not curated"
+      "why": "MC1R R160W, conflicting classification, two copies; ClinVar lists the gene as MC1R;TUBB3 and only the first gene is consulted for inheritance (TUBB3's dominant curation is about a different condition). Audit correction: additional named MONDO conditions have no exact ClinGen mapping, so the aggregate inheritance remains unresolved; individual matched curations remain visible as context.",
+      "inheritance": "unresolved (conditions not curated by ClinGen)"
     },
     "rs9939609": {
       "reported": true,
