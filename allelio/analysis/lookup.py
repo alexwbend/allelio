@@ -8,6 +8,7 @@ from allelio.database.store import AllelioDB
 from allelio.database.clinpgx import level_rank as pgx_level_rank
 from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, genotype_alleles, call_vcf_zygosity
 from allelio.parsers.base import VCFEvidence
+from allelio.analysis.identity import vcf_identity_reason
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -462,6 +463,7 @@ def _rank_clinvar(entry: ClinVarEntry) -> float:
 def _select_clinvar_rows(
     genotype: Optional[str], rows: List[Dict[str, Any]],
     vcf_evidence: Optional[VCFEvidence] = None,
+    chromosome: Optional[str] = None, position: Optional[int] = None,
 ) -> Tuple[List[ClinVarEntry], Optional[ZygosityCall], bool]:
     """Pick the ClinVar rows that apply to this genotype.
 
@@ -487,9 +489,12 @@ def _select_clinvar_rows(
     if any(e.ref_allele and e.alt_allele and e.ref_allele != e.alt_allele for e in entries):
         entries = [e for e in entries if not (e.ref_allele and e.ref_allele == e.alt_allele)]
     for entry in entries:
-        call = (call_vcf_zygosity(vcf_evidence, entry.ref_allele, entry.alt_allele)
-                if vcf_evidence is not None
-                else call_zygosity(genotype, entry.ref_allele, entry.alt_allele))
+        if vcf_evidence is not None:
+            reason = vcf_identity_reason(vcf_evidence, chromosome, position, entry)
+            call = (ZygosityCall(Zygosity.UNKNOWN, None, allele=entry.alt_allele, note=reason)
+                    if reason else call_vcf_zygosity(vcf_evidence, entry.ref_allele, entry.alt_allele))
+        else:
+            call = call_zygosity(genotype, entry.ref_allele, entry.alt_allele)
         if call.alt_copies is None:
             unknown.append((entry, call))
         elif call.alt_copies > 0:
@@ -764,7 +769,7 @@ def analyze_variants_with_stats(
 
         # ClinVar rows that apply to this genotype (allele-aware)
         clinvar_entries, call, is_reference = _select_clinvar_rows(
-            genotype, data["clinvar"], vcf_evidence
+            genotype, data["clinvar"], vcf_evidence, chromosome, position
         )
         clinvar_entry = clinvar_entries[0] if clinvar_entries else None
 

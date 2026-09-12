@@ -24,8 +24,14 @@ quality filtering, or general indel/structural-variant interpretation. ClinVar S
 reference allele and a declared target alternate, and never complements a VCF
 call to force a match. Multiallelic SNPs can carry two different alternates;
 each annotated alternate is counted independently. Non-SNP records and
-reference mismatches have unknown ClinVar zygosity. This is allele compatibility,
-not verification that the source and input coordinates/builds match.
+reference mismatches have unknown ClinVar zygosity. ClinVar matching also requires agreement between the declared VCF build,
+chromosome and position and the source row. Only bare `GRCh37`, `GRCh38`, `hg19`,
+and `hg38` declarations are recognized. Paths, URLs and unknown declarations
+remain unknown rather than being guessed. Canonical autosomes and X/Y accept
+an optional `chr` prefix. Mitochondrial and noncanonical contigs abstain until
+sequence-specific identity is supported. Declaration agreement does not verify
+the actual reference sequence or authenticate the input file. Missing metadata
+in a legacy database requires `allelio update` before VCF matches can be counted.
 
 GWAS and pharmacogenomic matching still use the legacy SNP path. Non-SNP VCF
 records are withheld from that path so flattened sequences cannot look like SNP
