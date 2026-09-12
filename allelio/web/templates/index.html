@@ -506,6 +506,13 @@
             color: var(--primary);
         }
 
+        .gene-group {
+            margin: 1rem 0; padding: 1rem; border: 1px solid var(--gray-300);
+            border-radius: 12px; background: var(--white);
+        }
+        .gene-group > summary { cursor: pointer; font-weight: 700; font-size: 1.1rem; }
+        .gene-group > p { margin: 0.75rem 0; }
+        body.dark-mode .gene-group { background: var(--gray-800); border-color: var(--gray-600); }
         .result-gene {
             font-size: 0.95rem;
             color: var(--gray-600);
@@ -1497,10 +1504,50 @@
                 return;
             }
 
-            results.forEach((result, idx) => {
-                const card = createResultCard(result);
-                container.appendChild(card);
-            });
+            if (Array.isArray(analysisResults.gene_groups) && analysisResults.gene_groups.length) {
+                const note = document.createElement('p');
+                note.textContent = 'Counts cover returned findings, not all variants in a gene. Shared findings appear in each associated gene.';
+                container.appendChild(note);
+                const visible = new Set(results);
+                const rendered = new Set();
+                analysisResults.gene_groups.forEach(group => {
+                    if (!group || typeof group !== 'object') return;
+                    const indices = Array.isArray(group.indices) ? group.indices : [];
+                    const members = [...new Set(indices.filter(Number.isInteger))]
+                        .map(i => analysisResults.results[i]).filter(r => r && visible.has(r));
+                    if (!members.length) return;
+                    const details = document.createElement('details');
+                    details.className = 'gene-group';
+                    const title = document.createElement('summary');
+                    const countLabel = members.length === group.count
+                        ? `${members.length} ${members.length === 1 ? 'finding' : 'findings'}`
+                        : `${members.length} of ${group.count} findings in this view`;
+                    title.textContent = `${group.gene} — ${countLabel}`;
+                    details.appendChild(title);
+                    const description = document.createElement('p');
+                    description.textContent = group.function || 'A sourced function summary is not available in this release.';
+                    details.appendChild(description);
+                    if (/^https:\/\/medlineplus\.gov\/genetics\/gene\/[a-z0-9-]+\/$/.test(group.function_source || '')) {
+                        const source = document.createElement('a');
+                        source.href = group.function_source;
+                        source.textContent = `MedlinePlus Genetics (summary version ${group.function_version || 'not recorded'})`;
+                        source.target = '_blank'; source.rel = 'noopener noreferrer';
+                        details.appendChild(source);
+                    }
+                    const interpretation = document.createElement('p');
+                    interpretation.textContent = group.note || '';
+                    details.appendChild(interpretation);
+                    members.forEach(result => {
+                        details.appendChild(createResultCard(result)); rendered.add(result);
+                    });
+                    container.appendChild(details);
+                });
+                // Corrupt or older saved grouping metadata must not hide findings.
+                results.filter(r => !rendered.has(r)).forEach(r => container.appendChild(createResultCard(r)));
+            } else {
+                // Saved analyses from earlier releases retain their flat view.
+                results.forEach(result => container.appendChild(createResultCard(result)));
+            }
         }
         // render-cards end
 

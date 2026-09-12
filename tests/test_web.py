@@ -1790,12 +1790,7 @@ def test_the_downloaded_report_names_the_model(client: TestClient, monkeypatch) 
 
 
 def test_the_downloaded_report_counts_the_rows_it_prints() -> None:
-    """The table stops at a hundred rows and the line above it did not.
-
-    A genome with more significant variants than that read "150 of 150
-    explanations" over a table holding a hundred, which is a count of a set the
-    reader was never shown.
-    """
+    """Every finding is reachable from gene groups, so count all rendered rows."""
     from allelio.web import routes as routes_module
 
     html = routes_module._generate_html_report(
@@ -1810,8 +1805,9 @@ def test_the_downloaded_report_counts_the_rows_it_prints() -> None:
         }
     )
 
-    assert "llama3.1:8b (100 of 100 explanations)" in html
-    assert html.count("<tr>") == 101  # the header row and the hundred it kept
+    assert "llama3.1:8b (150 of 150 explanations)" in html
+    assert 'id="finding-149"' in html
+    assert html.count("<tr") == 151  # the header and every displayed finding
 
 
 def test_the_report_counts_explanations_not_unexplained_rows() -> None:
