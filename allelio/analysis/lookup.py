@@ -9,7 +9,11 @@ from allelio.database.clinpgx import level_rank as pgx_level_rank
 from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, genotype_alleles, call_vcf_zygosity
 from allelio.parsers.base import VCFEvidence
 from allelio.analysis.identity import vcf_identity_reason
-from allelio.analysis.frequency import valid_frequency
+from allelio.analysis.frequency import (
+    AlleleAnchor, MATCHED as FREQUENCY_MATCHED, UNVERIFIED as FREQUENCY_UNVERIFIED,
+    frequency_identity, valid_frequency,
+)
+from allelio.analysis.identity import declared_build
 from allelio.analysis.quality import vcf_filter_reason
 from allelio.analysis.inheritance import (
     ClinGenEntry, InheritanceResolution, is_carrier, resolve_inheritance,
@@ -203,13 +207,37 @@ class PGxEntry:
 
 @dataclass
 class GnomADEntry:
-    """gnomAD population frequency entry."""
+    """One gnomAD frequency record, and whether it describes the matched allele.
+
+    ``identity`` is ``matched`` only when the record's assembly, chromosome,
+    position, REF and ALT agree with a checked source identity for the
+    allele the person carries (see allelio/analysis/frequency.py). Every
+    other value keeps the record inspectable as context without implying
+    that the frequency belongs to this allele; ``identity_note`` says why.
+    """
     rsid: str
     allele_frequency: Optional[float] = None
     af_popmax: Optional[float] = None
     ac: Optional[int] = None
     an: Optional[int] = None
     nhomalt: Optional[int] = None
+    af_afr: Optional[float] = None
+    af_eas: Optional[float] = None
+    af_fin: Optional[float] = None
+    af_nfe: Optional[float] = None
+    af_sas: Optional[float] = None
+    chromosome: Optional[str] = None
+    position: Optional[int] = None
+    ref_allele: Optional[str] = None
+    alt_allele: Optional[str] = None
+    assembly: Optional[str] = None
+    source_version: Optional[str] = None
+    identity: str = FREQUENCY_UNVERIFIED
+    identity_note: Optional[str] = None
+
+    @property
+    def describes_matched_allele(self) -> bool:
+        return self.identity == FREQUENCY_MATCHED
 
 
 @dataclass
@@ -221,7 +249,12 @@ class VariantResult:
     genotype: Optional[str] = None
     clinvar_entries: List[ClinVarEntry] = field(default_factory=list)
     gwas_entries: List[GWASEntry] = field(default_factory=list)
+    # The frequency record for the matched allele when exactly one agrees
+    # with its checked identity; otherwise the single record at the rsID,
+    # flagged as context (``identity`` says why it was not applied), or
+    # None. Every record at the rsID is in ``gnomad_entries``.
     gnomad_entry: Optional[GnomADEntry] = None
+    gnomad_entries: List[GnomADEntry] = field(default_factory=list)
     category: str = VariantCategory.UNKNOWN.value
     significance_rank: float = 999
     # How many copies of the annotated allele the user carries, the
@@ -393,10 +426,15 @@ def _calculate_frequency_adjustment(
     """Apply an optional display penalty; never change source classifications.
 
     Valid frequencies above the configured tiers increase the numeric rank
-    (lower display priority). Missing/invalid values leave it unchanged.
+    (lower display priority). Missing/invalid values leave it unchanged, and
+    so does a record whose allele identity is not verified as the matched
+    allele's: a frequency for a different allele, build, or position, or
+    for no recorded allele at all, must not move the rank.
     The cap never improves a rank already at or beyond the cap.
     """
     if gnomad_entry is None or not valid_frequency(gnomad_entry.allele_frequency):
+        return base_rank
+    if not gnomad_entry.describes_matched_allele:
         return base_rank
 
     af = gnomad_entry.allele_frequency
@@ -612,6 +650,73 @@ def _match_pgx(
     return entries
 
 
+def _allele_anchor(
+    clinvar_rows: List[Dict[str, Any]], matched_allele: Optional[str],
+    vcf_evidence: Optional[VCFEvidence], chromosome: Optional[str], position: Optional[int],
+) -> Optional[AlleleAnchor]:
+    """The checked identity of the matched allele, or None.
+
+    Preferred anchor: a ClinVar row at the rsID with full source identity
+    whose ALT is the matched allele (the row the genotype matched), with
+    the row's own REF. Otherwise, declared VCF evidence for the site.
+    Consumer-array rows declare no build, so a GWAS- or PGx-only finding
+    from one has no anchor and its frequency stays unverified.
+    """
+    allele = (matched_allele or "").upper()
+    if not allele:
+        return None
+    identified = [
+        row for row in clinvar_rows
+        if row.get("assembly") and row.get("chromosome") and row.get("position_vcf") and row.get("ref_allele")
+    ]
+    for row in identified:
+        if (row.get("alt_allele") or "").upper() == allele:
+            return AlleleAnchor(row["assembly"], str(row["chromosome"]), int(row["position_vcf"]),
+                                row["ref_allele"].upper(), allele, "the matched ClinVar record")
+    for row in identified:
+        # The matched allele (a GWAS risk allele, say) is the site's reference
+        # allele: an anchor whose ALT is its REF, so a frequency record for
+        # the alternate is reported as describing the other allele.
+        if row["ref_allele"].upper() == allele:
+            return AlleleAnchor(row["assembly"], str(row["chromosome"]), int(row["position_vcf"]),
+                                allele, allele, "the ClinVar record for this site")
+    if vcf_evidence is not None:
+        build = declared_build(vcf_evidence.reference_declaration)
+        if build and chromosome and isinstance(position, int) and vcf_evidence.reference:
+            return AlleleAnchor(build, str(chromosome), position, vcf_evidence.reference.upper(),
+                                allele, "the declared VCF record")
+    return None
+
+
+def _gnomad_entries(rsid: str, rows: List[Dict[str, Any]], anchor: Optional[AlleleAnchor]):
+    """Every frequency record at the rsID, each checked against the anchor.
+
+    Returns (entries, selected): ``selected`` is the one matched record, or
+    the only record when nothing matched (kept as flagged context), or None.
+    """
+    entries: List[GnomADEntry] = []
+    for gn in rows:
+        identity, note = frequency_identity(gn, anchor)
+        entries.append(GnomADEntry(
+            rsid=gn.get("rsid", rsid),
+            **{k: gn.get(k) for k in (
+                "allele_frequency", "af_popmax", "ac", "an", "nhomalt",
+                "af_afr", "af_eas", "af_fin", "af_nfe", "af_sas",
+                "position", "assembly", "source_version",
+            )},
+            chromosome=gn.get("chromosome") or None,
+            ref_allele=gn.get("ref_allele") or None,
+            alt_allele=gn.get("alt_allele") or None,
+            identity=identity, identity_note=note,
+        ))
+    matched = [e for e in entries if e.describes_matched_allele]
+    if len(matched) == 1:
+        return entries, matched[0]
+    if not matched and len(entries) == 1:
+        return entries, entries[0]
+    return entries, None
+
+
 def analyze_variants_with_stats(
     variants: List[Any],
     db: AllelioDB,
@@ -794,18 +899,16 @@ def analyze_variants_with_stats(
             if category not in (VariantCategory.HEALTH_CONDITIONS.value, VariantCategory.RISK_FACTORS.value):
                 category = VariantCategory.PHARMACOGENOMICS.value
 
-        # Create gnomAD entry if data available
-        gnomad_entry = None
-        if data.get("gnomad"):
-            gn = data["gnomad"]
-            gnomad_entry = GnomADEntry(
-                rsid=gn.get("rsid", rsid),
-                allele_frequency=gn.get("allele_frequency"),
-                af_popmax=gn.get("af_popmax"),
-                ac=gn.get("ac"),
-                an=gn.get("an"),
-                nhomalt=gn.get("nhomalt"),
-            )
+        # Frequency records at the rsID, checked against the identity of the
+        # allele the person carries; only a verified match may rank or be
+        # described as this allele's frequency.
+        matched_allele = call.allele if call is not None else None
+        if call is not None and call.strand_flipped and call.allele_role == "risk":
+            # A flipped GWAS call keeps the catalogue's name for the allele;
+            # the forward-strand base is what the site's records are keyed on.
+            matched_allele = _COMPLEMENT.get(matched_allele or "", matched_allele)
+        anchor = _allele_anchor(data["clinvar"], matched_allele, vcf_evidence, chromosome, position)
+        gnomad_entries, gnomad_entry = _gnomad_entries(rsid, data.get("gnomad") or [], anchor)
 
         # This optional frequency display penalty is not applied to PGx:
         # allele commonness does not determine drug-response applicability.
@@ -866,6 +969,7 @@ def analyze_variants_with_stats(
             clinvar_entries=clinvar_entries,
             gwas_entries=gwas_entries,
             gnomad_entry=gnomad_entry,
+            gnomad_entries=gnomad_entries,
             category=category,
             significance_rank=adjusted_rank,
             zygosity=call.zygosity.value,

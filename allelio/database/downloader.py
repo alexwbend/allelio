@@ -18,7 +18,7 @@ except ImportError:
 from .store import AllelioDB
 from .clinvar import parse_clinvar
 from .gwas import parse_gwas
-from .gnomad import parse_gnomad
+from .gnomad import parse_gnomad, gnomad_file_header
 from .clingen import parse_clingen, clingen_release_date
 from .clinpgx import parse_clinpgx, clinpgx_release_date, extract_bundle
 
@@ -47,6 +47,10 @@ DEFAULT_GNOMAD_MANIFEST = {
     "schema": 1,
     "source": "gnomAD",
     "version": "v4.1.1",
+    # Format 1: rsID-keyed, no allele, position, or assembly per row. Read
+    # as unverified context until a format 2 extract is published.
+    "format": 1,
+    "assembly": None,
     "file": "gnomad_v4.1.1_array_freq.tsv.gz",
     "sha256": "38b450846eddfa76a1e710f7e6dfdecb92763afe3430ae21778ee717a506ff5d",
     "urls": [
@@ -618,7 +622,19 @@ def setup_database(
 
             if gnomad_records:
                 db.insert_gnomad_batch(gnomad_records)
-            _log(f"[7/{total_steps}] gnomAD complete: {gnomad_count:,} variants with frequency data.")
+            # What the file itself declares about its rows: format 2 carries
+            # an allele per row and names its assembly; format 1 does not,
+            # and its frequencies are shown as unverified context.
+            gnomad_header = gnomad_file_header(str(gnomad_path))
+            db.set_metadata("gnomad_format", str(gnomad_header.get("format") or "1"))
+            db.set_metadata("gnomad_assembly", str(gnomad_header.get("assembly") or "undeclared"))
+            _log(f"[7/{total_steps}] gnomAD complete: {gnomad_count:,} allele frequency records "
+                 f"(format {gnomad_header.get('format') or '1'}, "
+                 f"assembly {gnomad_header.get('assembly') or 'undeclared'}).")
+            if (gnomad_header.get("format") or "1") == "1":
+                _log("       This extract records no allele identity, so frequencies are shown "
+                     "as unverified context and do not adjust ranking. A format 2 extract "
+                     "(scripts/build_gnomad_freq.py) restores the display adjustment.")
         else:
             _log(f"[7/{total_steps}] Skipping gnomAD parsing — frequency data not available.")
 

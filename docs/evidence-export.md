@@ -24,6 +24,11 @@ non-finite source numbers become null. The document contains:
   the ClinGen curations matched by MONDO identifier, the mapping method and
   version, the assertion's own conditions with their identifiers, and the
   gene-level summary kept separately. See [inheritance](inheritance.md).
+  `gnomad_entry` carries the frequency record's own identity (assembly,
+  chromosome, position, REF, ALT, source version) and an `identity` label with
+  `identity_note` saying whether it was verified as the matched allele's;
+  `gnomad_entries` lists every record at the rsID. Only a `matched` record
+  affected ranking. See [population frequency](population-frequency.md).
 - `gene_groups`: the same groups as the report, with `finding_ids` references.
 - `analysis_stats` and `limitations`: exclusion counts and interpretation limits.
 
