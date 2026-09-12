@@ -127,7 +127,7 @@ def semantic_errors(document: Dict[str, Any]) -> List[str]:
         rsids = {inp.get("rsid") for inp in inputs if isinstance(inp, dict) and inp.get("input_id") in set(finding.get("input_ids") or [])}
         if rsids and rsids != {finding.get("rsid")}:
             errors.append(f"findings/{index}/input_ids: referenced inputs carry rsIDs {sorted(rsids)}, finding is {finding.get('rsid')!r}")
-        if candidates:
+        if isinstance(matching, dict) and matching:
             check_refs(finding.get("candidate_ids"), candidate_ids, "candidate_id", f"findings/{index}/candidate_ids")
             for cid in finding.get("candidate_ids") or []:
                 candidate = next((c for c in candidates if c.get("candidate_id") == cid), None)
@@ -209,6 +209,52 @@ def semantic_errors(document: Dict[str, Any]) -> List[str]:
                     errors.append(f"matching/candidates/{index}/finding_id: {candidate['finding_id']!r} does not exist in this document")
                 elif candidate.get("decision") != "retained":
                     errors.append(f"matching/candidates/{index}/finding_id: a {candidate.get('decision')!r} candidate cannot support a finding")
+    # Cross-check relationships, not just existence and aggregate totals.
+    if isinstance(matching, dict) and matching:
+        candidate_map = {c["candidate_id"]: c for c in candidates}
+        finding_map = {f["finding_id"]: f for f in findings}
+        input_map = {i["input_id"]: i for i in inputs}
+        assigned = []
+        site_totals = Counter()
+        for index, site in enumerate(matching.get("sites") or []):
+            counts = site.get("counts") or {}
+            site_totals.update(counts)
+            if sum(counts.values()) != site["candidate_count"]:
+                errors.append(f"matching/sites/{index}/counts: does not sum to candidate_count")
+            for iid in site.get("input_ids") or []:
+                if iid in input_map and input_map[iid]["rsid"] != site["rsid"]:
+                    errors.append(f"matching/sites/{index}/input_ids: input belongs to a different rsID")
+            fid = site.get("finding_id")
+            if fid in finding_map and finding_map[fid]["rsid"] != site["rsid"]:
+                errors.append(f"matching/sites/{index}/finding_id: finding belongs to a different rsID")
+            ids = site.get("candidate_ids") or []
+            assigned.extend(ids)
+            listed_records = [candidate_map[cid] for cid in ids if cid in candidate_map]
+            if site.get("candidates_listed") and Counter(c["decision"] for c in listed_records) != Counter(counts):
+                errors.append(f"matching/sites/{index}/counts: does not match listed candidate decisions")
+            for candidate in listed_records:
+                if candidate["rsid"] != site["rsid"]:
+                    errors.append(f"matching/sites/{index}/candidate_ids: candidate belongs to a different rsID")
+        if Counter(assigned) != Counter(candidate_map.keys()):
+            errors.append("matching/sites: each listed candidate must belong to exactly one site")
+        if site_totals != Counter(matching.get("counts") or {}):
+            errors.append("matching/counts: does not match site decision totals")
+        source_totals = Counter()
+        for counts in (matching.get("by_source") or {}).values():
+            source_totals.update(counts)
+        if source_totals != Counter(matching.get("counts") or {}):
+            errors.append("matching/by_source: decision totals do not match matching/counts")
+        for index, candidate in enumerate(candidates):
+            fid = candidate.get("finding_id")
+            if fid in finding_map:
+                finding = finding_map[fid]
+                if finding["rsid"] != candidate["rsid"] or candidate["candidate_id"] not in (finding.get("candidate_ids") or []):
+                    errors.append(f"matching/candidates/{index}/finding_id: support must be reciprocal and share the rsID")
+        for index, finding in enumerate(findings):
+            for cid in finding.get("candidate_ids") or []:
+                candidate = candidate_map.get(cid)
+                if candidate and candidate.get("finding_id") != finding["finding_id"]:
+                    errors.append(f"findings/{index}/candidate_ids: candidate does not link back to this finding")
     return errors
 
 
@@ -225,7 +271,9 @@ def validate_evidence(document: Any, schema: Optional[Dict[str, Any]] = None) ->
         return [f"schema_version: {declared!r} is not a {SCHEMA_MAJOR}.x document; this validator ships schema {DEFAULT_SCHEMA_VERSION}"]
     schema = schema or load_schema(schema_version_for(document))
     errors = _structural_errors(document, schema)
-    errors.extend(semantic_errors(document))
+    # Semantic checks require structurally typed containers and references.
+    if not errors:
+        errors.extend(semantic_errors(document))
     return errors
 
 

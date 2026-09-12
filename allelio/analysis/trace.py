@@ -132,5 +132,5 @@ PATHS = {
     "gwas": "traced: risk-allele decisions per association; strand inference noted",
     "clinpgx": "traced: evidence-level threshold and genotype match per annotation row",
     "gnomad": "traced: frequency-record identity per allele row",
-    "clingen": "traced at condition level: each curation for the gene against the assertion's MONDO identifiers",
+    "clingen": "partial: curations for the leading ClinVar assertion are traced; secondary assertion resolutions are in findings",
 }

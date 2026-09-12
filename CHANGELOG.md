@@ -241,3 +241,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - No telemetry, tracking, or analytics
 - No user accounts or cloud storage
 - Genetic data is never persisted by Allelio beyond the analysis session
+
+## Cloud-work audit hardening
+
+Correct incomplete inheritance resolution, frequency identity and database
+upgrade handling, optional ClinVar header mapping, candidate-trace omissions,
+and evidence validation. Prevent incomplete frequency extracts from replacing
+a release. See `docs/cloud-work-audit.md` for findings, behavior changes and
+the outstanding format-2 data release.

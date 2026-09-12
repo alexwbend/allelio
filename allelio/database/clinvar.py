@@ -91,14 +91,19 @@ def _column_map(header_line: str) -> Dict[str, int]:
         name = _HEADER_NAMES.get(key, key)
         if name in by_name:
             columns[key] = by_name[name]
-        elif key.startswith(("Somatic", "ReviewStatusClinicalImpact", "Oncogenicity", "ReviewStatusOncogenicity")):
-            columns[key] = None  # older format: the column does not exist
+        elif key in by_name:
+            columns[key] = by_name[key]
+        else:
+            columns[key] = None  # an absent column must not read a neighbour
+    for required in ("#AlleleID", "Assembly", "RS#", "GeneSymbol", "ClinicalSignificance", "PhenotypeList", "ReviewStatus"):
+        if columns[required] is None:
+            raise ValueError(f"ClinVar header missing required column: {required}")
     return columns
 
 
 def _allele(fields, index: int) -> str:
     """Read an allele column; '' for missing, 'na', or '-' placeholders."""
-    if index >= len(fields):
+    if index is None or index >= len(fields):
         return ""
     value = fields[index].strip().upper()
     return "" if value in ("", "NA", "-", ".") else value
@@ -201,7 +206,7 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
     has_grch38 = _allele_ids_with_grch38(path, open_func, mode)
 
     columns = dict(CLINVAR_COLUMNS)
-    classification_type = CLASSIFICATION_GERMLINE
+    classification_type = "unknown"
     with open_func(path, mode, encoding='utf-8') as f:
         for line_num, line in enumerate(f, 1):
             # The header decides where each column is and which format this is
@@ -227,7 +232,8 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                 gene_symbol = fields[columns["GeneSymbol"]].strip()
                 clinical_sig = fields[columns["ClinicalSignificance"]].strip()
                 phenotype_list = fields[columns["PhenotypeList"]].strip()
-                phenotype_ids = fields[columns["PhenotypeIDS"]].strip()
+                phenotype_ids = (fields[columns["PhenotypeIDS"]].strip()
+                                 if columns.get("PhenotypeIDS") is not None else None)
                 review_status = _source_value(fields, "ReviewStatus", columns) or ""
                 last_evaluated = _source_value(fields, "LastEvaluated", columns) or ""
                 assembly = fields[columns["Assembly"]].strip()

@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+    # Review iterations use targeted local tests; run the full matrix when
+    # a PR is opened/ready, or explicitly for its final head.
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
 
 jobs:
   pytest:
