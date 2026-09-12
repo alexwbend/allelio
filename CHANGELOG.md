@@ -84,6 +84,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Candidate-level matching trace in the evidence JSON (`matching`): one
+  decision per reference record considered, retained, rejected, or
+  unresolved, with the stage, a structured reason code, the identity the
+  source gave the record, and a document-local `candidate_id`; findings
+  link to their supporting candidates and sites to their candidates.
+  Decisions are recorded by the matching functions themselves for ClinVar,
+  GWAS, ClinPGx, gnomAD, and ClinGen (at condition level). Candidate counts
+  are kept apart from input-row coverage and finding counts. Candidates at
+  reference-genotype sites are counted by default and listed with
+  `--detailed-trace`. No AI text enters the trace (`docs/matching-trace.md`).
+
 - Gene groups in CLI, web, and HTML reports, with distinct-finding counts,
   source-backed function descriptions where available, and individual details.
   Shared gene associations and unassigned findings remain visible. HTML exports

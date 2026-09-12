@@ -44,6 +44,12 @@ allele equivalence. These IDs are not VRS IDs or normalized variant identifiers.
 Raw VCF reference declarations are not certified genome assemblies. Null source
 identity fields stay null. AI prose is excluded from this evidence document.
 
+The additive `matching` field is the candidate-level selection trail: one
+decision per reference record considered, with stage, reason code, source
+identity, and document-local `candidate_id`; findings carry `candidate_ids` for
+the records that support them. Its counts are over records, not rows or
+findings. See [matching trace](matching-trace.md).
+
 The additive `coverage` field records input row dispositions, including parsing
 exclusions, when an audit is available. See [input coverage](input-coverage.md).
 No annotation or an omitted finding must not be interpreted as a negative test.

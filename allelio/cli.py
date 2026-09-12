@@ -116,6 +116,9 @@ def setup(no_gnomad: bool):
 )
 @click.option("--json-output", type=click.Path(dir_okay=False), default=None,
               help="Also save a versioned structured evidence JSON file.")
+@click.option("--detailed-trace", is_flag=True, default=False,
+              help="In the evidence JSON, list every candidate source record, including those at "
+                   "reference-genotype sites (large on whole-array files); by default they are counted only.")
 def analyze(
     file: str,
     output: str,
@@ -125,6 +128,7 @@ def analyze(
     top: int,
     traits_only: bool,
     json_output: Optional[str] = None,
+    detailed_trace: bool = False,
 ):
     """Analyze a genotype file for significant variants.
     
@@ -435,8 +439,9 @@ def analyze(
             write_evidence_export(build_evidence_export(
                 results, variants, provenance_of(db),
                 {"include_benign": include_benign, "include_reference": False,
-                 "traits_only": traits_only, "frequency_adjustment": True},
-                analysis_stats,
+                 "traits_only": traits_only, "frequency_adjustment": True,
+                 "detailed_trace": detailed_trace},
+                analysis_stats, detailed_trace=detailed_trace,
             ), json_output)
         except Exception as exc:
             raise click.ClickException(f"Failed to write evidence JSON: {exc}") from exc
