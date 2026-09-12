@@ -5,17 +5,15 @@ from typing import Any, Dict, List, Optional
 import html as html_escape
 from urllib.parse import quote
 
+from allelio.report_style import REPORT_CSS
 from allelio.ai.attribution import Explanation, attribution
 from allelio.analysis.lookup import _get_review_stars
+from allelio.analysis.genes import gene_overview_html, gene_label
 
 
 def _get_gene(variant) -> str:
     """Extract gene name from a VariantResult's sub-entries."""
-    if variant.clinvar_entries:
-        return getattr(variant.clinvar_entries[0], 'gene', None) or "Unknown"
-    elif variant.gwas_entries:
-        return getattr(variant.gwas_entries[0], 'mapped_gene', None) or "Unknown"
-    return "Unknown"
+    return gene_label(variant) or "Unknown"
 
 
 def _get_conditions(variant) -> str:
@@ -237,6 +235,9 @@ def generate_html_report(
         Complete HTML report as a string
     """
 
+    # Repeated references to the same result object need only one detail card.
+    results = list({id(result): result for result in results}.values())
+
     # Prepare data
     generated_at = metadata.get("generated_at", datetime.now().isoformat())
     db_version = metadata.get("db_version", "Unknown")
@@ -261,6 +262,9 @@ def generate_html_report(
     # these lines nothing in the report explains why.
     sources_html = _sources_html(provenance)
 
+    gene_overview = gene_overview_html(results)
+    finding_indices = {id(result): index for index, result in enumerate(results)}
+
     # Categorize results using actual VariantCategory values
     health_conditions = [r for r in results if r.category == "Health Conditions"]
     risk_factors = [r for r in results if r.category == "Risk Factors"]
@@ -268,7 +272,7 @@ def generate_html_report(
     traits = [r for r in results if r.category == "Traits"]
     carrier = [r for r in results if r.category == "Carrier Status"]
     benign = [r for r in results if r.category == "Benign"]
-    other = [r for r in results if r.category in ("Unknown",)]
+    other = [r for r in results if r.category not in {"Health Conditions", "Risk Factors", "Pharmacogenomics", "Traits", "Carrier Status", "Benign"}]
 
     def generate_variant_card(variant, explanation=None):
         """Generate HTML for a single variant card.
@@ -385,7 +389,7 @@ def generate_html_report(
             </div>
         </div>
 '''
-        return card_html
+        return f'<div id="finding-{finding_indices[id(variant)]}">{card_html}</div>'
 
     # Build category sections
     categories_html = ""
@@ -398,6 +402,8 @@ def generate_html_report(
         (carrier, "Carrier Status", "#0d9488", "carrier-status", "One copy of a pathogenic allele in a gene ClinGen curates only for recessive conditions: not the affected genotype, but relevant to family planning."),
         (benign, "Benign", "#16a34a", "benign", "Variants ClinVar classifies as benign or likely benign (shown with --include-benign)."),
     ]
+
+    sections.append((other, "Other Findings", "#64748b", "other-findings", "Findings without a supported category."))
 
     # Build tab navigation — only for sections that have results
     active_sections = [(vl, t, c, sid, d) for vl, t, c, sid, d in sections if vl]
@@ -412,8 +418,8 @@ def generate_html_report(
     for variant_list, title, color, section_id, description in sections:
         if not variant_list:
             continue
-        # Show up to 100 per category
-        display_list = sorted(variant_list, key=lambda x: x.significance_rank)[:100]
+        # All findings remain reachable from the gene overview.
+        display_list = sorted(variant_list, key=lambda x: x.significance_rank)
         categories_html += f'<section class="category-section" id="{section_id}">\n'
         categories_html += f'<h2 class="category-title" style="color: {color}; border-color: {color};">{title} ({len(variant_list)})</h2>\n'
         categories_html += f'<p class="category-desc">{description}</p>\n'
@@ -429,7 +435,7 @@ def generate_html_report(
         categories_html = '<section class="category-section">\n'
         categories_html += '<h2 class="category-title">All Findings</h2>\n'
         categories_html += '<div class="variants-grid">\n'
-        for variant in sorted(results, key=lambda x: x.significance_rank)[:100]:
+        for variant in sorted(results, key=lambda x: x.significance_rank):
             explanation = explanations.get(variant.rsid)
             categories_html += generate_variant_card(variant, explanation)
         categories_html += '</div>\n</section>\n'
@@ -523,6 +529,9 @@ def generate_html_report(
             margin-bottom: 10px;
         }}
 
+        [id^="finding-"] {{ scroll-margin-top: 100px; }}
+        .gene-group {{ padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 8px; }}
+        .gene-group summary {{ cursor: pointer; font-weight: 600; }}
         .generated-date {{
             opacity: 0.9;
             font-size: 14px;
@@ -855,6 +864,7 @@ def generate_html_report(
             .variant-card {{ break-inside: avoid; page-break-inside: avoid; }}
             a {{ text-decoration: underline; }}
         }}
+        {REPORT_CSS}
     </style>
 </head>
 <body>
@@ -895,6 +905,8 @@ def generate_html_report(
         {gap_note}
 
         {ai_note}
+
+        {gene_overview}
 
         {tab_nav_html}
 

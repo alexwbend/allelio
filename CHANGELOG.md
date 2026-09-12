@@ -26,6 +26,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Gene groups in CLI, web, and HTML reports, with distinct-finding counts,
+  source-backed function descriptions where available, and individual details.
+  Shared gene associations and unassigned findings remain visible. HTML exports
+  no longer truncate at 100 findings, so every gene-summary link is reachable.
+
 - ClinVar assembly, chromosome, VCF position, and source identifiers survive
   parsing, storage, and lookup. Existing allele-aware databases migrate without
   losing rows; missing legacy metadata stays unknown until refresh.
