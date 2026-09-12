@@ -221,6 +221,14 @@ pick for your RAM, and what a good setup feels like.
 
 ---
 
+## Findings by gene
+
+Results now include gene groups in the CLI, web interface, and HTML reports.
+Expand a group to inspect its findings, their categories, and any available
+sourced function summary. Shared findings can appear under several genes; having
+multiple findings alone does not establish higher risk. See
+[gene grouping](docs/gene-grouping.md) for counting rules and coverage limits.
+
 ## How it works under the hood
 
 Allelio's pipeline is straightforward:
