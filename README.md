@@ -410,12 +410,12 @@ then association, and so on down to benign), then two adjustments are applied:
    stars) nudges the rank within its own tier — a 4-star pathogenic call
    ranks slightly above a 0-star one — capped so it can never cross into a
    different significance tier.
-2. **Population frequency.** A variant common in gnomAD is less likely to be
-   truly pathogenic, so common variants (allele frequency above roughly 5%
-   and 1%, echoing the [ACMG/AMP BA1 and BS1 population-frequency
-   thresholds](https://doi.org/10.1038/gim.2015.30), Richards et al. 2015) are
-   downgraded toward "less significant," capped so they never fully cross the
-   benign boundary.
+2. **Population frequency.** Optional display penalties use frequency tiers
+   above 5%, 1%, and 0.1%. These thresholds and penalty sizes are Allelio
+   heuristics, not ACMG/AMP classification rules. They only lower display
+   priority; source classifications remain unchanged. Missing or invalid
+   frequencies do not adjust ranking. Rarity alone does not establish
+   pathogenicity, and commonness alone does not establish benignity.
 
 To see exactly what the frequency adjustment does, run
 `python3 scripts/ablation_frequency.py`: it ranks the example file with the
@@ -424,10 +424,9 @@ to use your full local database). On the example, the adjustment leaves the
 rare pathogenic alleles where they are and pushes two common
 "conflicting" variants (APOE ε4, HFE H63D) below the default cutoff.
 
-The frequency *thresholds* are cited to ACMG/AMP; the specific *penalty
-sizes* are not — ACMG/AMP's BA1/BS1 are qualitative evidence codes, not point
-values, so Allelio's amounts are an author choice, documented as such at each
-constant in `allelio/analysis/lookup.py`.
+[ClinGen defines BS1 relative to the expected frequency for a disorder](https://dataexchange.clinicalgenome.org/interpretation/entities/VariantPathogenicityInterpretationCriterion.html),
+not a universal 1% cutoff. Allelio does not apply BS1 or BA1 evidence codes.
+The optional ranking heuristic is not a validated clinical classifier.
 
 ---
 

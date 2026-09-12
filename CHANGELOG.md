@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Separate frequency display heuristics from clinical evidence, ignore invalid
+  frequency values, and prevent rank caps from increasing benign-row priority.
+
 - Require declared VCF build, chromosome and position agreement with ClinVar
   before counting SNP alleles. Unknown/mismatched identities abstain with a
   reason; no build inference, liftover, or mitochondrial matching is attempted.

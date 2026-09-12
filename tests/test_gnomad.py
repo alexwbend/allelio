@@ -436,3 +436,26 @@ class TestGnomADPrompts:
 
         assert "Population Frequency" in prompt
         assert "5.0000%" in prompt
+
+@pytest.mark.parametrize('af', [float('nan'), float('inf'), -0.1, 1.1, True, '0.2'])
+def test_invalid_frequency_does_not_rank_or_prompt(af):
+    entry = GnomADEntry(rsid='rs1', allele_frequency=af)
+    assert _calculate_frequency_adjustment(2.0, entry) == 2.0
+    assert 'No population frequency data' in format_gnomad_summary(entry)
+
+@pytest.mark.parametrize('rank', [9.9, 10, 11, 99])
+def test_frequency_cap_never_improves_priority(rank):
+    entry = GnomADEntry(rsid='rs1', allele_frequency=0.5)
+    assert _calculate_frequency_adjustment(rank, entry) == rank
+
+@pytest.mark.parametrize('af', [0, 0.00005, 0.005, 0.03, 0.3, 1])
+def test_frequency_context_does_not_infer_pathogenicity(af):
+    text = format_gnomad_summary(GnomADEntry(rsid='rs1', allele_frequency=af))
+    assert 'Frequency alone does not establish benignity or pathogenicity' in text
+    assert 'typically benign' not in text
+    assert 'more likely to be clinically significant' not in text
+
+@pytest.mark.parametrize('popmax', [float('inf'), 2, True, '0.5'])
+def test_invalid_popmax_is_not_prompted(popmax):
+    text = format_gnomad_summary(GnomADEntry(rsid='rs1', allele_frequency=0.1, af_popmax=popmax))
+    assert 'Highest in any population' not in text
