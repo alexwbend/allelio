@@ -28,5 +28,6 @@ allele equivalence. These IDs are not VRS IDs or normalized variant identifiers.
 Raw VCF reference declarations are not certified genome assemblies. Null source
 identity fields stay null. AI prose is excluded from this evidence document.
 
-Version 1.0 captures parsed observations, not rows discarded by parsing. No
-annotation or an omitted finding must not be interpreted as a negative test.
+The additive `coverage` field records input row dispositions, including parsing
+exclusions, when an audit is available. See [input coverage](input-coverage.md).
+No annotation or an omitted finding must not be interpreted as a negative test.

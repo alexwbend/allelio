@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from allelio import __version__
+from allelio.coverage import build_coverage
 from allelio.analysis.genes import group_findings
 
 SCHEMA_VERSION = "1.0"
@@ -60,12 +61,13 @@ def build_evidence_export(results, inputs, provenance, configuration=None, stats
         "findings": findings,
         "gene_groups": groups,
         "analysis_stats": stats,
+        "coverage": build_coverage(inputs, results, stats),
         "limitations": [
             "Research and education only; not a clinical interpretation.",
             "Document-local IDs do not assert normalized genomic identity.",
             "Source records are annotations retained by matching, not all database candidates.",
             "Missing and non-finite numeric values are null, not zero.",
-            "Parsed inputs omit rows rejected by parsing; absent findings are not negative results.",
+            "Coverage records parsing exclusions when an input audit is available; absent findings are not negative results.",
         ],
     })
 

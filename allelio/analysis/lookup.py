@@ -295,6 +295,9 @@ class AnalysisStats:
     zygosity_unknown_sites: int = 0
     benign_sites: int = 0
     vcf_filter_failed_sites: int = 0
+    dispositions: Dict[str, str] = field(default_factory=dict)
+    duplicate_rows: int = 0
+    conflicting_input_sites: int = 0
 
 
 def _determine_category(clinvar_entry: Optional[ClinVarEntry], gwas_entries: List[GWASEntry]) -> str:
@@ -691,17 +694,26 @@ def analyze_variants_with_stats(
     if not variants:
         return [], stats
 
-    # Extract rsIDs from variant objects
-    rsids = [getattr(v, 'rsid', str(v)) for v in variants]
-    rsids = [r for r in rsids if r]  # Filter empty rsids
-
+    # Collapse only exactly agreeing observations. Conflicts never depend on
+    # input order, including differences in VCF phase/build/filter evidence.
+    grouped = {}
+    for variant in variants:
+        rsid = getattr(variant, 'rsid', str(variant))
+        grouped.setdefault(rsid, []).append(variant)
+    rsid_to_variant = {}
+    for rsid, rows in grouped.items():
+        if not rsid or not rsid.startswith('rs'):
+            stats.dispositions[rsid] = 'unsupported_identifier'
+        elif any(row != rows[0] for row in rows[1:]):
+            stats.dispositions[rsid] = 'conflicting_input'
+            stats.conflicting_input_sites += 1
+        else:
+            rsid_to_variant[rsid] = rows[0]
+            stats.duplicate_rows += len(rows) - 1
+            stats.dispositions[rsid] = 'no_annotation'
+    rsids = list(rsid_to_variant)
     if not rsids:
         return [], stats
-
-    # Create mapping of rsid to original variant for metadata
-    rsid_to_variant = {
-        getattr(v, 'rsid', str(v)): v for v in variants
-    }
 
     # Batch lookup from database
     lookup_results = db.lookup_rsids_batch(rsids)
@@ -726,11 +738,12 @@ def analyze_variants_with_stats(
     # Build results
     results = []
 
-    for rsid, data in lookup_results.items():
+    for rsid in rsids:
+        data = lookup_results.get(rsid) or {"clinvar": [], "gwas": []}
         pgx_rows = pgx_by_rsid.get(rsid) or []
-        if not data["clinvar"] and not data["gwas"] and not pgx_rows:
-            continue
-        stats.annotated_sites += 1
+        annotated = bool(data["clinvar"] or data["gwas"] or pgx_rows)
+        if annotated:
+            stats.annotated_sites += 1
 
         # Get variant metadata
         original_variant = rsid_to_variant.get(rsid)
@@ -741,7 +754,11 @@ def analyze_variants_with_stats(
         vcf_evidence = getattr(original_variant, 'vcf_evidence', None)
         if vcf_filter_reason(vcf_evidence):
             # Do not let rejected genotypes enter any source-specific matcher.
-            stats.vcf_filter_failed_sites += 1
+            if annotated:
+                stats.vcf_filter_failed_sites += 1
+            stats.dispositions[rsid] = "failed_filter"
+            continue
+        if not annotated:
             continue
         # Do not let non-SNP sequences reach legacy SNP/GWAS/PGx matching as
         # concatenated bases. Their complete alleles remain in source evidence.
@@ -798,6 +815,7 @@ def analyze_variants_with_stats(
         if site_is_reference:
             stats.reference_genotype_sites += 1
             if not include_reference:
+                stats.dispositions[rsid] = "reference_or_no_applicable_annotation"
                 continue
             if call is None:
                 call = ZygosityCall(Zygosity.HOMOZYGOUS_REFERENCE, 0)
@@ -853,6 +871,7 @@ def analyze_variants_with_stats(
         # Skip benign variants unless requested
         if not include_benign and adjusted_rank >= 8:
             stats.benign_sites += 1
+            stats.dispositions[rsid] = "rank_filtered"
             continue
 
         if call is None:
@@ -903,6 +922,7 @@ def analyze_variants_with_stats(
             pgx_entries=pgx_entries,
         )
 
+        stats.dispositions[rsid] = "reported"
         results.append(result)
 
     # Sort by significance rank (lower = more significant); ties by rsID so

@@ -126,7 +126,7 @@ def test_web_filter_notice_clears_when_loading_an_older_report():
     from pathlib import Path
     template = (Path(__file__).resolve().parents[1] / 'allelio/web/templates/index.html').read_text()
     start = template.index("            const filterNotice =")
-    code = template[start:template.index('            // Executive Summary', start)]
+    code = template[start:template.index('            // Coverage is absent', start)]
     script = '''const notice = {style: {}, textContent: ''};
 const document = {getElementById: () => notice};
 const render = new Function('analysisResults', 'document', CODE);

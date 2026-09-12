@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 import html as html_escape
 from urllib.parse import quote
 
+from allelio.coverage import coverage_html
 from allelio.report_style import REPORT_CSS
 from allelio.ai.attribution import Explanation, attribution
 from allelio.analysis.lookup import _get_review_stars
@@ -449,9 +450,9 @@ def generate_html_report(
     # never looked up because every lookup is keyed by rsID, not 23andMe's
     # internal i-prefixed probe IDs. See README "Known gaps: 23andMe internal
     # IDs" and PUB-11-lite in PUBLICATION_PLAN.md.
-    gap_note = ""
+    gap_note = coverage_html(metadata.get("coverage"))
     if skipped_i_id_rows:
-        gap_note = (
+        gap_note += (
             f'<div class="gap-note"><strong>Known gap:</strong> '
             f'skipped {skipped_i_id_rows:,} rows with 23andMe internal (i) IDs '
             f'— not yet looked up. See README: known gaps.</div>'
