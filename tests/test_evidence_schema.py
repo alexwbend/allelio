@@ -203,17 +203,21 @@ class TestCommandLine:
         path.write_text(json.dumps(_load("invalid_dangling_reference")))
         result = CliRunner().invoke(cli.validate_evidence_command, [str(path)])
         assert result.exit_code == 1
-        assert "1 problem(s)" in result.output and "input-9" in result.output
+        output = " ".join(result.output.split())  # the console wraps at 80 columns when not a TTY
+        assert "1 problem(s)" in output and "input-9" in output
 
 
 class TestInstalledWheel:
     @pytest.fixture(scope="class")
     def wheel(self, tmp_path_factory):
         out = tmp_path_factory.mktemp("wheel")
-        build = subprocess.run(
-            [sys.executable, "-m", "pip", "wheel", str(ROOT), "--no-deps", "--no-build-isolation", "-w", str(out), "-q"],
-            capture_output=True, text=True,
-        )
+        command = [sys.executable, "-m", "pip", "wheel", str(ROOT), "--no-deps", "-w", str(out), "-q"]
+        # Without isolation when the environment has the build backend (a
+        # development checkout, no network needed); a Python without
+        # setuptools installed (3.12 on CI) falls back to pip's isolated build.
+        build = subprocess.run(command + ["--no-build-isolation"], capture_output=True, text=True)
+        if build.returncode != 0 and "BackendUnavailable" in build.stderr:
+            build = subprocess.run(command, capture_output=True, text=True)
         assert build.returncode == 0, build.stderr
         [path] = out.glob("allelio-*.whl")
         return path
