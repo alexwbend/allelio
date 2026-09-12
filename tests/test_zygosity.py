@@ -110,7 +110,7 @@ class TestParsers:
         assert parse_risk_allele("rs1-A x rs2-G") is None
 
     def test_clinvar_alleles_from_vcf_columns(self, tmp_path):
-        header = "\t".join(f"c{i}" for i in range(34)).replace("c0", "#AlleleID")
+        header = (Path(__file__).parent / "fixtures/clinvar_context/variant_summary_unsplit.tsv").read_text().splitlines()[0]
         def row(rs, sig, ref, alt):
             r = ["0"] * 34
             r[4] = "HBB"; r[6] = sig; r[9] = rs; r[16] = "GRCh38"; r[24] = "criteria provided, single submitter"

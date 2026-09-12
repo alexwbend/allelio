@@ -35,6 +35,7 @@ dependencies = [
     "aiofiles>=23.2.0",
     "rich>=13.0.0",
     "python-multipart>=0.0.6",
+    "jsonschema>=4.17",  # validates evidence JSON against the shipped schema (allelio/schemas)
 ]
 
 [project.optional-dependencies]
@@ -61,5 +62,7 @@ include = ["allelio*"]
 # with the package. Without this, a wheel install builds fine and `allelio
 # serve` starts fine, then every page load 500s on a missing template —
 # invisible from a source checkout, broken for everyone who pip-installs.
+# The evidence JSON Schema ships with the package too, so an installed wheel
+# can validate an export (allelio.schema.load_schema, allelio validate-evidence).
 [tool.setuptools.package-data]
-allelio = ["web/templates/*.html"]
+allelio = ["web/templates/*.html", "schemas/*.json"]

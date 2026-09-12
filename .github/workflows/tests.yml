@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+    # Review iterations use targeted local tests; run the full matrix when
+    # a PR is opened/ready, or explicitly for its final head.
+    types: [opened, reopened, ready_for_review]
+  workflow_dispatch:
 
 jobs:
   pytest:
@@ -14,10 +18,10 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"

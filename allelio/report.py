@@ -88,10 +88,20 @@ def _get_frequency_html(variant) -> str:
         color = "#dc2626"  # red — rare
         label = "Rare"
 
+    # Only a record verified as describing the matched allele is shown as
+    # the person's allele frequency; anything else is source context at the
+    # rsID, labelled with why it was not applied (and it did not rank).
+    verified = getattr(gnomad, "identity", None) == "matched"
+    heading = "Population Frequency:" if verified else "Population Frequency (unverified, context only):"
+    identity_note = "" if verified else (
+        f'<br><span style="color:#6b7280; font-weight: normal;">Not verified as this allele\'s frequency: '
+        f'{html_escape.escape(str(getattr(gnomad, "identity_note", None) or getattr(gnomad, "identity", "unverified")))}'
+        '. Not used for ranking.</span>'
+    )
     freq_html = f'''
                 <div class="info-row">
-                    <span class="label">Population Frequency:</span>
-                    <span class="value" style="color: {color}; font-weight: bold;">{af_percent:.3f}% ({label})</span>
+                    <span class="label">{heading}</span>
+                    <span class="value" style="color: {color}; font-weight: bold;">{af_percent:.3f}% ({label}){identity_note}</span>
                 </div>
 '''
 
@@ -170,6 +180,31 @@ def _pgx_rows(variant) -> str:
         '                    <span class="value">' + "".join(blocks) + '</span>\n'
         '                </div>\n'
     )
+
+
+def _classification_context_row(variant) -> str:
+    """What kind of ClinVar classification the card shows, and its context."""
+    entries = getattr(variant, "clinvar_entries", None) or []
+    if not entries:
+        return ""
+    phrases = getattr(entries[0], "context_phrases", lambda: [])()
+    if not phrases:
+        return ""
+    value = "; ".join(html_escape.escape(str(p)) for p in phrases)
+    extra = ""
+    if len(entries) > 1:
+        others = "; ".join(
+            html_escape.escape(f"{e.clinical_significance or 'unclassified'} ({e.allele_match}, record {e.allele_id or '?'})"
+                              + (f"; inheritance: {e.inheritance.inheritance}" if e.inheritance else ""))
+            for e in entries[1:]
+        )
+        extra = f'<br><span style="color:#6b7280;">Other ClinVar records for this site: {others}</span>'
+    return f'''
+                <div class="info-row">
+                    <span class="label">Classification context:</span>
+                    <span class="value" style="color:#374151;">{value}{extra}</span>
+                </div>
+'''
 
 
 def _inheritance_row(variant) -> str:
@@ -362,6 +397,7 @@ def generate_html_report(
                     <span class="label">Zygosity:</span>
                     <span class="value">{html_escape.escape(_zygosity_phrase(variant))}</span>
                 </div>
+{_classification_context_row(variant)}
 {_inheritance_row(variant)}
 {_pgx_rows(variant)}
                 <div class="info-row">
@@ -400,7 +436,7 @@ def generate_html_report(
         (risk_factors, "Risk Factors", "#ea580c", "risk-factors", "Variants associated with increased risk for certain conditions."),
         (pharma, "Pharmacogenomics", "#7c3aed", "pharmacogenomics", "Variants that may affect drug metabolism or response."),
         (traits, "Trait Associations", "#2563eb", "traits", "Variants associated with traits identified in genome-wide studies."),
-        (carrier, "Carrier Status", "#0d9488", "carrier-status", "One copy of a pathogenic allele in a gene ClinGen curates only for recessive conditions: not the affected genotype, but relevant to family planning."),
+        (carrier, "Carrier Status", "#0d9488", "carrier-status", "One copy of a pathogenic allele whose ClinVar condition ClinGen curates as recessive (matched by MONDO identifier, never by name): not the affected genotype, but relevant to family planning. Conflicting or unresolved conditions stay under Health Conditions."),
         (benign, "Benign", "#16a34a", "benign", "Variants ClinVar classifies as benign or likely benign (shown with --include-benign)."),
     ]
 

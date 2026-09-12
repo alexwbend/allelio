@@ -304,6 +304,31 @@ def sample_db_with_gnomad(sample_db) -> AllelioDB:
     Returns:
         AllelioDB instance with ClinVar, GWAS, and gnomAD data
     """
+    # Allele identity for the sites whose frequency should apply: the
+    # frequency record has to agree with the ClinVar record the genotype
+    # matched (assembly, chromosome, position, REF, ALT) before it may move
+    # a rank. The base fixture's ClinVar rows name no alleles, so give
+    # these four an identity here; the genotypes in the sample files carry
+    # the ALT named (rs4988235 CC = two copies of C, rs762551 AA = two of A).
+    identity = {
+        "rs429358": ("19", 44908684, "T", "C"),
+        "rs7412": ("19", 44908822, "C", "T"),
+        "rs4988235": ("2", 135851076, "T", "C"),
+        "rs762551": ("11", 62326389, "C", "A"),
+    }
+    for rsid, (chrom, pos, ref, alt) in identity.items():
+        sample_db.cursor.execute(
+            "UPDATE clinvar SET ref_allele = ?, alt_allele = ?, assembly = 'GRCh38', chromosome = ?, "
+            "position_vcf = ? WHERE rsid = ?",
+            (ref, alt, chrom, pos, rsid),
+        )
+    sample_db.conn.commit()
+
+    def with_identity(record):
+        chrom, pos, ref, alt = identity[record["rsid"]]
+        return {**record, "chromosome": chrom, "position": pos, "ref_allele": ref,
+                "alt_allele": alt, "assembly": "GRCh38", "source_version": "v4.1.1"}
+
     gnomad_records = [
         {
             "rsid": "rs429358",
@@ -359,6 +384,6 @@ def sample_db_with_gnomad(sample_db) -> AllelioDB:
         },
     ]
 
-    sample_db.insert_gnomad_batch(gnomad_records)
+    sample_db.insert_gnomad_batch([with_identity(r) for r in gnomad_records])
 
     return sample_db
