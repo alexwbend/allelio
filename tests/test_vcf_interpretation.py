@@ -19,12 +19,13 @@ from allelio.parsers.vcf_parser import parse_vcf
 ])
 def test_parser_evidence_reaches_clinvar(tmp_path, ref, alt, gt, cv_ref, cv_alt, copies):
     path = tmp_path / 'input.vcf'
-    path.write_text('##fileformat=VCFv4.3\n'
+    path.write_text('##fileformat=VCFv4.3\n##reference=GRCh38\n'
                     '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS\n'
                     f'1\t100\trs1\t{ref}\t{alt}\t.\tPASS\t.\tGT\t{gt}\n')
     db = AllelioDB(str(tmp_path / 'a.db'))
     db.initialize()
     db.insert_clinvar_batch([dict(rsid='rs1', ref_allele=cv_ref, alt_allele=cv_alt,
+        assembly='GRCh38', chromosome='1', position_vcf=100,
         gene='EXAMPLE', clinical_significance='Pathogenic', conditions='Example',
         review_status='reviewed by expert panel', last_evaluated='')])
     results, stats = analyze_variants_with_stats(parse_vcf(str(path)), db)
