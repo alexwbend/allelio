@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Require declared VCF build, chromosome and position agreement with ClinVar
+  before counting SNP alleles. Unknown/mismatched identities abstain with a
+  reason; no build inference, liftover, or mitochondrial matching is attempted.
+
 - Use structured VCF evidence for ClinVar SNP copy counts, including two
   different alternate alleles at a multiallelic site. VCF reference mismatches
   no longer trigger consumer-array strand inference. Non-SNP VCF records
