@@ -52,6 +52,20 @@ def _allele(fields, index: int) -> str:
     return "" if value in ("", "NA", "-", ".") else value
 
 
+def _source_value(fields, column):
+    index = CLINVAR_COLUMNS[column]
+    value = fields[index].strip() if index < len(fields) else ""
+    return None if value in ("", "na", "NA", "-", ".", "-1") else value
+
+
+def _position(fields):
+    try:
+        value = int(_source_value(fields, "PositionVCF"))
+        return value if 0 < value < 2**63 else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _bit(bitmap: bytearray, allele_id: str) -> bool:
     try:
         n = int(allele_id)
@@ -152,6 +166,12 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                 # Create record
                 record = {
                     "rsid": rsid,
+                    "assembly": assembly,
+                    "chromosome": _source_value(fields, "Chromosome"),
+                    "position_vcf": _position(fields),
+                    "allele_id": _source_value(fields, "#AlleleID"),
+                    "variation_id": _source_value(fields, "VariationID"),
+                    "hgnc_id": _source_value(fields, "HGNC_ID"),
                     "ref_allele": ref_allele,
                     "alt_allele": alt_allele,
                     "gene": gene_symbol if gene_symbol else None,
