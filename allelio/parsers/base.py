@@ -12,6 +12,31 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 
+@dataclass(frozen=True)
+class VCFEvidence:
+    """Original VCF evidence; reference declaration is not a verified build.
+
+    Alleles and indices retain GT order. Phase applies within this record;
+    phase_set is retained without inferring relationships between records.
+    Quality values remain source strings; None means unavailable, not zero.
+    """
+    reference: str
+    alternates: Tuple[str, ...]
+    allele_indices: Tuple[int, ...]
+    alleles: Tuple[str, ...]
+    phased: Optional[bool]
+    reference_declaration: Optional[str] = None
+    phase_set: Optional[str] = None
+    quality: Optional[str] = None
+    filter_status: Optional[str] = None
+    genotype_quality: Optional[str] = None
+    depth: Optional[str] = None
+
+    @property
+    def ploidy(self) -> int:
+        return len(self.allele_indices)
+
+
 @dataclass
 class Variant:
     """Represents a genetic variant with genotype information.
@@ -26,6 +51,7 @@ class Variant:
     chromosome: str
     position: int
     genotype: str
+    vcf_evidence: Optional[VCFEvidence] = None
 
 
 def detect_format(filepath: str) -> str:
