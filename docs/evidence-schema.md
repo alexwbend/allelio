@@ -104,3 +104,7 @@ each fixture, and the schema's presence in a built wheel.
 
 This schema describes Allelio's export. It does not claim conformance to
 GA4GH VRS, Phenopackets, or any other genomic standard.
+
+Malformed structure returns validation errors before semantic checks run. The
+semantic validator also checks reciprocal finding/candidate links, site rsIDs,
+unique candidate ownership and per-decision totals across sites and sources.

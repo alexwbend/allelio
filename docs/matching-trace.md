@@ -75,3 +75,9 @@ in `configuration.detailed_trace`). The web export uses the default form.
 
 The trace records Allelio's matching decisions only. AI-generated text is
 never part of it.
+
+The `paths.clingen` entry explicitly marks a partial trace: candidate decisions
+cover the leading assertion's curations. Secondary assertions retain their own
+condition resolutions in findings, but do not yet have separate candidate-level
+ClinGen decisions. Frequency-only and omitted reference sites are counted too;
+unresolved ClinVar calls no longer silently omit accompanying GWAS candidates.

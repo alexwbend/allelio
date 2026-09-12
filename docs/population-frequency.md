@@ -76,3 +76,16 @@ and fetch date in its header.
 Unsupported cases stay unresolved: no liftover between builds, no
 normalisation of indel representations, no strand inference for frequency
 records.
+
+## Audit hardening
+
+Database keys include assembly, chromosome, position, REF/ALT, rsID and source
+version. Upgrades retain both legacy rsID-only rows and existing format-2 rows;
+legacy databases can also be read before migration. Only a carried allele with
+verified identity can anchor a frequency. Conflicting source coordinates remain
+unverified rather than selecting the first record.
+
+The extract builder writes to a `.partial` file and replaces its destination
+only after every requested chromosome succeeds and at least one row is emitted.
+Failures return a nonzero status without printing a publishable manifest or
+checksum. Per-allele fields missing a value for an alternate remain missing.

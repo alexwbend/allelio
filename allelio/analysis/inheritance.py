@@ -23,7 +23,7 @@ from allelio.database.clingen import MOI_LABELS
 # inferred from disease names. Bump the version when the rule or the table
 # changes.
 CONDITION_MAPPING_METHOD = "mondo-exact"
-CONDITION_MAPPING_VERSION = "1.0"
+CONDITION_MAPPING_VERSION = "1.1"
 
 # Explicit, reviewed equivalences: a MONDO identifier as ClinVar writes it
 # mapped to the identifier ClinGen curates under. Empty until a case has been
@@ -224,13 +224,24 @@ def resolve_inheritance(
 
     matched = [e for e in clingen_entries if e.mondo_id and e.mondo_id in wanted]
     unmatched = sorted(wanted - {e.mondo_id for e in matched})
-    if not matched:
+    known_modes = {e.moi for e in matched if e.moi and e.classification in CLINGEN_ESTABLISHED}
+    if not matched or (unmatched and len(known_modes) < 2):
         return InheritanceResolution(
             UNMAPPED, "unresolved (conditions not curated by ClinGen)",
-            note=f"none of the assertion's conditions ({', '.join(unmatched)}) is a ClinGen "
+            note=f"some or all of the assertion's conditions ({', '.join(unmatched)}) lack a ClinGen "
                  f"curation for this gene; matched by {CONDITION_MAPPING_METHOD} "
                  f"{CONDITION_MAPPING_VERSION}. {context}",
-            matched=[], unmatched_condition_ids=unmatched, mapping=mapping, **base,
+            matched=matched, unmatched_condition_ids=unmatched, mapping=mapping, **base,
+        )
+
+    unidentified = [r for r in refs if not r.mondo_id
+                    and (r.name or "").lower() not in ("not provided", "not specified", "", "-")
+                    and not any("HP:" in ident for ident in r.identifiers)]
+    if unidentified and len(known_modes) < 2:
+        return InheritanceResolution(
+            NO_IDENTIFIERS, "unresolved (some conditions lack identifiers)",
+            note="Named conditions lack a MONDO mapping: " + "; ".join(r.name for r in unidentified)
+                 + f". {context}", matched=matched, mapping=mapping, **base,
         )
 
     established = [e for e in matched if (e.classification or "") in CLINGEN_ESTABLISHED]
@@ -246,7 +257,7 @@ def resolve_inheritance(
     modes = sorted({e.moi for e in established if e.moi})
     described = "; ".join(_describe(e) for e in established)
     provenance = f"matched by {CONDITION_MAPPING_METHOD} {CONDITION_MAPPING_VERSION}"
-    if len(modes) == 1:
+    if len(modes) == 1 and all(e.moi for e in established):
         phrase = _MODE_PHRASES.get(modes[0], MOI_LABELS.get(modes[0], modes[0]))
         note = f"ClinGen: {described}; {provenance}"
         if gene_phrase != phrase:

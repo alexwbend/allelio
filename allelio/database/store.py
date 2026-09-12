@@ -98,8 +98,10 @@ class AllelioDB:
         self.cursor.execute("DROP INDEX IF EXISTS idx_clinvar_rsid")
         self._create_clinvar_table()
         copied = [c for c in self._columns("clinvar") if c in old_columns and c not in ("chromosome", "allele_id")]
-        select = ", ".join(copied) + ", COALESCE(chromosome, ''), COALESCE(allele_id, '')" \
-            if "allele_id" in old_columns else ", ".join(copied) + ", '', ''"
+        select = ", ".join(copied + [
+            f"COALESCE({col}, '')" if col in old_columns else "''"
+            for col in ("chromosome", "allele_id")
+        ])
         self.cursor.execute(
             f"INSERT OR IGNORE INTO clinvar ({', '.join(copied)}, chromosome, allele_id) "
             f"SELECT {select} FROM clinvar_allele_keyed"
@@ -123,6 +125,37 @@ class AllelioDB:
         cols = self._columns("gnomad")
         return bool(cols) and "alt_allele" in cols
 
+    GNOMAD_KEY = ("rsid", "ref_allele", "alt_allele", "assembly", "chromosome", "position", "source_version")
+
+    def _migrate_gnomad_identity(self) -> None:
+        """Preserve format-2 rows while extending the key to source identity."""
+        self.cursor.execute("ALTER TABLE gnomad RENAME TO gnomad_old_identity")
+        self.cursor.execute("DROP INDEX IF EXISTS idx_gnomad_rsid")
+        self._create_gnomad_table()
+        columns = self._columns("gnomad")
+        select = []
+        for column in columns:
+            fallback = "0" if column == "position" else "''"
+            select.append(f"COALESCE({column}, {fallback})" if column in self.GNOMAD_KEY else column)
+        self.cursor.execute(f"INSERT INTO gnomad ({', '.join(columns)}) SELECT {', '.join(select)} FROM gnomad_old_identity")
+        self.cursor.execute("DROP TABLE gnomad_old_identity")
+
+    def _create_gnomad_table(self) -> None:
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS gnomad (
+                rsid TEXT NOT NULL,
+                ref_allele TEXT NOT NULL DEFAULT '',
+                alt_allele TEXT NOT NULL DEFAULT '',
+                chromosome TEXT NOT NULL DEFAULT '',
+                position INTEGER NOT NULL DEFAULT 0,
+                assembly TEXT NOT NULL DEFAULT '',
+                source_version TEXT NOT NULL DEFAULT '',
+                allele_frequency REAL, af_popmax REAL, ac INTEGER, an INTEGER, nhomalt INTEGER,
+                af_afr REAL, af_eas REAL, af_fin REAL, af_nfe REAL, af_sas REAL,
+                PRIMARY KEY (rsid, ref_allele, alt_allele, assembly, chromosome, position, source_version)
+            )
+        """)
+
     def _migrate_gnomad_rsid_only(self) -> None:
         """Rebuild an rsID-keyed gnomad table around (rsid, ref, alt).
 
@@ -131,28 +164,7 @@ class AllelioDB:
         """
         self.cursor.execute("ALTER TABLE gnomad RENAME TO gnomad_rsid_only")
         self.cursor.execute("DROP INDEX IF EXISTS idx_gnomad_rsid")
-        self.cursor.execute("""
-            CREATE TABLE gnomad (
-                rsid TEXT NOT NULL,
-                ref_allele TEXT NOT NULL DEFAULT '',
-                alt_allele TEXT NOT NULL DEFAULT '',
-                chromosome TEXT NOT NULL DEFAULT '',
-                position INTEGER,
-                assembly TEXT,
-                source_version TEXT,
-                allele_frequency REAL,
-                af_popmax REAL,
-                ac INTEGER,
-                an INTEGER,
-                nhomalt INTEGER,
-                af_afr REAL,
-                af_eas REAL,
-                af_fin REAL,
-                af_nfe REAL,
-                af_sas REAL,
-                PRIMARY KEY (rsid, ref_allele, alt_allele)
-            )
-        """)
+        self._create_gnomad_table()
         self.cursor.execute("""
             INSERT OR IGNORE INTO gnomad
                 (rsid, allele_frequency, af_popmax, ac, an, nhomalt,
@@ -219,28 +231,9 @@ class AllelioDB:
         # matched allele's frequency.
         if self._columns("gnomad") and not self.gnomad_is_allele_aware():
             self._migrate_gnomad_rsid_only()
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS gnomad (
-                rsid TEXT NOT NULL,
-                ref_allele TEXT NOT NULL DEFAULT '',
-                alt_allele TEXT NOT NULL DEFAULT '',
-                chromosome TEXT NOT NULL DEFAULT '',
-                position INTEGER,
-                assembly TEXT,
-                source_version TEXT,
-                allele_frequency REAL,
-                af_popmax REAL,
-                ac INTEGER,
-                an INTEGER,
-                nhomalt INTEGER,
-                af_afr REAL,
-                af_eas REAL,
-                af_fin REAL,
-                af_nfe REAL,
-                af_sas REAL,
-                PRIMARY KEY (rsid, ref_allele, alt_allele)
-            )
-        """)
+        if self._columns("gnomad") and self._primary_key("gnomad") != list(self.GNOMAD_KEY):
+            self._migrate_gnomad_identity()
+        self._create_gnomad_table()
 
         # Create ClinGen gene-disease validity table (gene-level: mode of
         # inheritance and how well established the gene-disease link is)
@@ -378,11 +371,11 @@ class AllelioDB:
         rows = [
             {
                 "chromosome": r.get("chromosome") or "",
-                "position": r.get("position"),
+                "position": r.get("position") or 0,
                 "ref_allele": (r.get("ref_allele") or "").upper(),
                 "alt_allele": (r.get("alt_allele") or "").upper(),
-                "assembly": r.get("assembly"),
-                "source_version": r.get("source_version"),
+                "assembly": r.get("assembly") or "",
+                "source_version": r.get("source_version") or "",
                 **{k: r.get(k) for k in ("rsid", "allele_frequency", "af_popmax", "ac", "an",
                                          "nhomalt", "af_afr", "af_eas", "af_fin", "af_nfe", "af_sas")},
             }
@@ -512,6 +505,18 @@ class AllelioDB:
         """Check whether the gnomad table exists (backward compatibility)."""
         return self._has_table("gnomad")
 
+    def _record_order(self, table, preferred):
+        available = self._columns(table)
+        columns = [c for c in preferred if c in available]
+        return " ORDER BY " + ", ".join(columns) if columns else ""
+
+    @staticmethod
+    def _gnomad_record(row):
+        record = dict(row)
+        for key in ("position", "assembly", "source_version"):
+            record[key] = record.get(key) or None
+        return record
+
     def lookup_rsid(self, rsid: str) -> Dict[str, Any]:
         """Look up combined ClinVar, GWAS, and gnomAD data for a single rsID.
 
@@ -525,7 +530,7 @@ class AllelioDB:
         result = {"clinvar": [], "gwas": [], "gnomad": []}
 
         # Query ClinVar, every allele row for the rsID, in a stable order
-        order = " ORDER BY ref_allele, alt_allele, chromosome, allele_id" if self.clinvar_is_allele_aware() else ""
+        order = self._record_order("clinvar", self.CLINVAR_KEY)
         self.cursor.execute(f"SELECT * FROM clinvar WHERE rsid = ?{order}", (rsid,))
         result["clinvar"] = [dict(row) for row in self.cursor.fetchall()]
 
@@ -537,9 +542,9 @@ class AllelioDB:
         # Query gnomAD, every allele row (the table may not exist)
         if self._has_gnomad_table():
             self.cursor.execute(
-                "SELECT * FROM gnomad WHERE rsid = ? ORDER BY ref_allele, alt_allele", (rsid,)
+                "SELECT * FROM gnomad WHERE rsid = ?" + self._record_order("gnomad", self.GNOMAD_KEY), (rsid,)
             )
-            result["gnomad"] = [dict(row) for row in self.cursor.fetchall()]
+            result["gnomad"] = [self._gnomad_record(row) for row in self.cursor.fetchall()]
 
         return result
     
@@ -559,9 +564,8 @@ class AllelioDB:
             return result
 
         has_gnomad = self._has_gnomad_table()
-        clinvar_order = (
-            " ORDER BY rsid, ref_allele, alt_allele, chromosome, allele_id" if self.clinvar_is_allele_aware() else ""
-        )
+        clinvar_order = self._record_order("clinvar", self.CLINVAR_KEY)
+        gnomad_order = self._record_order("gnomad", self.GNOMAD_KEY)
 
         # Initialize result dict with all rsids
         for rsid in rsids:
@@ -590,11 +594,11 @@ class AllelioDB:
             # Query gnomAD, one row per recorded allele
             if has_gnomad:
                 query = (f"SELECT * FROM gnomad WHERE rsid IN ({placeholders})"
-                         " ORDER BY rsid, ref_allele, alt_allele")
+                         f"{gnomad_order}")
                 self.cursor.execute(query, chunk)
                 for row in self.cursor.fetchall():
                     rsid = row["rsid"]
-                    result[rsid]["gnomad"].append(dict(row))
+                    result[rsid]["gnomad"].append(self._gnomad_record(row))
 
         return result
     

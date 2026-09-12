@@ -19,7 +19,7 @@ from similarity.
 The rule is recorded on every resolution as `mapping`:
 
 ```json
-{"method": "mondo-exact", "version": "1.0"}
+{"method": "mondo-exact", "version": "1.1"}
 ```
 
 `CONDITION_ALIASES` in `allelio/analysis/inheritance.py` is the only place an
@@ -47,8 +47,8 @@ Statuses other than `resolved` mean the carrier rule did not apply:
 - `conflicting`: the assertion names conditions ClinGen inherits differently
   (GBA1 with Gaucher disease and Parkinson disease). Which condition the allele
   causes is not decided here.
-- `unmapped`: the assertion carries MONDO identifiers, but none is a ClinGen
-  curation for the gene.
+- `unmapped`: the assertion carries MONDO identifiers, but at least one has no ClinGen
+  curation for the assertion's genes.
 - `no_identifiers`: ClinVar gives no MONDO identifier (for example, only
   "not provided").
 - `identifiers_not_stored`: the local database predates the `condition_ids`
@@ -65,7 +65,11 @@ one copy of the annotated allele, and the resolution is `resolved` to autosomal
 recessive, or to X-linked on a diploid genotype (a single-letter genotype is
 hemizygous, so one copy is the affected genotype). A gene curated for a
 dominant and a recessive condition yields carrier status only when the
-assertion names the recessive one alone.
+assertion names the recessive one alone. Each assertion uses its own listed
+genes. A secondary pathogenic assertion with unresolved or dominant inheritance
+prevents a site-wide carrier label. Named diseases without MONDO mappings also
+remain unresolved; placeholder names and explicitly identified HPO features do
+not decide inheritance.
 
 These remain presentation rules over source curations. They do not establish
 affected status, penetrance, symptoms, or biological sex.

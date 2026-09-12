@@ -75,8 +75,8 @@ class TestResolveInheritance:
                                 [_cg("HFE", "MONDO:0021001", "AR", disease="hemochromatosis type 1")])
         assert r.status == "resolved" and r.inheritance == "autosomal recessive"
         assert r.condition == "hemochromatosis type 1" and r.condition_id == "MONDO:0021001"
-        assert r.mapping == {"method": "mondo-exact", "version": "1.0"}
-        assert "mondo-exact 1.0" in r.note
+        assert r.mapping == {"method": "mondo-exact", "version": "1.1"}
+        assert "mondo-exact 1.1" in r.note
         assert r.gene_inheritance == "autosomal recessive"
 
     def test_resolved_against_one_condition_of_a_mixed_gene(self):
@@ -236,7 +236,7 @@ class TestChallengeFixtures:
         finding = document["findings"][0]
         assert finding["inheritance"] == r.inheritance
         assert finding["inheritance_resolution"]["status"] == "conflicting"
-        assert finding["inheritance_resolution"]["mapping"] == {"method": "mondo-exact", "version": "1.0"}
+        assert finding["inheritance_resolution"]["mapping"] == {"method": "mondo-exact", "version": "1.1"}
         assert finding["clinvar_entries"][0]["inheritance"]["status"] == "conflicting"
         assert finding["clinvar_entries"][0]["condition_ids"].startswith("MONDO:MONDO:0900001")
         json.dumps(document)

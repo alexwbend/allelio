@@ -117,7 +117,7 @@ class TestDownloadFileProvenance:
 
 
 def _clinvar_gz(path: Path):
-    header = "\t".join(f"c{i}" for i in range(34)).replace("c0", "#AlleleID")
+    header = (Path(__file__).parent / "fixtures/clinvar_context/variant_summary_unsplit.tsv").read_text().splitlines()[0]
     row = ["0"] * 34
     row[4] = "BRCA2"; row[6] = "Pathogenic"; row[9] = "80359550"; row[16] = "GRCh38"; row[24] = "criteria provided, single submitter"
     with gzip.open(path, "wt") as f:

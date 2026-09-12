@@ -174,10 +174,11 @@ class TestBuildAndFilter:
         assert (c["decision"], c["stage"], c["reason"]) == ("unresolved", "identity", "build_mismatch")
 
     def test_frequency_build_mismatch_is_rejected_with_its_identity(self, db):
-        # The fixture's second rs700 row (GRCh37) replaced the GRCh38 one: one extract is one assembly.
+        # Both assemblies survive; only the compatible record supports the finding.
         evidence = VCFEvidence("A", ("G",), (0, 1), ("A", "G"), False, reference_declaration="GRCh38")
         document = _export(db, [Variant("rs700", "1", 700, "AG", evidence)])
-        [c] = [c for c in document["matching"]["candidates"] if c["source"] == "gnomad"]
+        [c] = [c for c in document["matching"]["candidates"] if c["source"] == "gnomad"
+               and c["identity"]["assembly"] == "GRCh37"]
         assert (c["decision"], c["stage"], c["reason"]) == ("rejected", "frequency", "frequency_build_mismatch")
         assert c["identity"]["assembly"] == "GRCh37" and c["identity"]["allele_frequency"] == 0.9
         assert document["findings"][0]["candidate_ids"] and c["candidate_id"] not in document["findings"][0]["candidate_ids"]
@@ -211,7 +212,7 @@ class TestReferenceOnlyAndCounts:
         [ref_site] = [s for s in matching["sites"] if s["rsid"] == "rs600"]
         assert ref_site["disposition"] == "reference_or_no_applicable_annotation"
         assert ref_site["finding_id"] is None and ref_site["candidates_listed"] is False
-        assert ref_site["candidate_ids"] is None and ref_site["counts"] == {"rejected": 2}
+        assert ref_site["candidate_ids"] is None and ref_site["counts"] == {"rejected": 2, "unresolved": 1}
         assert matching["candidate_count"] == matching["listed_candidate_count"] + ref_site["candidate_count"]
         assert not any(c["rsid"] == "rs600" for c in matching["candidates"])
         # rs999 has no reference record at all: no candidates, but it is in coverage
@@ -220,7 +221,7 @@ class TestReferenceOnlyAndCounts:
         detailed = _export(db, variants, detailed=True)["matching"]
         assert detailed["detailed"] and detailed["listed_candidate_count"] == detailed["candidate_count"]
         listed = [c for c in detailed["candidates"] if c["rsid"] == "rs600"]
-        assert {(c["source"], c["reason"]) for c in listed} == {("clinvar", "allele_absent"), ("gwas", "risk_allele_absent")}
+        assert {(c["source"], c["reason"]) for c in listed} == {("clinvar", "allele_absent"), ("gwas", "risk_allele_absent"), ("gnomad", "frequency_identity_unverified")}
 
     def test_counts_are_records_not_rows_or_findings(self, db):
         variants = [Variant("rs334", "11", 5227002, "TA"), Variant("rs334", "11", 5227002, "TA"),
@@ -255,7 +256,7 @@ class TestCrossSourceAndPaths:
     def test_every_path_is_declared(self, db):
         document = _export(db, [Variant("rs334", "11", 5227002, "TA")])
         assert set(document["matching"]["paths"]) == {"clinvar", "gwas", "clinpgx", "gnomad", "clingen"} == set(PATHS)
-        assert all(text.startswith("traced") for text in document["matching"]["paths"].values())
+        assert all(text.startswith(("traced", "partial:")) for text in document["matching"]["paths"].values())
         assert "trace" not in document["analysis_stats"]
         assert any("AI-generated" in line for line in document["matching"]["limitations"])
 

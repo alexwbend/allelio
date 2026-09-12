@@ -134,7 +134,7 @@ def allele_values(info: dict, allele_index: int) -> list:
     values = []
     for col in FREQUENCY_COLUMNS:
         raw = info.get(col, ".")
-        if col in PER_ALLELE_FIELDS and "," in raw:
+        if col in PER_ALLELE_FIELDS:
             parts = raw.split(",")
             raw = parts[allele_index] if allele_index < len(parts) else "."
         values.append(raw if raw else ".")
@@ -160,7 +160,7 @@ def load_array_sites(path: str) -> set:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            token = line.replace(",", "\t").split("\t", 1)[0].strip()
+            token = line.replace(",", " ").split()[0]
             if token.startswith("rs"):
                 sites.add(token)
     return sites
@@ -431,11 +431,13 @@ def main():
     print(f"Chromosomes: {', '.join(chroms)}")
     print()
 
+    failed_chromosomes = []
     total_variants = 0
     start_time = time.time()
 
     # Open output file (gzipped TSV)
-    with gzip.open(str(output_path), "wt", encoding="utf-8", compresslevel=6) as out:
+    partial_path = output_path.with_name(output_path.name + ".partial")
+    with gzip.open(str(partial_path), "wt", encoding="utf-8", compresslevel=6) as out:
         # Write header
         out.write("## Allelio gnomAD frequency file\n")
         out.write(f"## Format: {EXTRACT_FORMAT}\n")
@@ -464,7 +466,8 @@ def main():
                     # Opt-in: download the whole file to disk first (needs room
                     # for the largest chromosome, ~40+ GB), then process.
                     if not download_vcf(url, str(vcf_path)):
-                        print(f"  Skipping {chrom} due to download failure")
+                        failed_chromosomes.append(chrom)
+                        print(f"  Failed {chrom}: download failure")
                         continue
                     total_variants = process_vcf(str(vcf_path), out, total_variants, array_sites)
                     if not args.keep_vcfs and not args.vcf_dir:
@@ -475,11 +478,18 @@ def main():
                     # Default: stream from the network, nothing saved to disk.
                     total_variants = stream_process_vcf(url, out, total_variants, array_sites)
             except Exception as e:
-                print(f"  Skipping {chrom} — error while processing: {e}")
+                failed_chromosomes.append(chrom)
+                print(f"  Failed {chrom}: {e}")
                 continue
 
             print()
 
+    if failed_chromosomes or total_variants == 0:
+        print("ERROR: extract incomplete; no publishable output or manifest produced. "
+              f"Failed chromosomes: {', '.join(failed_chromosomes) or 'none; no rows found'}. "
+              f"Partial data retained at {partial_path}.")
+        return 1
+    partial_path.replace(output_path)
     elapsed = time.time() - start_time
     output_size_mb = output_path.stat().st_size / (1024**2)
 
@@ -531,4 +541,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
