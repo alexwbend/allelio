@@ -561,3 +561,16 @@ Allelio is provided "as-is" for educational and informational purposes only. It 
 ---
 
 **Made with care by the Allelio community.**
+
+### VCF filter handling
+
+An explicit failure in record `FILTER` or sample `FORMAT/FT` sets an annotated
+site aside before ClinVar, GWAS or genotype-specific PGx interpretation. CLI,
+web results and HTML exports report the count separately; an excluded site is
+not a negative finding. Raw filter values remain in the parsed VCF evidence.
+
+`PASS` means the upstream filters passed; `.` or an absent filter means filtering
+is unknown or not applied, and does not itself exclude the site. Allelio does
+not infer PASS or introduce arbitrary QUAL/GQ/DP cutoffs. Passing filters does
+not validate a genotype or remove the other identity and allele checks. See the
+[VCF specification](https://samtools.github.io/hts-specs/VCFv4.3.pdf).

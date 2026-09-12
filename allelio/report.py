@@ -460,6 +460,13 @@ def generate_html_report(
     # Annotated positions where this person carries only the reference allele
     # are not findings for them. They are counted here so the omission is
     # visible, the same way the i-ID gap is.
+    failed_filters = metadata.get("vcf_filter_failed_sites", 0)
+    if failed_filters:
+        gap_note += (
+            f'<div class="gap-note"><strong>VCF filters failed:</strong> '
+            f'{int(failed_filters):,} annotated positions were set aside because '
+            'record or sample filters failed. These are not negative findings.</div>'
+        )
     if reference_genotype_sites:
         gap_note += (
             f'<div class="gap-note"><strong>Set aside:</strong> '
