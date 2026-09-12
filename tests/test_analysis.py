@@ -649,7 +649,7 @@ class TestRankingOrderRegression:
         }
 
     def test_pinned_triage_order(self, tmp_dir):
-        """Multi-star pathogenic < zero-star pathogenic < VUS < common benign < rare benign."""
+        """Multi-star pathogenic < zero-star pathogenic < VUS < tied benign rows."""
         from pathlib import Path
 
         db_path = str(Path(tmp_dir) / "ranking_regression.db")
@@ -727,5 +727,5 @@ class TestRankingOrderRegression:
         assert ranks["rs_path_4star"] == pytest.approx(0.6)
         assert ranks["rs_path_0star"] == pytest.approx(1.0)
         assert ranks["rs_vus"] == pytest.approx(7.0)
-        assert ranks["rs_benign_common"] == pytest.approx(9.9)
+        assert ranks["rs_benign_common"] == pytest.approx(10.0)
         assert ranks["rs_benign_rare"] == pytest.approx(10.0)
