@@ -7,6 +7,7 @@ human-readable text suitable for inclusion in prompts.
 """
 
 from typing import List, Optional
+from allelio.analysis.frequency import valid_frequency
 
 
 SYSTEM_PROMPT = """You are a genetics education assistant for Allelio, an open-source genomics tool. Your role is to explain genetic variant findings in clear, accessible language. You MUST: 1) Use plain English that a non-scientist can understand. 2) Explain what the variant means in practical terms. 3) Provide relevant lifestyle or dietary context from published research when applicable. 4) Always note limitations and uncertainties. 5) Never make definitive medical diagnoses. 6) Cite the source databases (ClinVar, GWAS Catalog) and relevant studies. 7) Recommend consulting a genetic counselor for clinically significant findings. Keep explanations concise (2-4 paragraphs). Be warm, informative, and reassuring without minimizing genuine risks."""
@@ -154,7 +155,7 @@ def format_gnomad_summary(gnomad_entry) -> str:
         return "No population frequency data available for this variant."
 
     af = getattr(gnomad_entry, 'allele_frequency', None)
-    if af is None:
+    if not valid_frequency(af):
         return "No population frequency data available for this variant."
 
     af_percent = af * 100
@@ -171,21 +172,26 @@ def format_gnomad_summary(gnomad_entry) -> str:
         lines.append(f"- Global Allele Frequency: {af_percent:.4f}%")
 
     # Popmax
-    if af_popmax is not None and af_popmax > af:
+    if valid_frequency(af_popmax) and af_popmax > af:
         lines.append(f"- Highest in any population: {af_popmax * 100:.4f}%")
 
     # Interpretation hint for the LLM
-    if af > 0.05:
-        lines.append("- Context: Common variant (>5% frequency) — typically benign or population-specific")
+    if af == 0:
+        lines.append("- Context: Not observed in the recorded source sample; absence is not evidence of pathogenicity")
+    elif af > 0.05:
+        lines.append("- Context: Common variant (>5% frequency)")
     elif af > 0.01:
-        lines.append("- Context: Moderately common variant (1-5% frequency)")
+        lines.append("- Context: Moderately common variant (>1% to 5% frequency)")
     elif af > 0.001:
-        lines.append("- Context: Uncommon variant (0.1-1% frequency)")
+        lines.append("- Context: Uncommon variant (>0.1% to 1% frequency)")
     elif af > 0.00001:
-        lines.append("- Context: Rare variant (<0.1% frequency) — more likely to be clinically significant")
+        lines.append("- Context: Rare variant (>0.001% to 0.1% frequency)")
     else:
-        lines.append("- Context: Very rare variant (<0.001% frequency) — warrants careful interpretation")
+        lines.append("- Context: Very rare variant (>0% to 0.001% frequency)")
 
+    lines.append("- Frequency alone does not establish benignity or pathogenicity. "
+                 "Clinical interpretation requires disease-specific evidence; "
+                 "do not apply a universal BS1 threshold.")
     return "\n".join(lines)
 
 

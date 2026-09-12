@@ -9,6 +9,7 @@ from allelio.database.clinpgx import level_rank as pgx_level_rank
 from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, genotype_alleles, call_vcf_zygosity
 from allelio.parsers.base import VCFEvidence
 from allelio.analysis.identity import vcf_identity_reason
+from allelio.analysis.frequency import valid_frequency
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -75,28 +76,15 @@ SIGNIFICANCE_RANKS = {
 }
 
 # --- Allele-frequency tiers used to adjust the rank ------------------------
-# ACMG/AMP (Richards et al. 2015, https://doi.org/10.1038/gim.2015.30) treats
-# population allele frequency as evidence against pathogenicity: BA1
-# (stand-alone) at roughly 5%, BS1 (strong) at roughly 1%, for a fully
-# penetrant dominant disorder. Those are the two cited cutoffs below. BA1/BS1
-# are categorical evidence codes, not numeric rank penalties, so the tier
-# boundaries are cited but the third, tighter tier and every penalty size
-# below are Allelio's own choices, not a re-derivation of ACMG/AMP.
-COMMON_AF_THRESHOLD = 0.05  # cf. ACMG/AMP BA1 (~5%), Richards et al. 2015
-MODERATELY_COMMON_AF_THRESHOLD = 0.01  # cf. ACMG/AMP BS1 (~1%), Richards et al. 2015
-UNCOMMON_AF_THRESHOLD = 0.001  # author choice, no ACMG/AMP precedent at this cutoff
-
-# Common variants are less likely to be truly pathogenic, so their rank is
-# pushed toward "less significant" — more at the common tier, less at the
-# uncommon one. ACMG/AMP's BA1/BS1 are evidence codes, not point values, so
-# none of these three sizes has an external citation: they are author
-# choices, sized only so a common variant is downgraded more than a
-# moderately common one, which is downgraded more than an uncommon one, and
-# so that no single downgrade crosses a full significance tier on its own
-# (see MAX_ADJUSTED_RANK).
-COMMON_AF_PENALTY = 3.0  # author choice, no external precedent
-MODERATELY_COMMON_AF_PENALTY = 1.5  # author choice, no external precedent
-UNCOMMON_AF_PENALTY = 0.5  # author choice, no external precedent
+# These are display-priority heuristics, not ACMG/AMP classification rules.
+# BS1 depends on the disorder; 1% is not a universal BS1 cutoff. Frequency
+# alone establishes neither benignity nor pathogenicity.
+COMMON_AF_THRESHOLD = 0.05
+MODERATELY_COMMON_AF_THRESHOLD = 0.01
+UNCOMMON_AF_THRESHOLD = 0.001
+COMMON_AF_PENALTY = 3.0
+MODERATELY_COMMON_AF_PENALTY = 1.5
+UNCOMMON_AF_PENALTY = 0.5
 
 # Keeps a frequency-adjusted rank below the "benign" tier boundary at 10, no
 # matter how common the variant is. Author choice, not an external constant.
@@ -396,25 +384,13 @@ def _calculate_frequency_adjustment(
     base_rank: float,
     gnomad_entry: Optional[GnomADEntry],
 ) -> float:
-    """Adjust significance rank based on gnomAD allele frequency.
+    """Apply an optional display penalty; never change source classifications.
 
-    Common variants are less likely to be truly pathogenic, so we increase
-    their rank (making them less significant). Rare variants keep their
-    original rank. See the COMMON_AF_THRESHOLD/_PENALTY family above for
-    which parts of this are cited to ACMG/AMP and which are author choices.
-
-    The adjustment is bounded so it never crosses major tier boundaries
-    completely — a pathogenic variant with high AF will be downgraded but
-    still noted as unusual.
-
-    Args:
-        base_rank: The original significance rank (lower = more significant)
-        gnomad_entry: gnomAD frequency data, or None
-
-    Returns:
-        Adjusted rank as float (higher = less significant)
+    Valid frequencies above the configured tiers increase the numeric rank
+    (lower display priority). Missing/invalid values leave it unchanged.
+    The cap never improves a rank already at or beyond the cap.
     """
-    if gnomad_entry is None or gnomad_entry.allele_frequency is None:
+    if gnomad_entry is None or not valid_frequency(gnomad_entry.allele_frequency):
         return base_rank
 
     af = gnomad_entry.allele_frequency
@@ -430,7 +406,7 @@ def _calculate_frequency_adjustment(
         # Rare — no adjustment needed
         return base_rank
 
-    return min(base_rank + adjustment, MAX_ADJUSTED_RANK)
+    return max(base_rank, min(base_rank + adjustment, MAX_ADJUSTED_RANK))
 
 
 def _clinvar_entry(cv_data: Dict[str, Any]) -> ClinVarEntry:
@@ -858,11 +834,8 @@ def analyze_variants_with_stats(
                 nhomalt=gn.get("nhomalt"),
             )
 
-        # Adjust significance rank based on population frequency. Not for
-        # pharmacogenomic findings: the adjustment encodes "a common allele is
-        # unlikely to be pathogenic", and a drug-response allele is not a
-        # pathogenicity claim, most are common by nature (VKORC1 -1639G>A is
-        # carried by a third of Europeans) and no less actionable for it.
+        # This optional frequency display penalty is not applied to PGx:
+        # allele commonness does not determine drug-response applicability.
         pharmacogenomic = category == VariantCategory.PHARMACOGENOMICS.value
         adjusted_rank = (
             _calculate_frequency_adjustment(sig_rank, gnomad_entry)
