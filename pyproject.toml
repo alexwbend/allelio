@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "allelio"
 version = "0.3.0"
-description = "Privacy-first local genomics analysis powered by AI"
+description = "Local genetic variant annotation with gene grouping, source provenance, and optional AI explanations"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
