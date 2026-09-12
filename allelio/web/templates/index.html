@@ -1116,6 +1116,7 @@
 
             <!-- Who wrote the explanations below, for this run. The status pill
                  at the top is read once at page load and can be stale by now. -->
+            <div class="gap-banner" id="coverageNotice" style="display: none;" role="status"></div>
             <div class="gap-banner" id="vcfFilterNotice" style="display: none;" role="status"></div>
             <div class="summary-text" id="modelUsed" style="display: none;"></div>
 
@@ -1397,6 +1398,11 @@
                 ? `${failedFilters.toLocaleString()} annotated positions were set aside because VCF record or sample filters failed. These are not negative findings.`
                 : '';
             filterNotice.style.display = hasFailures ? 'block' : 'none';
+
+            // Coverage is absent in reports saved before row accounting.
+            const coverageNotice = document.getElementById('coverageNotice');
+            coverageNotice.textContent = analysisResults.coverage_summary || '';
+            coverageNotice.style.display = analysisResults.coverage_summary ? 'block' : 'none';
 
             // Executive Summary
             const executiveSummary = document.getElementById('executiveSummary');

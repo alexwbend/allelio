@@ -16,6 +16,7 @@ from rich.table import Table
 from allelio.analysis.lookup import analyze_variants, AnalysisStats
 from allelio.database import AllelioDB, setup_database, staleness_warning, sources_summary, provenance_of
 from allelio.parsers import parse_genotype_file_with_stats
+from allelio.coverage import build_coverage, coverage_text
 from allelio.evidence import build_evidence_export, write_evidence_export
 from allelio.report import generate_html_report
 from allelio.analysis.genes import group_findings, gene_label
@@ -271,6 +272,9 @@ def analyze(
         console.print(f"\n[bold red]✗[/bold red] Analysis failed: {e}\n", style="red")
         raise click.Abort()
     
+    coverage = build_coverage(variants, results, analysis_stats)
+    console.print(escape(coverage_text(coverage)))
+
     # Generate AI explanations if enabled
     # rsID -> Explanation: the text and, where the model wrote it, its name.
     # Everything printed about who wrote what is counted off this, so there is
@@ -443,6 +447,7 @@ def analyze(
         else:
             summary = f"Analysis of {len(variants):,} variants found {len(significant)} significant findings."
         metadata = {
+            "coverage": coverage,
             "generated_at": __import__("datetime").datetime.now().isoformat(),
             "db_version": db.version(),
             "provenance": provenance_of(db),

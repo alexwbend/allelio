@@ -16,10 +16,10 @@ Format specification:
 import gzip
 from typing import List, Generator
 
-from .base import Variant
+from .base import ParseAudit, ParsedVariants, Variant
 
 
-def _parse_ancestry_lines(filepath: str) -> Generator[Variant, None, None]:
+def _parse_ancestry_lines(filepath: str, audit=None) -> Generator[Variant, None, None]:
     """Generate Variant objects from an AncestryDNA format file.
     
     Args:
@@ -34,11 +34,11 @@ def _parse_ancestry_lines(filepath: str) -> Generator[Variant, None, None]:
     with file_opener(filepath, 'rt', encoding='utf-8', errors='replace') as f:
         header_seen = False
         
-        for line in f:
-            line = line.rstrip('\n')
+        for line_number, line in enumerate(f, 1):
+            line = line.rstrip('\r\n')
             
             # Skip empty lines and comments
-            if not line or line.startswith('#'):
+            if not line.strip() or line.startswith('#'):
                 continue
             
             # Skip header line (starts with 'rsid')
@@ -46,6 +46,8 @@ def _parse_ancestry_lines(filepath: str) -> Generator[Variant, None, None]:
                 header_seen = True
                 continue
             
+            entry = audit.row(line_number) if audit is not None else {}
+
             # Parse tab-delimited line
             parts = line.split('\t')
             
@@ -69,21 +71,28 @@ def _parse_ancestry_lines(filepath: str) -> Generator[Variant, None, None]:
                 continue
             
             # Skip no-calls
-            if genotype in ('00', '0', '--'):
+            if genotype in ('00', '0', '--', '.', '') or '0' in genotype or '-' in genotype:
+                entry['status'] = 'no_call'
                 continue
             
             # Parse position as integer
             try:
                 position = int(position_str)
             except ValueError:
+                entry['status'] = 'invalid_position'
+                continue
+            if position <= 0:
+                entry['status'] = 'invalid_position'
                 continue
             
+            entry.update(status='parsed', rsid=rsid)
             # Yield valid variant
             yield Variant(
                 rsid=rsid,
                 chromosome=chromosome,
                 position=position,
-                genotype=genotype
+                genotype=genotype,
+                source_line=line_number,
             )
 
 
@@ -98,4 +107,5 @@ def parse_ancestry(filepath: str) -> List[Variant]:
     Returns:
         List of Variant objects parsed from the file
     """
-    return list(_parse_ancestry_lines(filepath))
+    audit = ParseAudit()
+    return ParsedVariants(_parse_ancestry_lines(filepath, audit=audit), audit)

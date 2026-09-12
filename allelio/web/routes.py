@@ -13,6 +13,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from starlette.background import BackgroundTask
 
+from allelio.coverage import build_coverage, coverage_text, coverage_html
 from allelio.evidence import build_evidence_export
 from allelio.report_style import REPORT_CSS
 from allelio import __version__
@@ -233,7 +234,8 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             None, parse_genotype_file, temp_file_path
         )
         
-        if not genotypes:
+        has_row_audit = bool(getattr(getattr(genotypes, "audit", None), "rows", None))
+        if not genotypes and not has_row_audit:
             raise HTTPException(
                 status_code=400, 
                 detail="No valid genotype data found in file"
@@ -254,7 +256,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         )
         analysis_stats = getattr(analysis_results, "stats", None) or AnalysisStats()
 
-        if not analysis_results and not analysis_stats.vcf_filter_failed_sites:
+        if not analysis_results and not analysis_stats.vcf_filter_failed_sites and not has_row_audit:
             raise HTTPException(
                 status_code=400,
                 detail="No variants found in database"
@@ -283,7 +285,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         _progress.update(stage="Summarizing", done=0, total=0)
         try:
             if not top_variants:
-                summary = "No reportable findings remain. Annotated positions with failed VCF filters were set aside; this is not a negative result."
+                summary = "No reportable findings remain. See input coverage for exclusions; this is not a negative result."
             else:
                 if not ai_engine.will_explain():
                     raise RuntimeError("no model server answering")
@@ -337,7 +339,10 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             }
             formatted_results.append(result_dict)
 
+        coverage = build_coverage(genotypes, analysis_results, analysis_stats)
         payload = {
+            "coverage": {k: v for k, v in coverage.items() if k != "rows"},
+            "coverage_summary": coverage_text(coverage),
             "evidence_export": build_evidence_export(
                 analysis_results, genotypes, provenance_of(db),
                 {"include_benign": False, "include_reference": False,
@@ -576,10 +581,10 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     total_variants = escape(str(analysis_data.get("total_variants", 0)))
     analyzed_at = escape(str(analysis_data.get("analyzed_at") or "Unknown"))
     sources = escape(str(analysis_data.get("sources") or "not recorded"))
-    set_aside = ""
+    set_aside = coverage_html(analysis_data.get("coverage"))
     ref_sites = analysis_data.get("reference_genotype_sites") or 0
     if ref_sites:
-        set_aside = (
+        set_aside += (
             f"<p><strong>Set aside:</strong> {int(ref_sites):,} annotated positions where "
             "you carry only the reference allele (not findings).</p>"
         )
