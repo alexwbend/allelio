@@ -41,6 +41,8 @@ Please provide:
 4. Any relevant lifestyle, dietary, or environmental context from research
 5. Important caveats and limitations
 
+Each ClinVar line says which kind of classification it is (germline, or from a file that mixed germline and somatic), where the variant was observed (origin), and any separate somatic clinical impact or oncogenicity assertion; a somatic assertion describes tumour tissue and says nothing about inherited risk, so never present it as a germline finding, and if the classification type is unknown say so. If several ClinVar records are listed for this site, they are distinct records, not one; do not merge them into a single conclusion.
+
 If there are pharmacogenomic annotations, explain what they say about this genotype and the named drugs, quote the level of evidence, and make clear that any change to a medication or dose is a decision for the prescriber; never tell the user to start, stop, or adjust a medication."""
 
 
@@ -99,6 +101,15 @@ def format_clinvar_summary(clinvar_entries: List[dict]) -> str:
         stars_display = "\u2605" * review_stars + "\u2606" * (4 - review_stars)
 
         line = f"- {condition}: {significance} ({stars_display} {review_status})"
+        # Context that decides how the classification may be read: which
+        # kind it is, where the variant was observed, any separate somatic
+        # assertion, and whether this person carries the allele at all.
+        context = entry.get('context') or []
+        allele_match = entry.get('allele_match')
+        if allele_match:
+            context = [f"allele match: {allele_match}" + (f" ({entry['allele_match_note']})" if entry.get('allele_match_note') else "")] + list(context)
+        if context:
+            line += "\n  " + "; ".join(context)
         formatted_lines.append(line)
     
     if formatted_lines:
@@ -238,11 +249,15 @@ def build_variant_prompt(result) -> str:
     # Format clinical and research data — convert dataclass entries to dicts for formatters
     clinvar_dicts = []
     for e in (result.clinvar_entries or []):
+        context = getattr(e, 'context_phrases', None)
         clinvar_dicts.append({
             'clinical_significance': getattr(e, 'clinical_significance', None),
             'condition': getattr(e, 'conditions', None),
             'review_status': getattr(e, 'review_status', None),
             'review_stars': getattr(e, 'review_stars', 0),
+            'context': context() if callable(context) else [],
+            'allele_match': getattr(e, 'allele_match', None),
+            'allele_match_note': getattr(e, 'allele_match_note', None),
         })
     gwas_dicts = []
     for e in (result.gwas_entries or []):

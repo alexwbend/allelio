@@ -45,4 +45,9 @@ def test_legacy_migration_preserves_rows(tmp_path):
     db.initialize()  # Idempotent.
     row, = db.lookup_rsid('rs1')['clinvar']
     assert row['gene'] == 'GENE' and row['alt_allele'] == 'G'
-    assert all(row[key] is None for key in ('assembly', 'chromosome', 'position_vcf', 'allele_id', 'variation_id', 'hgnc_id'))
+    assert all(row[key] is None for key in ('assembly', 'position_vcf', 'variation_id', 'hgnc_id'))
+    # Key columns cannot be NULL; '' is "not recorded" and reads as None on the entry.
+    assert (row['chromosome'], row['allele_id']) == ('', '')
+    from allelio.analysis.lookup import _clinvar_entry
+    entry = _clinvar_entry(row)
+    assert entry.chromosome is None and entry.allele_id is None and entry.classification_type == "unknown"

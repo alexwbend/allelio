@@ -32,6 +32,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- ClinVar context survives import and reporting. The importer reads the
+  header of `variant_summary.txt` and keeps origin, RCV accessions,
+  submitter count, variant type and name, and the separate somatic
+  clinical impact and oncogenicity assertions with their review statuses
+  and dates; `classification_type` records whether the classification is
+  the post-2024 aggregate germline one, from a pre-split file that mixed
+  origins, or unknown (legacy database), never assumed. Records are keyed
+  by `(rsid, ref, alt, chromosome, allele_id)`, so pseudoautosomal X/Y
+  pairs and distinct records for one allele are kept instead of silently
+  overwritten (701 such keys in the 2026-09-03 release); the table
+  migrates in place without inventing metadata. Every ClinVar entry keeps
+  the source classification, its allele match (`allele_match`,
+  `allele_match_note`), and Allelio's `display_rank` as separate fields.
+  The report, web card, AI prompt, fallback text, and evidence JSON show
+  the same context; the prompt is told not to merge records or present a
+  somatic assertion as germline. Field mapping in `docs/clinvar-fields.md`,
+  with synthetic fixtures in both file layouts.
+
 - Population frequencies are matched by assembly, coordinate, and allele
   before they count. gnomAD rows are keyed by `(rsid, ref, alt)` with
   chromosome, position, assembly, and source version, so the alternate

@@ -173,6 +173,76 @@ class ClinVarEntry:
     # How this assertion's own conditions are inherited, per ClinGen. Set for
     # every applicable assertion once the result's gene is known.
     inheritance: Optional[InheritanceResolution] = None
+    # What ``clinical_significance`` is: "germline" (the aggregate germline
+    # classification of a post-2024 file), "unsplit" (an older file that
+    # mixed germline and somatic in one column), or "unknown" (legacy
+    # database). Never assumed. See docs/clinvar-fields.md.
+    classification_type: str = "unknown"
+    # Context ClinVar gives for reading the classification, verbatim; None
+    # is unknown or not asserted, never "germline by default".
+    origin: Optional[str] = None
+    origin_simple: Optional[str] = None
+    rcv_accessions: Optional[str] = None
+    number_submitters: Optional[int] = None
+    variant_type: Optional[str] = None
+    name: Optional[str] = None
+    somatic_clinical_impact: Optional[str] = None
+    somatic_review_status: Optional[str] = None
+    somatic_last_evaluated: Optional[str] = None
+    oncogenicity: Optional[str] = None
+    oncogenicity_review_status: Optional[str] = None
+    oncogenicity_last_evaluated: Optional[str] = None
+    # Three things a reader must not conflate, kept apart: the source
+    # classification above, whether this person carries the allele it is
+    # about (``allele_match``: "carried", "unknown", "absent", with the copy
+    # count or the reason), and Allelio's own display rank for the row.
+    allele_match: str = "unknown"
+    allele_match_note: Optional[str] = None
+    display_rank: Optional[float] = None
+
+    @property
+    def rcv_list(self) -> List[str]:
+        """The per-condition record accessions this row aggregates."""
+        return [a for a in (self.rcv_accessions or "").split("|") if a]
+
+    def context_phrases(self) -> List[str]:
+        """Short phrases saying what kind of classification this is and its context.
+
+        The same phrases feed the HTML report, the web card, the AI prompt,
+        the fallback text, and (as fields) the evidence JSON. Absent context
+        reads as unknown; a somatic or oncogenicity assertion is named
+        separately from the germline one, never folded into it.
+        """
+        phrases: List[str] = []
+        if self.classification_type == "germline":
+            phrases.append("germline classification (aggregate across the listed conditions)")
+        elif self.classification_type == "unsplit":
+            phrases.append("classification from a pre-2024 ClinVar file that mixed germline and somatic assertions")
+        else:
+            phrases.append("classification type unknown (database predates context columns; run allelio update)")
+        if self.origin_simple or self.origin:
+            origin = self.origin_simple or self.origin
+            detail = f" ({self.origin})" if self.origin and self.origin != origin else ""
+            phrases.append(f"origin: {origin}{detail}")
+        elif self.classification_type != "unknown":
+            phrases.append("origin: not provided")
+        if self.somatic_clinical_impact:
+            status = f"; {self.somatic_review_status}" if self.somatic_review_status else ""
+            date = f"; {self.somatic_last_evaluated}" if self.somatic_last_evaluated else ""
+            phrases.append(f"somatic clinical impact: {self.somatic_clinical_impact}{status}{date}")
+        if self.oncogenicity:
+            status = f"; {self.oncogenicity_review_status}" if self.oncogenicity_review_status else ""
+            date = f"; {self.oncogenicity_last_evaluated}" if self.oncogenicity_last_evaluated else ""
+            phrases.append(f"oncogenicity: {self.oncogenicity}{status}{date}")
+        rcvs = self.rcv_list
+        if rcvs or self.number_submitters is not None:
+            parts = []
+            if rcvs:
+                parts.append(f"{len(rcvs)} condition record{'s' if len(rcvs) != 1 else ''} (RCV)")
+            if self.number_submitters is not None:
+                parts.append(f"{self.number_submitters} submitter{'s' if self.number_submitters != 1 else ''}")
+            phrases.append("aggregates " + ", ".join(parts) + "; per-condition classifications are not in this source file")
+        return phrases
 
 
 @dataclass
@@ -459,14 +529,19 @@ def _clinvar_entry(cv_data: Dict[str, Any]) -> ClinVarEntry:
         rsid=cv_data.get("rsid"),
         gene=cv_data.get("gene"),
         clinical_significance=cv_data.get("clinical_significance"),
+        classification_type=cv_data.get("classification_type") or "unknown",
         conditions=cv_data.get("conditions"),
         review_status=review_status,
         review_stars=_get_review_stars(review_status),
         ref_allele=cv_data.get("ref_allele") or None,
         alt_allele=cv_data.get("alt_allele") or None,
+        chromosome=cv_data.get("chromosome") or None,
+        allele_id=cv_data.get("allele_id") or None,
         **{key: cv_data.get(key) for key in (
-            "assembly", "chromosome", "position_vcf", "allele_id", "variation_id", "hgnc_id",
-            "condition_ids",
+            "assembly", "position_vcf", "variation_id", "hgnc_id", "condition_ids",
+            "origin", "origin_simple", "rcv_accessions", "number_submitters", "variant_type", "name",
+            "somatic_clinical_impact", "somatic_review_status", "somatic_last_evaluated",
+            "oncogenicity", "oncogenicity_review_status", "oncogenicity_last_evaluated",
         )},
     )
 
@@ -516,11 +591,17 @@ def _select_clinvar_rows(
                     if reason else call_vcf_zygosity(vcf_evidence, entry.ref_allele, entry.alt_allele))
         else:
             call = call_zygosity(genotype, entry.ref_allele, entry.alt_allele)
+        entry.display_rank = _rank_clinvar(entry)
         if call.alt_copies is None:
+            entry.allele_match, entry.allele_match_note = "unknown", call.note or "allele not recorded"
             unknown.append((entry, call))
         elif call.alt_copies > 0:
+            entry.allele_match = "carried"
+            entry.allele_match_note = f"{call.alt_copies} {'copy' if call.alt_copies == 1 else 'copies'} of {call.allele}" + (
+                " (genotype read on the opposite strand)" if call.strand_flipped else "")
             carried.append((entry, call))
         else:
+            entry.allele_match, entry.allele_match_note = "absent", f"no copy of {call.allele}"
             absent.append((entry, call))
 
     if carried:
