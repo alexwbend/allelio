@@ -113,10 +113,10 @@ class TestResolveInheritance:
         r = resolve_inheritance("a", "MONDO:MONDO:1", [_cg("G", "MONDO:1", "AD", cls="Disputed")])
         assert r.status == "not_established" and r.inheritance == "not established (Disputed)"
 
-    def test_limited_match_does_not_decide_but_established_one_does(self):
+    def test_unestablished_named_condition_prevents_aggregate_resolution(self):
         curations = [_cg("G", "MONDO:1", "AD", cls="Limited"), _cg("G", "MONDO:2", "AR")]
         r = resolve_inheritance("a|b", "MONDO:MONDO:1|MONDO:MONDO:2", curations)
-        assert r.status == "resolved" and r.inheritance == "autosomal recessive"
+        assert r.status == "not_established" and "some condition" in r.inheritance
 
     def test_two_recessive_conditions_agree(self):
         curations = [_cg("G", "MONDO:1", "AR"), _cg("G", "MONDO:2", "AR", cls="Strong")]

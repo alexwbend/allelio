@@ -113,6 +113,9 @@ def semantic_errors(document: Dict[str, Any]) -> List[str]:
     # listed ones are ascending but need not be contiguous.
     candidate_ids = check_ids("candidate_id", _ids(candidates, "candidate_id"), "matching/candidates", contiguous=False)
 
+    input_map = {item.get("input_id"): item for item in inputs if isinstance(item, dict) and isinstance(item.get("input_id"), str)}
+    candidate_map = {item.get("candidate_id"): item for item in candidates if isinstance(item, dict) and isinstance(item.get("candidate_id"), str)}
+
     def check_refs(values: Any, known: set, kind: str, where: str) -> None:
         if not isinstance(values, list):
             return
@@ -124,13 +127,13 @@ def semantic_errors(document: Dict[str, Any]) -> List[str]:
         if not isinstance(finding, dict):
             continue
         check_refs(finding.get("input_ids"), input_ids, "input_id", f"findings/{index}/input_ids")
-        rsids = {inp.get("rsid") for inp in inputs if isinstance(inp, dict) and inp.get("input_id") in set(finding.get("input_ids") or [])}
+        rsids = {input_map[iid].get("rsid") for iid in finding.get("input_ids") or [] if iid in input_map}
         if rsids and rsids != {finding.get("rsid")}:
             errors.append(f"findings/{index}/input_ids: referenced inputs carry rsIDs {sorted(rsids)}, finding is {finding.get('rsid')!r}")
         if isinstance(matching, dict) and matching:
             check_refs(finding.get("candidate_ids"), candidate_ids, "candidate_id", f"findings/{index}/candidate_ids")
             for cid in finding.get("candidate_ids") or []:
-                candidate = next((c for c in candidates if c.get("candidate_id") == cid), None)
+                candidate = candidate_map.get(cid)
                 if candidate and candidate.get("decision") != "retained":
                     errors.append(f"findings/{index}/candidate_ids: {cid} is {candidate.get('decision')!r}, only retained candidates support a finding")
     for index, group in enumerate(document.get("gene_groups") or []):
@@ -165,6 +168,22 @@ def semantic_errors(document: Dict[str, Any]) -> List[str]:
         for index, row in enumerate(rows if isinstance(rows, list) else []):
             if isinstance(row, dict) and row.get("input_id") is not None and row["input_id"] not in input_ids:
                 errors.append(f"coverage/rows/{index}/input_id: {row['input_id']!r} does not exist in this document")
+
+    if isinstance(coverage, dict) and coverage:
+        coverage_ids = [row.get("input_id") for row in coverage.get("rows") or []
+                        if isinstance(row, dict) and row.get("input_id") is not None]
+        if Counter(coverage_ids) != Counter(input_ids):
+            errors.append("coverage/rows: every parsed input must be accounted for exactly once")
+        for index, row in enumerate(coverage.get("rows") or []):
+            if isinstance(row, dict) and row.get("input_id") in input_map:
+                if row.get("rsid") != input_map[row["input_id"]].get("rsid"):
+                    errors.append(f"coverage/rows/{index}/rsid: does not match its input")
+    for index, group in enumerate(document.get("gene_groups") or []):
+        if isinstance(group, dict) and isinstance(group.get("indices"), list):
+            expected = [findings[i].get("finding_id") for i in group["indices"]
+                        if isinstance(i, int) and 0 <= i < len(findings)]
+            if group.get("finding_ids") != expected:
+                errors.append(f"gene_groups/{index}/finding_ids: does not match the listed finding indices")
 
     # Matching: candidate counts are conserved and sites reference what they list.
     if isinstance(matching, dict) and matching:
@@ -244,6 +263,11 @@ def semantic_errors(document: Dict[str, Any]) -> List[str]:
             source_totals.update(counts)
         if source_totals != Counter(matching.get("counts") or {}):
             errors.append("matching/by_source: decision totals do not match matching/counts")
+        listed_source_counts = Counter((c["source"], c["decision"]) for c in candidates)
+        for (source, decision), observed in listed_source_counts.items():
+            advertised = (matching.get("by_source") or {}).get(source, {}).get(decision, 0)
+            if advertised < observed:
+                errors.append(f"matching/by_source/{source}/{decision}: fewer than the listed candidates")
         for index, candidate in enumerate(candidates):
             fid = candidate.get("finding_id")
             if fid in finding_map:

@@ -148,6 +148,8 @@ def _classification_context_of(variant):
                 "allele_match": getattr(e, "allele_match", None),
                 "allele_match_note": getattr(e, "allele_match_note", None),
                 "display_rank": getattr(e, "display_rank", None),
+                "inheritance": e.inheritance.inheritance if getattr(e, "inheritance", None) else None,
+                "inheritance_note": e.inheritance.note if getattr(e, "inheritance", None) else None,
             }
             for e in entries
         ],

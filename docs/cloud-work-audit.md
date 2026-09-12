@@ -28,9 +28,8 @@ but was not ready to merge without corrections.
   absent context remains unknown and missing required columns fail clearly.
 - **Candidate trace (#35):** reference-only and frequency-only sites omitted
   frequency candidates; unresolved ClinVar calls could omit accompanying GWAS
-  candidates. These paths are now recorded. The remaining leading-assertion-only
-  ClinGen trace is explicitly marked partial, while secondary assertion
-  resolutions remain available in findings.
+  candidates. These paths are now recorded. ClinGen now traces every applicable assertion, retaining per-assertion
+  source identities and resolution status under each curation candidate.
 - **Evidence validation (#36):** malformed structures could crash semantic
   checks. They now return structural errors first. Semantic checks reject
   dangling support even with an empty candidate array, inconsistent reciprocal
@@ -70,6 +69,25 @@ The full local suite passed: **802 tests in 90.33 seconds**. One additional
 format-2 database migration regression passed separately after that run; the
 final test collection contains 803 tests. The suite includes CLI/web evidence
 exports and installed-wheel schema access. Whitespace validation passed.
+
+## Follow-through
+
+The remaining partial ClinGen trace was completed. Unestablished relationships
+and missing inheritance modes stay unresolved, and coverage now verifies that
+each parsed input is counted exactly once. Evidence validation uses direct ID
+lookups rather than repeatedly scanning whole input/candidate arrays. When
+applicable pathogenic assertions disagree, the site headline stays conflicting
+or unresolved; each record retains its own inheritance in reports and evidence.
+
+Follow-through validation: the expanded full local suite passed **810 tests in
+100.65 seconds**. Targeted report, web, inheritance, trace, schema and rebuild
+regressions were rerun after the final headline correction.
+
+A resumable three-worker rebuild is running under `build/gnomad-format2`, using
+603,137 rsIDs recovered from the exact published legacy extract. Completed
+chromosomes are checksummed and reused. The output is combined only after all
+24 chromosomes complete. `scripts/validate_gnomad_release.py` checks the release
+before upload. See `docs/gnomad-release.md` for the resumable procedure.
 
 ## Data release remains outstanding
 

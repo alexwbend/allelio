@@ -82,3 +82,7 @@ covering a gene with dominant and recessive conditions, missing identifiers, a
 disputed relationship, multiple conditions, an unmapped condition, an
 unambiguous recessive case, an X-linked case, and a legacy database.
 `tests/test_inheritance.py` runs them through the real parsers and analysis.
+
+An aggregate also remains unresolved when one named condition has an established
+relationship but another has only Limited/Disputed/Refuted support. A missing
+mode is shown as undetermined. Known conflicting modes remain explicit.
