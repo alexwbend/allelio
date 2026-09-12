@@ -15,7 +15,7 @@ Format specification:
 import gzip
 from typing import List, Generator, Optional, Tuple
 
-from .base import Variant
+from .base import Variant, VCFEvidence
 
 
 def _parse_gt_field(gt_str: str, ref: str, alt: str) -> Optional[str]:
@@ -63,7 +63,9 @@ def _parse_gt_field(gt_str: str, ref: str, alt: str) -> Optional[str]:
     if len(genotype_alleles) == 2:
         return ''.join(sorted(genotype_alleles))
     elif len(genotype_alleles) == 1:
-        return genotype_alleles[0] * 2  # Haploid to diploid
+        # The legacy display cannot distinguish a two-base haploid allele
+        # from two SNP copies. Keep it uncalled there; evidence retains it.
+        return genotype_alleles[0] if len(genotype_alleles[0]) == 1 else "--"
     else:
         return None
 
@@ -85,6 +87,7 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
         format_index = None
         sample_column_index = None
         gt_index = None
+        reference_declaration = None
         
         for line in f:
             line = line.rstrip('\n')
@@ -95,11 +98,13 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
             
             # Skip meta-info lines
             if line.startswith('##'):
+                if line.startswith('##reference='):
+                    reference_declaration = line.partition('=')[2] or None
                 continue
             
             # Parse header line
             if line.startswith('#CHROM'):
-                header_line = line
+                header_line = None
                 parts = line[1:].split('\t')  # Remove leading #
                 
                 try:
@@ -113,6 +118,7 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                     
                     # Sample column is the first column after FORMAT
                     sample_column_index = format_index + 1
+                    header_line = line
                 except ValueError:
                     continue
                 
@@ -163,12 +169,30 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                 if genotype is None:
                     continue
                 
+                fields = dict(zip(format_parts, sample_parts))
+                def available(value):
+                    return value if value not in (None, "", ".") else None
+
+                indices = tuple(int(i) for i in gt_str.replace('|', '/').split('/'))
+                alternatives = tuple(alt.split(',')) if alt != '.' else ()
+                options = (ref,) + alternatives
+                evidence = VCFEvidence(
+                    reference=ref, alternates=alternatives,
+                    allele_indices=indices, alleles=tuple(options[i] for i in indices),
+                    phased=('|' in gt_str) if len(indices) > 1 else None,
+                    reference_declaration=reference_declaration,
+                    phase_set=available(fields.get('PS')),
+                    quality=available(parts[5]), filter_status=available(parts[6]),
+                    genotype_quality=available(fields.get('GQ')),
+                    depth=available(fields.get('DP')),
+                )
                 # Yield valid variant
                 yield Variant(
                     rsid=rsid,
                     chromosome=chromosome,
                     position=position,
-                    genotype=genotype
+                    genotype=genotype,
+                    vcf_evidence=evidence,
                 )
             
             except (ValueError, IndexError):

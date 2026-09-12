@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- Preserve haploid VCF genotypes as one allele rather than duplicating them,
+  so haploid SNVs reach zygosity interpretation with the correct copy count.
+- Skip malformed VCF headers without crashing on unset column indices.
+
+### Added
+
+- Optional VCF source evidence on parsed variants: ordered alleles/indices,
+  phase and ploidy, raw reference declaration, and quality fields. Existing
+  consumer-format constructors remain compatible. See `docs/vcf-evidence.md`
+  for interpretation limits and reproducible development checks.
+
 ## [0.3.0] - 2026-09-09 — Revival
 
 **Unblocking population frequencies, and hardening the rolling downloads.** The gnomAD frequency feature shipped in 0.2.1 was inert because its data file was never published (the download 404'd). This makes it real and shores up the other data sources against upstream drift.
