@@ -182,6 +182,30 @@ def _pgx_rows(variant) -> str:
     )
 
 
+def _classification_context_row(variant) -> str:
+    """What kind of ClinVar classification the card shows, and its context."""
+    entries = getattr(variant, "clinvar_entries", None) or []
+    if not entries:
+        return ""
+    phrases = getattr(entries[0], "context_phrases", lambda: [])()
+    if not phrases:
+        return ""
+    value = "; ".join(html_escape.escape(str(p)) for p in phrases)
+    extra = ""
+    if len(entries) > 1:
+        others = "; ".join(
+            html_escape.escape(f"{e.clinical_significance or 'unclassified'} ({e.allele_match}, record {e.allele_id or '?'})")
+            for e in entries[1:]
+        )
+        extra = f'<br><span style="color:#6b7280;">Other ClinVar records for this site: {others}</span>'
+    return f'''
+                <div class="info-row">
+                    <span class="label">Classification context:</span>
+                    <span class="value" style="color:#374151;">{value}{extra}</span>
+                </div>
+'''
+
+
 def _inheritance_row(variant) -> str:
     """The ClinGen inheritance line, or nothing for GWAS-only cards."""
     inheritance = getattr(variant, "inheritance", None)
@@ -372,6 +396,7 @@ def generate_html_report(
                     <span class="label">Zygosity:</span>
                     <span class="value">{html_escape.escape(_zygosity_phrase(variant))}</span>
                 </div>
+{_classification_context_row(variant)}
 {_inheritance_row(variant)}
 {_pgx_rows(variant)}
                 <div class="info-row">

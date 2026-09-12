@@ -123,6 +123,37 @@ async def get_status() -> Dict[str, Any]:
     }
 
 
+def _classification_context_of(variant):
+    """Context phrases for the primary ClinVar record, and every record's fields."""
+    entries = getattr(variant, "clinvar_entries", None) or []
+    if not entries:
+        return None
+    primary = entries[0]
+    phrases = getattr(primary, "context_phrases", None)
+    return {
+        "phrases": phrases() if callable(phrases) else [],
+        "records": [
+            {
+                "allele_id": getattr(e, "allele_id", None),
+                "variation_id": getattr(e, "variation_id", None),
+                "chromosome": getattr(e, "chromosome", None),
+                "clinical_significance": getattr(e, "clinical_significance", None),
+                "classification_type": getattr(e, "classification_type", None),
+                "origin": getattr(e, "origin_simple", None) or getattr(e, "origin", None),
+                "somatic_clinical_impact": getattr(e, "somatic_clinical_impact", None),
+                "oncogenicity": getattr(e, "oncogenicity", None),
+                "review_status": getattr(e, "review_status", None),
+                "conditions": getattr(e, "conditions", None),
+                "rcv_accessions": getattr(e, "rcv_list", None) or [],
+                "allele_match": getattr(e, "allele_match", None),
+                "allele_match_note": getattr(e, "allele_match_note", None),
+                "display_rank": getattr(e, "display_rank", None),
+            }
+            for e in entries
+        ],
+    }
+
+
 def _resolution_of(variant):
     """``inheritance_resolution`` as JSON, or None for GWAS-only findings."""
     from dataclasses import asdict, is_dataclass
@@ -327,6 +358,11 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 # the gene-level summary kept separately. Same object the
                 # HTML report, CLI, prompt, and evidence JSON read.
                 "inheritance_resolution": _resolution_of(variant),
+                # What kind of ClinVar classification the card shows, its
+                # origin and any separate somatic assertion, plus every
+                # ClinVar record at the site with its own allele match and
+                # display rank, kept apart from the source classification.
+                "classification_context": _classification_context_of(variant),
                 "pgx": [
                     {
                         "drugs": e.drugs, "level": e.level, "phenotype_category": e.phenotype_category,

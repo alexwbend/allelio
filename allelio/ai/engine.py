@@ -1049,6 +1049,9 @@ class AIEngine:
                 sig = getattr(entry, 'clinical_significance', 'Unknown')
                 cond = getattr(entry, 'conditions', 'Unknown')
                 lines.append(f"  - {cond}: {sig}")
+                context = getattr(entry, 'context_phrases', None)
+                for phrase in (context() if callable(context) else []):
+                    lines.append(f"    {phrase}")
 
         if result.gwas_entries:
             lines.append("\nGWAS Associations:")

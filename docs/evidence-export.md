@@ -24,6 +24,12 @@ non-finite source numbers become null. The document contains:
   the ClinGen curations matched by MONDO identifier, the mapping method and
   version, the assertion's own conditions with their identifiers, and the
   gene-level summary kept separately. See [inheritance](inheritance.md).
+  Each ClinVar entry carries its classification context (`classification_type`,
+  `origin`, `origin_simple`, `rcv_accessions`, `number_submitters`, the somatic
+  clinical impact and oncogenicity assertions with their review statuses and
+  dates) and, separately from the source classification, `allele_match` with
+  `allele_match_note` and Allelio's `display_rank`; every ClinVar record at the
+  site is listed, distinct records included. See [ClinVar fields](clinvar-fields.md).
   `gnomad_entry` carries the frequency record's own identity (assembly,
   chromosome, position, REF, ALT, source version) and an `identity` label with
   `identity_note` saying whether it was verified as the matched allele's;

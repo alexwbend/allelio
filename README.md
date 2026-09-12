@@ -140,7 +140,7 @@ analysis filters still affect which findings are returned.
 
 | Source | Used for | Interpretation boundary |
 |---|---|---|
-| [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) | Submitted variant classifications, conditions, review status and allele identifiers | Assertions can disagree or change; retrieval is not independent verification |
+| [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) | Submitted variant classifications, conditions, review status, origin, separate somatic assertions, and allele identifiers ([field mapping](docs/clinvar-fields.md)) | Assertions can disagree or change; per-condition classifications are not in the summary file; retrieval is not independent verification |
 | [GWAS Catalog](https://www.ebi.ac.uk/gwas/) | Variant–trait associations and reported risk alleles | An association is not a personal risk estimate or a causal diagnosis |
 | [gnomAD](https://gnomad.broadinstitute.org/) | Population-frequency context from a pinned compact extract, matched by assembly, position and allele | Coverage is incomplete; a record not verified as the matched allele's is context only; rarity and commonness alone do not classify a variant |
 | [ClinGen](https://clinicalgenome.org/) | Gene–disease validity and inheritance context, matched to each ClinVar assertion's condition by MONDO identifier | Assertions without identifiers, or naming conditions inherited differently, stay unresolved |
