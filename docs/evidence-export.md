@@ -19,6 +19,11 @@ non-finite source numbers become null. The document contains:
   Fields mirror `VariantResult`: source entries (ClinVar, GWAS, gnomAD, ClinGen,
   PGx), category/rank, allele role/copies, strand decision, zygosity and inheritance
   notes. These are selected annotations, not every candidate database record.
+  The additive `inheritance_resolution` field (and `inheritance` on each ClinVar
+  entry) records how the inheritance phrase was reached: the resolution status,
+  the ClinGen curations matched by MONDO identifier, the mapping method and
+  version, the assertion's own conditions with their identifiers, and the
+  gene-level summary kept separately. See [inheritance](inheritance.md).
 - `gene_groups`: the same groups as the report, with `finding_ids` references.
 - `analysis_stats` and `limitations`: exclusion counts and interpretation limits.
 

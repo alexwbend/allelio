@@ -143,7 +143,7 @@ analysis filters still affect which findings are returned.
 | [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) | Submitted variant classifications, conditions, review status and allele identifiers | Assertions can disagree or change; retrieval is not independent verification |
 | [GWAS Catalog](https://www.ebi.ac.uk/gwas/) | Variant–trait associations and reported risk alleles | An association is not a personal risk estimate or a causal diagnosis |
 | [gnomAD](https://gnomad.broadinstitute.org/) | Population-frequency context from a pinned compact extract | Coverage is incomplete; rarity and commonness alone do not classify a variant |
-| [ClinGen](https://clinicalgenome.org/) | Gene–disease validity and inheritance context | Current gene-level rules do not resolve every allele–condition relationship |
+| [ClinGen](https://clinicalgenome.org/) | Gene–disease validity and inheritance context, matched to each ClinVar assertion's condition by MONDO identifier | Assertions without identifiers, or naming conditions inherited differently, stay unresolved |
 | [ClinPGx](https://www.clinpgx.org/) | Supported single-rsID, genotype-specific pharmacogenomic annotations | No comprehensive star-allele, diplotype or metabolizer calling |
 
 Source records and an optional display ranking are separate. Allelio does not
@@ -205,11 +205,16 @@ unknown. Consumer-array matching includes limited strand-complement and `I`/`D`
 length handling, which is not sequence-level confirmation of an indel. VCF SNP
 matching does not use that strand inference.
 
-ClinGen curations provide inheritance context. Current rules can group a
-single-copy finding under **Carrier Status** for a gene with suitable recessive
-curations; mixed inheritance remains unresolved. These are gene-level
-presentation rules, not condition-specific diagnoses. Haploid or diploid allele
-counts do not establish biological sex, penetrance, symptoms or affected status.
+ClinGen curations provide inheritance context, resolved for the condition each
+ClinVar assertion names: the assertion's MONDO identifiers are matched to
+ClinGen's, never its disease names. A single-copy finding is grouped under
+**Carrier Status** only when its condition resolves to a recessive curation.
+An assertion that names conditions inherited differently, carries no
+identifier, or names a condition ClinGen has not curated stays unresolved,
+with the reason and the gene-level summary shown beside it (see
+[docs/inheritance.md](docs/inheritance.md)). These are presentation rules over
+source curations, not diagnoses. Haploid or diploid allele counts do not
+establish biological sex, penetrance, symptoms or affected status.
 
 ### Gene grouping
 

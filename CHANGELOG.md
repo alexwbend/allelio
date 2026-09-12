@@ -30,6 +30,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   so haploid SNVs reach zygosity interpretation with the correct copy count.
 - Skip malformed VCF headers without crashing on unset column indices.
 
+### Changed
+
+- Inheritance is resolved for the condition each ClinVar assertion names, not
+  for the whole gene: ClinVar's `PhenotypeIDS` identifiers are stored
+  (`condition_ids`) and matched to ClinGen curations by MONDO identifier,
+  never by name (`mondo-exact` mapping, version 1.0, recorded on every
+  resolution). Carrier Status now requires a resolved recessive (or diploid
+  X-linked) condition; an assertion naming conditions inherited differently
+  reads "conflicting", one without identifiers or naming an uncurated
+  condition reads "unresolved" with the reason, and the gene-level summary is
+  kept separately. Findings and ClinVar entries carry the full
+  `inheritance_resolution` in web payloads and evidence JSON; the CLI table
+  shows an Inheritance column. Databases built before the column migrate in
+  place and read "identifiers not stored" until `allelio update`. Synthetic
+  challenge fixtures cover each path (`docs/inheritance.md`).
+
 ### Added
 
 - Gene groups in CLI, web, and HTML reports, with distinct-finding counts,

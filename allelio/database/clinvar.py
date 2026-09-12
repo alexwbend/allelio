@@ -106,8 +106,14 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
     
     Yields:
         Dict with keys: rsid, ref_allele, alt_allele, gene,
-        clinical_significance, conditions, review_status, last_evaluated.
-        Alleles come from the VCF-style columns (forward strand of the
+        clinical_significance, conditions, condition_ids, review_status,
+        last_evaluated. ``condition_ids`` is ClinVar's PhenotypeIDS column
+        verbatim: identifiers for each entry of PhenotypeList, in the same
+        order, so a condition can be resolved by MONDO identifier rather
+        than by name (see allelio/analysis/inheritance.py); it is '' when
+        ClinVar gives none, never None, so a stored row is never mistaken
+        for one from a database built before the column existed. Alleles come
+        from the VCF-style columns (forward strand of the
         reference build, the same convention consumer genotype files use);
         they are '' when ClinVar gives "na", which happens for large or
         complex variants.
@@ -146,6 +152,7 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                 gene_symbol = fields[CLINVAR_COLUMNS["GeneSymbol"]].strip()
                 clinical_sig = fields[CLINVAR_COLUMNS["ClinicalSignificance"]].strip()
                 phenotype_list = fields[CLINVAR_COLUMNS["PhenotypeList"]].strip()
+                phenotype_ids = fields[CLINVAR_COLUMNS["PhenotypeIDS"]].strip()
                 review_status = fields[CLINVAR_COLUMNS["ReviewStatus"]].strip()
                 last_evaluated = fields[CLINVAR_COLUMNS["LastEvaluated"]].strip()
                 assembly = fields[CLINVAR_COLUMNS["Assembly"]].strip()
@@ -177,6 +184,7 @@ def parse_clinvar(filepath: str) -> Generator[Dict[str, Any], None, None]:
                     "gene": gene_symbol if gene_symbol else None,
                     "clinical_significance": clinical_sig if clinical_sig else None,
                     "conditions": phenotype_list if phenotype_list else None,
+                    "condition_ids": phenotype_ids,
                     "review_status": review_status if review_status else None,
                     "last_evaluated": last_evaluated if last_evaluated else None,
                 }

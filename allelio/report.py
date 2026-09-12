@@ -400,7 +400,7 @@ def generate_html_report(
         (risk_factors, "Risk Factors", "#ea580c", "risk-factors", "Variants associated with increased risk for certain conditions."),
         (pharma, "Pharmacogenomics", "#7c3aed", "pharmacogenomics", "Variants that may affect drug metabolism or response."),
         (traits, "Trait Associations", "#2563eb", "traits", "Variants associated with traits identified in genome-wide studies."),
-        (carrier, "Carrier Status", "#0d9488", "carrier-status", "One copy of a pathogenic allele in a gene ClinGen curates only for recessive conditions: not the affected genotype, but relevant to family planning."),
+        (carrier, "Carrier Status", "#0d9488", "carrier-status", "One copy of a pathogenic allele whose ClinVar condition ClinGen curates as recessive (matched by MONDO identifier, never by name): not the affected genotype, but relevant to family planning. Conflicting or unresolved conditions stay under Health Conditions."),
         (benign, "Benign", "#16a34a", "benign", "Variants ClinVar classifies as benign or likely benign (shown with --include-benign)."),
     ]
 

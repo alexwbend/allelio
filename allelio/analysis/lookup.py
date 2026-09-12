@@ -11,6 +11,9 @@ from allelio.parsers.base import VCFEvidence
 from allelio.analysis.identity import vcf_identity_reason
 from allelio.analysis.frequency import valid_frequency
 from allelio.analysis.quality import vcf_filter_reason
+from allelio.analysis.inheritance import (
+    ClinGenEntry, InheritanceResolution, is_carrier, resolve_inheritance,
+)
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -116,8 +119,9 @@ class VariantCategory(str, Enum):
     RISK_FACTORS = "Risk Factors"
     PHARMACOGENOMICS = "Pharmacogenomics"
     TRAITS = "Traits"
-    # One copy of a pathogenic allele in a gene ClinGen curates only for
-    # recessive conditions (or one copy on a diploid X for an X-linked one).
+    # One copy of a pathogenic allele whose ClinVar condition ClinGen curates
+    # as recessive (or X-linked, on a diploid genotype). Decided per
+    # assertion by MONDO identifier; see allelio/analysis/inheritance.py.
     CARRIER_STATUS = "Carrier Status"
     BENIGN = "Benign"
     UNKNOWN = "Unknown"
@@ -141,11 +145,6 @@ PGX_LEVEL_RANKS = {"1A": 3.0, "1B": 3.0, "2A": 4.0, "2B": 4.0, "3": 6.0, "4": 7.
 # thousands of them, so a real file would drown in single-study drug notes.
 PGX_DEFAULT_MIN_LEVEL = "2B"
 
-# ClinGen classifications that count as an established gene-disease link when
-# deciding the mode of inheritance. Limited / Disputed / Refuted / "No Known
-# Disease Relationship" do not decide it.
-CLINGEN_ESTABLISHED = ("Definitive", "Strong", "Moderate")
-
 
 @dataclass
 class ClinVarEntry:
@@ -164,6 +163,12 @@ class ClinVarEntry:
     allele_id: Optional[str] = None
     variation_id: Optional[str] = None
     hgnc_id: Optional[str] = None
+    # ClinVar PhenotypeIDS, parallel to ``conditions``; None when the database
+    # predates the column. See allelio/analysis/inheritance.py.
+    condition_ids: Optional[str] = None
+    # How this assertion's own conditions are inherited, per ClinGen. Set for
+    # every applicable assertion once the result's gene is known.
+    inheritance: Optional[InheritanceResolution] = None
 
 
 @dataclass
@@ -177,16 +182,6 @@ class GWASEntry:
     study: Optional[str] = None
     pubmed_id: Optional[str] = None
     risk_allele: Optional[str] = None
-
-
-@dataclass
-class ClinGenEntry:
-    """One ClinGen gene-disease validity curation."""
-    gene: str
-    disease: Optional[str] = None
-    moi: Optional[str] = None
-    classification: Optional[str] = None
-    report_url: Optional[str] = None
 
 
 @dataclass
@@ -238,12 +233,16 @@ class VariantResult:
     strand_flipped: bool = False
     zygosity_note: Optional[str] = None
     allele_role: str = "alternate"
-    # ClinGen's curations for the gene, and what they say about inheritance:
-    # "autosomal recessive", "autosomal dominant", "X-linked", "mixed
-    # (dominant and recessive conditions)", or "not curated".
+    # ClinGen's curations for the gene, and the inheritance of the condition
+    # the primary ClinVar assertion is about: "autosomal recessive",
+    # "autosomal dominant", "X-linked", or an unresolved phrase that says
+    # why ("conflicting (...)", "unresolved (...)", "not curated"). The full
+    # resolution, with the matched curations, the mapping that produced it,
+    # and the gene-level summary kept separately, is ``inheritance_resolution``.
     clingen_entries: List[ClinGenEntry] = field(default_factory=list)
     inheritance: str = "not curated"
     inheritance_note: Optional[str] = None
+    inheritance_resolution: Optional[InheritanceResolution] = None
     # ClinPGx annotations whose genotype row matches this person's genotype,
     # best level of evidence first.
     pgx_entries: List[PGxEntry] = field(default_factory=list)
@@ -428,7 +427,8 @@ def _clinvar_entry(cv_data: Dict[str, Any]) -> ClinVarEntry:
         ref_allele=cv_data.get("ref_allele") or None,
         alt_allele=cv_data.get("alt_allele") or None,
         **{key: cv_data.get(key) for key in (
-            "assembly", "chromosome", "position_vcf", "allele_id", "variation_id", "hgnc_id"
+            "assembly", "chromosome", "position_vcf", "allele_id", "variation_id", "hgnc_id",
+            "condition_ids",
         )},
     )
 
@@ -610,59 +610,6 @@ def _match_pgx(
     ]
     entries.sort(key=lambda e: (pgx_level_rank(e.level), e.drugs or ""))
     return entries
-
-
-def _inheritance(entries: List[ClinGenEntry]) -> Tuple[str, Optional[str]]:
-    """Summarise ClinGen's curations for a gene as one inheritance phrase.
-
-    Only established curations (see CLINGEN_ESTABLISHED) decide it. A gene
-    curated for both dominant and recessive conditions reads "mixed": with
-    one copy, whether that is carrier status depends on which condition the
-    allele causes, which gene-level curation cannot say.
-
-    Returns:
-        (inheritance, note), e.g. ("autosomal recessive", "ClinGen:
-        hemochromatosis type 1 (Definitive)").
-    """
-    from allelio.database.clingen import MOI_LABELS
-
-    established = [e for e in entries if (e.classification or "") in CLINGEN_ESTABLISHED]
-    if not entries:
-        return "not curated", None
-    if not established:
-        return "not established", (
-            "ClinGen lists no established gene-disease relationship for this gene ("
-            + "; ".join(f"{e.disease}: {e.classification}" for e in entries[:3]) + ")"
-        )
-    mois = {e.moi for e in established if e.moi}
-    note = "ClinGen: " + "; ".join(
-        f"{e.disease} ({MOI_LABELS.get(e.moi, e.moi or '?')}, {e.classification})" for e in established[:4]
-    )
-    if mois == {"AR"}:
-        return "autosomal recessive", note
-    if mois == {"AD"}:
-        return "autosomal dominant", note
-    if mois == {"XL"}:
-        return "X-linked", note
-    if mois == {"SD"}:
-        return "semidominant", note
-    if mois == {"MT"}:
-        return "mitochondrial", note
-    if "AR" in mois and ("AD" in mois or "SD" in mois or "XL" in mois):
-        return "mixed (dominant and recessive conditions)", note
-    return ", ".join(sorted(MOI_LABELS.get(m, m) for m in mois)) or "undetermined", note
-
-
-def _carrier(inheritance: str, call: ZygosityCall, genotype: Optional[str]) -> bool:
-    """One copy of the allele where inheritance says one copy is a carrier."""
-    if call.alt_copies != 1:
-        return False
-    if inheritance == "autosomal recessive":
-        return True
-    if inheritance == "X-linked":
-        # A single-letter genotype is hemizygous (one X): affected, not carrier.
-        return len(genotype or "") == 2
-    return False
 
 
 def analyze_variants_with_stats(
@@ -879,11 +826,14 @@ def analyze_variants_with_stats(
         if call.alt_copies is None and call.zygosity != Zygosity.NO_CALL:
             stats.zygosity_unknown_sites += 1
 
-        # Inheritance from ClinGen, and the carrier rule: one copy of a
-        # pathogenic allele in a recessive-only gene is carrier status, ordered
-        # a tier below the affected genotype.
+        # Inheritance from ClinGen, resolved against the condition each
+        # applicable assertion names rather than the gene as a whole, and the
+        # carrier rule: one copy of a pathogenic allele for a condition ClinGen
+        # curates as recessive is carrier status, ordered a tier below the
+        # affected genotype. An unresolved or conflicting condition never is.
         clingen_entries: List[ClinGenEntry] = []
         inheritance, inheritance_note = "not curated", None
+        resolution: Optional[InheritanceResolution] = None
         if clinvar_entry and clinvar_entry.gene:
             # ClinVar can list several overlapping genes ("MC1R;TUBB3"); the
             # first is the one the record is about, and a curation for a
@@ -893,9 +843,17 @@ def analyze_variants_with_stats(
                     clingen_entries.append(ClinGenEntry(
                         gene=row.get("gene"), disease=row.get("disease"), moi=row.get("moi"),
                         classification=row.get("classification"), report_url=row.get("report_url"),
+                        mondo_id=row.get("mondo_id"),
                     ))
-            inheritance, inheritance_note = _inheritance(clingen_entries)
-            if category == VariantCategory.HEALTH_CONDITIONS.value and _carrier(inheritance, call, genotype):
+            for entry in clinvar_entries:
+                entry.inheritance = resolve_inheritance(
+                    entry.conditions, entry.condition_ids, clingen_entries
+                )
+            resolution = clinvar_entry.inheritance
+            inheritance, inheritance_note = resolution.inheritance, resolution.note
+            if category == VariantCategory.HEALTH_CONDITIONS.value and is_carrier(
+                resolution, call.alt_copies, genotype
+            ):
                 category = VariantCategory.CARRIER_STATUS.value
                 adjusted_rank = min(adjusted_rank + CARRIER_RANK_SHIFT, MAX_ADJUSTED_RANK)
 
@@ -919,6 +877,7 @@ def analyze_variants_with_stats(
             clingen_entries=clingen_entries,
             inheritance=inheritance,
             inheritance_note=inheritance_note,
+            inheritance_resolution=resolution,
             pgx_entries=pgx_entries,
         )
 

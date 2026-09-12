@@ -123,6 +123,15 @@ async def get_status() -> Dict[str, Any]:
     }
 
 
+def _resolution_of(variant):
+    """``inheritance_resolution`` as JSON, or None for GWAS-only findings."""
+    from dataclasses import asdict, is_dataclass
+    resolution = getattr(variant, "inheritance_resolution", None)
+    if resolution is None or not getattr(variant, "clinvar_entries", None):
+        return None
+    return asdict(resolution) if is_dataclass(resolution) else resolution
+
+
 def _zygosity_label(variant) -> Optional[str]:
     describe = getattr(variant, "describe_zygosity", None)
     if not callable(describe):
@@ -313,6 +322,11 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 "zygosity_label": _zygosity_label(variant),
                 "inheritance": getattr(variant, "inheritance", None) if getattr(variant, "clinvar_entries", None) else None,
                 "inheritance_note": getattr(variant, "inheritance_note", None),
+                # The condition-level resolution behind the phrase: status,
+                # matched ClinGen curations, the mapping that produced it, and
+                # the gene-level summary kept separately. Same object the
+                # HTML report, CLI, prompt, and evidence JSON read.
+                "inheritance_resolution": _resolution_of(variant),
                 "pgx": [
                     {
                         "drugs": e.drugs, "level": e.level, "phenotype_category": e.phenotype_category,
