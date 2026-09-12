@@ -13,6 +13,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from starlette.background import BackgroundTask
 
+from allelio.evidence import build_evidence_export
 from allelio.report_style import REPORT_CSS
 from allelio import __version__
 from allelio.parsers import parse_genotype_file
@@ -337,6 +338,11 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             formatted_results.append(result_dict)
 
         payload = {
+            "evidence_export": build_evidence_export(
+                analysis_results, genotypes, provenance_of(db),
+                {"include_benign": False, "include_reference": False,
+                 "traits_only": False, "frequency_adjustment": True}, analysis_stats,
+            ),
             "summary": summary,
             "results": formatted_results,
             "gene_groups": group_findings(formatted_results),

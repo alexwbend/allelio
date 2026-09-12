@@ -1127,6 +1127,7 @@
 
             <!-- Export -->
             <div class="export-container">
+                <button class="export-button" id="evidenceButton">Export Evidence JSON</button>
                 <button class="export-button" id="exportButton">📥 Export Report</button>
                 <button class="export-button secondary" id="saveButton">💾 Save results on this computer</button>
             </div>
@@ -1184,6 +1185,7 @@
 
             // Export Button
             document.getElementById('exportButton').addEventListener('click', exportReport);
+            document.getElementById('evidenceButton').addEventListener('click', exportEvidence);
 
             // Saving results on this machine — opt-in, and reversible
             document.getElementById('saveButton').addEventListener('click', saveResults);
@@ -1614,6 +1616,20 @@
         }
 
         // Export Report
+        function exportEvidence() {
+            if (!analysisResults || !analysisResults.evidence_export) {
+                alert('Evidence JSON is unavailable for this older saved analysis. Run the analysis again.');
+                return;
+            }
+            const blob = new Blob([JSON.stringify(analysisResults.evidence_export, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'allelio-evidence.json';
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
         async function exportReport() {
             if (!analysisResults) return;
 
