@@ -37,7 +37,7 @@ VARIANT_PROMPT_TEMPLATE = """Please explain the following genetic variant findin
 Please provide:
 1. A plain-English explanation of what this variant means
 2. What the user's specific genotype ({genotype}, {zygosity}) implies given the inheritance ({inheritance}). The inheritance line is resolved for the condition this ClinVar assertion names, matched to a ClinGen curation by MONDO identifier, and the note says how: for an autosomal recessive condition, one copy means carrier status rather than being affected and two copies is the affected genotype; for an autosomal dominant one, one copy is the relevant genotype; if the inheritance reads conflicting (the assertion names conditions inherited differently), unresolved, not established, or not curated, or the zygosity is unknown, say so plainly and do not assume either; never treat the gene-level context in the note as settling the condition
-3. How the population frequency affects interpretation (e.g., common variants are less likely to cause rare diseases)
+3. How the population frequency affects interpretation (e.g., common variants are less likely to cause rare diseases), only if its allele identity is verified; if it is not verified, say the frequency could not be confirmed as this allele's and do not draw a conclusion from it
 4. Any relevant lifestyle, dietary, or environmental context from research
 5. Important caveats and limitations
 
@@ -164,6 +164,19 @@ def format_gnomad_summary(gnomad_entry) -> str:
     an = getattr(gnomad_entry, 'an', None)
 
     lines = []
+
+    # Whether this record is the matched allele's frequency at all. An
+    # unverified record is site context, never "the user's allele is common".
+    identity = getattr(gnomad_entry, "identity", None)
+    identity_note = getattr(gnomad_entry, "identity_note", None)
+    if identity == "matched":
+        lines.append(f"- Allele identity: verified ({identity_note or 'agrees with the matched record'})")
+    else:
+        lines.append(
+            f"- Allele identity: NOT verified ({identity or 'unverified'}: {identity_note or 'no identity recorded'}). "
+            "Treat the figures below as context for this site, not as the frequency of the user's "
+            "allele; they did not affect ranking."
+        )
 
     # Main frequency line
     if ac is not None and an is not None:

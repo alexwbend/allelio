@@ -52,6 +52,52 @@ class AllelioDB:
         cols = self._columns("clinvar")
         return bool(cols) and "alt_allele" in cols
 
+    def gnomad_is_allele_aware(self) -> bool:
+        """True if the gnomad table carries ref/alt alleles (format 2 schema)."""
+        cols = self._columns("gnomad")
+        return bool(cols) and "alt_allele" in cols
+
+    def _migrate_gnomad_rsid_only(self) -> None:
+        """Rebuild an rsID-keyed gnomad table around (rsid, ref, alt).
+
+        Rows are kept, with empty alleles and no assembly, so a database
+        that has not been refreshed still shows its frequencies as context.
+        """
+        self.cursor.execute("ALTER TABLE gnomad RENAME TO gnomad_rsid_only")
+        self.cursor.execute("DROP INDEX IF EXISTS idx_gnomad_rsid")
+        self.cursor.execute("""
+            CREATE TABLE gnomad (
+                rsid TEXT NOT NULL,
+                ref_allele TEXT NOT NULL DEFAULT '',
+                alt_allele TEXT NOT NULL DEFAULT '',
+                chromosome TEXT NOT NULL DEFAULT '',
+                position INTEGER,
+                assembly TEXT,
+                source_version TEXT,
+                allele_frequency REAL,
+                af_popmax REAL,
+                ac INTEGER,
+                an INTEGER,
+                nhomalt INTEGER,
+                af_afr REAL,
+                af_eas REAL,
+                af_fin REAL,
+                af_nfe REAL,
+                af_sas REAL,
+                PRIMARY KEY (rsid, ref_allele, alt_allele)
+            )
+        """)
+        self.cursor.execute("""
+            INSERT OR IGNORE INTO gnomad
+                (rsid, allele_frequency, af_popmax, ac, an, nhomalt,
+                 af_afr, af_eas, af_fin, af_nfe, af_sas)
+            SELECT rsid, allele_frequency, af_popmax, ac, an, nhomalt,
+                   af_afr, af_eas, af_fin, af_nfe, af_sas
+            FROM gnomad_rsid_only
+        """)
+        self.cursor.execute("DROP TABLE gnomad_rsid_only")
+        self.conn.commit()
+
     def initialize(self) -> None:
         """Create tables and indexes, migrating an older schema where needed."""
         # A pre-allele-aware clinvar table cannot be upgraded in place: its rows
@@ -113,10 +159,23 @@ class AllelioDB:
         if "risk_allele" not in self._columns("gwas"):
             self.cursor.execute("ALTER TABLE gwas ADD COLUMN risk_allele TEXT")
         
-        # Create gnomAD population frequency table
+        # gnomAD population frequencies, one row per (rsID, ref, alt) so the
+        # alternate alleles of a multiallelic site (rs334 T>A and T>G) keep
+        # their own frequencies. A table built from the rsID-only extract is
+        # migrated in place: its rows keep empty alleles and a NULL assembly,
+        # which the analysis reads as "identity unverified", never as the
+        # matched allele's frequency.
+        if self._columns("gnomad") and not self.gnomad_is_allele_aware():
+            self._migrate_gnomad_rsid_only()
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS gnomad (
-                rsid TEXT PRIMARY KEY,
+                rsid TEXT NOT NULL,
+                ref_allele TEXT NOT NULL DEFAULT '',
+                alt_allele TEXT NOT NULL DEFAULT '',
+                chromosome TEXT NOT NULL DEFAULT '',
+                position INTEGER,
+                assembly TEXT,
+                source_version TEXT,
                 allele_frequency REAL,
                 af_popmax REAL,
                 ac INTEGER,
@@ -126,7 +185,8 @@ class AllelioDB:
                 af_eas REAL,
                 af_fin REAL,
                 af_nfe REAL,
-                af_sas REAL
+                af_sas REAL,
+                PRIMARY KEY (rsid, ref_allele, alt_allele)
             )
         """)
 
@@ -253,29 +313,48 @@ class AllelioDB:
 
         Args:
             records: List of dicts with keys: rsid, allele_frequency, af_popmax,
-                    ac, an, nhomalt, af_afr, af_eas, af_fin, af_nfe, af_sas
+                    ac, an, nhomalt, af_afr, af_eas, af_fin, af_nfe, af_sas,
+                    and optionally chromosome, position, ref_allele,
+                    alt_allele, assembly, source_version (default: no
+                    identity recorded, as in a format 1 extract)
         """
         if not records:
             return
 
+        rows = [
+            {
+                "chromosome": r.get("chromosome") or "",
+                "position": r.get("position"),
+                "ref_allele": (r.get("ref_allele") or "").upper(),
+                "alt_allele": (r.get("alt_allele") or "").upper(),
+                "assembly": r.get("assembly"),
+                "source_version": r.get("source_version"),
+                **{k: r.get(k) for k in ("rsid", "allele_frequency", "af_popmax", "ac", "an",
+                                         "nhomalt", "af_afr", "af_eas", "af_fin", "af_nfe", "af_sas")},
+            }
+            for r in records
+        ]
         self.cursor.executemany(
             """INSERT OR REPLACE INTO gnomad
-               (rsid, allele_frequency, af_popmax, ac, an, nhomalt,
+               (rsid, ref_allele, alt_allele, chromosome, position, assembly, source_version,
+                allele_frequency, af_popmax, ac, an, nhomalt,
                 af_afr, af_eas, af_fin, af_nfe, af_sas)
-               VALUES (:rsid, :allele_frequency, :af_popmax, :ac, :an, :nhomalt,
-                        :af_afr, :af_eas, :af_fin, :af_nfe, :af_sas)
+               VALUES (:rsid, :ref_allele, :alt_allele, :chromosome, :position, :assembly, :source_version,
+                       :allele_frequency, :af_popmax, :ac, :an, :nhomalt,
+                       :af_afr, :af_eas, :af_fin, :af_nfe, :af_sas)
             """,
-            records
+            rows
         )
         self.conn.commit()
 
     def clear_table(self, table: str) -> None:
         """Empty one of the reference tables before a re-index.
 
-        Rows are keyed by (rsid, alleles) for ClinVar and by rsid for gnomAD,
-        so a re-index replaces what it re-emits, but a row the new release no
-        longer carries (a withdrawn record, or one whose alleles are now read
-        differently) would otherwise survive beside the new ones.
+        Rows are keyed by (rsid, alleles) for ClinVar and gnomAD, so a
+        re-index replaces what it re-emits, but a row the new release no
+        longer carries (a withdrawn record, one whose alleles are now read
+        differently, or an rsID-only row beside its allele-aware replacement)
+        would otherwise survive beside the new ones.
         """
         if table not in ("clinvar", "gwas", "gnomad", "clingen", "clinpgx"):
             raise ValueError(f"not a reference table: {table}")
@@ -387,9 +466,9 @@ class AllelioDB:
 
         Returns:
             Dict with 'clinvar' (list of dicts), 'gwas' (list of dicts),
-            and 'gnomad' (dict or None) keys
+            and 'gnomad' (list of dicts, one per recorded allele) keys
         """
-        result = {"clinvar": [], "gwas": [], "gnomad": None}
+        result = {"clinvar": [], "gwas": [], "gnomad": []}
 
         # Query ClinVar, every allele row for the rsID, in a stable order
         order = " ORDER BY ref_allele, alt_allele" if self.clinvar_is_allele_aware() else ""
@@ -401,12 +480,12 @@ class AllelioDB:
         gwas_rows = self.cursor.fetchall()
         result["gwas"] = [dict(row) for row in gwas_rows]
 
-        # Query gnomAD (backward compatible — table may not exist)
+        # Query gnomAD, every allele row (the table may not exist)
         if self._has_gnomad_table():
-            self.cursor.execute("SELECT * FROM gnomad WHERE rsid = ?", (rsid,))
-            gnomad_row = self.cursor.fetchone()
-            if gnomad_row:
-                result["gnomad"] = dict(gnomad_row)
+            self.cursor.execute(
+                "SELECT * FROM gnomad WHERE rsid = ? ORDER BY ref_allele, alt_allele", (rsid,)
+            )
+            result["gnomad"] = [dict(row) for row in self.cursor.fetchall()]
 
         return result
     
@@ -417,7 +496,8 @@ class AllelioDB:
             rsids: List of rsIDs to look up
 
         Returns:
-            Dict mapping rsid -> {clinvar: [...], gwas: [...], gnomad: dict|None}
+            Dict mapping rsid -> {clinvar: [...], gwas: [...], gnomad: [...]},
+            gnomAD holding one row per recorded allele at the rsID
         """
         result = {}
 
@@ -431,7 +511,7 @@ class AllelioDB:
 
         # Initialize result dict with all rsids
         for rsid in rsids:
-            result[rsid] = {"clinvar": [], "gwas": [], "gnomad": None}
+            result[rsid] = {"clinvar": [], "gwas": [], "gnomad": []}
 
         # SQLite has a variable limit — process in chunks of 500
         chunk_size = 500
@@ -453,13 +533,14 @@ class AllelioDB:
                 rsid = row["rsid"]
                 result[rsid]["gwas"].append(dict(row))
 
-            # Query gnomAD (backward compatible)
+            # Query gnomAD, one row per recorded allele
             if has_gnomad:
-                query = f"SELECT * FROM gnomad WHERE rsid IN ({placeholders})"
+                query = (f"SELECT * FROM gnomad WHERE rsid IN ({placeholders})"
+                         " ORDER BY rsid, ref_allele, alt_allele")
                 self.cursor.execute(query, chunk)
                 for row in self.cursor.fetchall():
                     rsid = row["rsid"]
-                    result[rsid]["gnomad"] = dict(row)
+                    result[rsid]["gnomad"].append(dict(row))
 
         return result
     

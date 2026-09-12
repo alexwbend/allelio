@@ -10,6 +10,15 @@ keep the shipped file to a few MB (rather than hundreds), pass --array-sites
 with a consumer-array rsID list (or a 23andMe / AncestryDNA raw file) so the
 extract is trimmed to the ~1–2 M sites those chips actually report.
 
+Format 2 (this script): one row per alternate allele, with chromosome,
+position, REF and ALT, and an ``## Assembly:`` header line, so Allelio can
+check that a frequency describes the allele a person carries before showing
+it as theirs or letting it move a rank. The format 1 extract published for
+0.3.0 was keyed by rsID alone and kept only the first alternate allele at a
+multiallelic site; Allelio reads it as unverified context. A refreshed
+extract is only publishable with its source URLs, the gnomAD release, the
+SHA-256 this script prints, and gnomAD's CC0 terms recorded in the manifest.
+
 Usage:
     # Trim to a consumer-array rsID list (recommended — output is a few MB).
     # The rsID file may be a plain list, or a raw 23andMe / AncestryDNA export
@@ -67,6 +76,13 @@ GNOMAD_VCF_TEMPLATE = (
 
 ALL_CHROMOSOMES = [f"chr{i}" for i in range(1, 23)] + ["chrX", "chrY"]
 
+# Which reference build each gnomAD major release is on. Anything else has
+# to be declared with --assembly; the file will not claim a build it does not
+# know.
+ASSEMBLY_BY_MAJOR_VERSION = {"2": "GRCh37", "3": "GRCh38", "4": "GRCh38"}
+
+EXTRACT_FORMAT = 2
+
 # VCF INFO fields to extract
 FREQUENCY_FIELDS = {
     "AF": "af",
@@ -81,24 +97,48 @@ FREQUENCY_FIELDS = {
     "AF_sas": "af_sas",
 }
 
-# Output TSV column order
-OUTPUT_COLUMNS = [
-    "rsid", "AF", "AF_grpmax", "AC", "AN", "nhomalt",
+# Output TSV column order. The first five identify the allele; the rest are
+# the INFO fields above, per alternate allele.
+IDENTITY_COLUMNS = ["rsid", "chrom", "pos", "ref", "alt"]
+FREQUENCY_COLUMNS = [
+    "AF", "AF_grpmax", "AC", "AN", "nhomalt",
     "AF_afr", "AF_eas", "AF_fin", "AF_nfe", "AF_sas",
 ]
+OUTPUT_COLUMNS = IDENTITY_COLUMNS + FREQUENCY_COLUMNS
+
+# INFO fields with one value per alternate allele (VCF Number=A). AN is one
+# value for the site.
+PER_ALLELE_FIELDS = {c for c in FREQUENCY_COLUMNS if c != "AN"}
 
 
 def parse_info_field(info_str: str) -> dict:
-    """Parse VCF INFO field into a dict of key=value pairs."""
+    """Parse a VCF INFO field into a dict of key=value pairs, values verbatim.
+
+    Comma-separated values (one per alternate allele) are kept whole; see
+    ``allele_values`` for picking the one that belongs to a given ALT.
+    """
     result = {}
     for item in info_str.split(";"):
         if "=" in item:
             key, value = item.split("=", 1)
-            # For multi-allelic sites, take the first value
-            if "," in value:
-                value = value.split(",")[0]
             result[key] = value
     return result
+
+
+def allele_values(info: dict, allele_index: int) -> list:
+    """The FREQUENCY_COLUMNS for one alternate allele, '.' where absent.
+
+    Per-allele fields are split on commas and indexed; a field with fewer
+    values than alleles yields '.' rather than another allele's number.
+    """
+    values = []
+    for col in FREQUENCY_COLUMNS:
+        raw = info.get(col, ".")
+        if col in PER_ALLELE_FIELDS and "," in raw:
+            parts = raw.split(",")
+            raw = parts[allele_index] if allele_index < len(parts) else "."
+        values.append(raw if raw else ".")
+    return values
 
 
 def load_array_sites(path: str) -> set:
@@ -190,6 +230,9 @@ def emit_records(line_iter, output_file, count_so_far: int, array_sites: set = N
         fields = line.rstrip("\n").split("\t", 8)  # only split first 8 fields
         if len(fields) < 8:
             continue
+        chrom = fields[0][3:] if fields[0].startswith("chr") else fields[0]
+        pos, ref = fields[1], fields[3].upper()
+        alts = [a.upper() for a in fields[4].split(",")]
 
         # fields[2] = ID. gnomAD may pack several rsIDs here ("rs1;rs2"),
         # so match each against the array set rather than trusting one.
@@ -208,16 +251,16 @@ def emit_records(line_iter, output_file, count_so_far: int, array_sites: set = N
         # fields[7] = INFO
         info = parse_info_field(fields[7])
 
-        # Build the frequency values once; emit a row per matched rsID so a
-        # multi-rsID site still lands under whichever ID the array reports.
-        freq_values = []
-        for col in OUTPUT_COLUMNS[1:]:  # skip rsid, already handled
-            val = info.get(col, ".")
-            freq_values.append(val if val else ".")
-
-        for rsid in rsids:
-            output_file.write("\t".join([rsid] + freq_values) + "\n")
-            count += 1
+        # One row per alternate allele, with its own frequency values, under
+        # each matched rsID (gnomAD may pack several rsIDs into ID, and a
+        # multi-rsID site should land under whichever ID the array reports).
+        for allele_index, alt in enumerate(alts):
+            if alt in ("*", "."):
+                continue  # spanning deletion / missing: not an allele to report
+            freq_values = allele_values(info, allele_index)
+            for rsid in rsids:
+                output_file.write("\t".join([rsid, chrom, pos, ref, alt] + freq_values) + "\n")
+                count += 1
 
         if count % 1_000_000 == 0:
             print(f"  ... {count:,} variants extracted (skipped {skipped:,})")
@@ -312,6 +355,11 @@ def main():
              "directory and VCF filename version on the public bucket.",
     )
     parser.add_argument(
+        "--assembly",
+        help="Reference build the VCFs are on. Inferred from --version for "
+             "gnomAD 2 (GRCh37), 3 and 4 (GRCh38); required otherwise.",
+    )
+    parser.add_argument(
         "--array-sites",
         help="Path to a consumer-array rsID list (or a raw 23andMe / "
              "AncestryDNA file) to trim the extract to. Strongly recommended — "
@@ -335,6 +383,11 @@ def main():
         help="With --cache-vcfs, don't delete each VCF after processing.",
     )
     args = parser.parse_args()
+
+    assembly = args.assembly or ASSEMBLY_BY_MAJOR_VERSION.get(args.version.split(".")[0])
+    if not assembly:
+        print(f"ERROR: no known assembly for gnomAD {args.version}; pass --assembly")
+        sys.exit(1)
 
     # Load the consumer-array trim set, if given.
     array_sites = None
@@ -385,7 +438,10 @@ def main():
     with gzip.open(str(output_path), "wt", encoding="utf-8", compresslevel=6) as out:
         # Write header
         out.write("## Allelio gnomAD frequency file\n")
+        out.write(f"## Format: {EXTRACT_FORMAT}\n")
         out.write(f"## Source: gnomAD v{args.version} genome sites VCFs\n")
+        out.write(f"## Assembly: {assembly}\n")
+        out.write("## License: CC0 1.0 (gnomAD); redistribution permitted\n")
         trim_note = f"{len(array_sites):,} array sites" if array_sites else "all rsIDs"
         out.write(f"## Trim: {trim_note}\n")
         out.write(f"## Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -454,11 +510,16 @@ def main():
     print("  3. Update data/gnomad_manifest.json to point at the new file:")
     print()
     manifest = {
-        "schema": 1,
+        "schema": 2,
         "source": "gnomAD",
         "version": f"v{args.version}",
+        "format": EXTRACT_FORMAT,
+        "assembly": assembly,
         "file": output_path.name,
         "sha256": sha256,
+        "rows": total_variants,
+        "source_urls": [GNOMAD_VCF_TEMPLATE.format(version=args.version, chrom=c) for c in chroms],
+        "license": "CC0 1.0",
         "urls": [
             "<PERMAWEB_URL_HERE>",
             f"https://github.com/alexwbend/allelio/releases/download/"

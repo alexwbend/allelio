@@ -32,6 +32,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Population frequencies are matched by assembly, coordinate, and allele
+  before they count. gnomAD rows are keyed by `(rsid, ref, alt)` with
+  chromosome, position, assembly, and source version, so the alternate
+  alleles of a multiallelic site coexist; a record is labelled `matched`
+  only when it agrees with the ClinVar record the genotype matched (or
+  declared VCF evidence), and only a matched record may adjust the display
+  rank or be described as the person's allele frequency. Other records stay
+  visible as context with the reason (`unverified`, `build_mismatch`,
+  `position_mismatch`, `other_allele`, `alleles_swapped`,
+  `orientation_reversed`); the report, prompt, and evidence JSON say so.
+  The extract format gains per-allele rows and an assembly header (format
+  2, `scripts/build_gnomad_freq.py`), the build script splits multiallelic
+  INFO values per allele instead of keeping the first, and the rsID-only
+  table migrates in place. The published format 1 extract now reads as
+  unverified context, so the display adjustment is inert until a format 2
+  extract is published with its provenance, checksum, and CC0 terms in the
+  manifest (`docs/population-frequency.md`).
+
 - Inheritance is resolved for the condition each ClinVar assertion names, not
   for the whole gene: ClinVar's `PhenotypeIDS` identifiers are stored
   (`condition_ids`) and matched to ClinGen curations by MONDO identifier,

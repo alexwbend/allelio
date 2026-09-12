@@ -88,10 +88,20 @@ def _get_frequency_html(variant) -> str:
         color = "#dc2626"  # red — rare
         label = "Rare"
 
+    # Only a record verified as describing the matched allele is shown as
+    # the person's allele frequency; anything else is source context at the
+    # rsID, labelled with why it was not applied (and it did not rank).
+    verified = getattr(gnomad, "identity", None) == "matched"
+    heading = "Population Frequency:" if verified else "Population Frequency (unverified, context only):"
+    identity_note = "" if verified else (
+        f'<br><span style="color:#6b7280; font-weight: normal;">Not verified as this allele\'s frequency: '
+        f'{html_escape.escape(str(getattr(gnomad, "identity_note", None) or getattr(gnomad, "identity", "unverified")))}'
+        '. Not used for ranking.</span>'
+    )
     freq_html = f'''
                 <div class="info-row">
-                    <span class="label">Population Frequency:</span>
-                    <span class="value" style="color: {color}; font-weight: bold;">{af_percent:.3f}% ({label})</span>
+                    <span class="label">{heading}</span>
+                    <span class="value" style="color: {color}; font-weight: bold;">{af_percent:.3f}% ({label}){identity_note}</span>
                 </div>
 '''
 

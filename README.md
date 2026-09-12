@@ -142,7 +142,7 @@ analysis filters still affect which findings are returned.
 |---|---|---|
 | [ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/) | Submitted variant classifications, conditions, review status and allele identifiers | Assertions can disagree or change; retrieval is not independent verification |
 | [GWAS Catalog](https://www.ebi.ac.uk/gwas/) | Variant–trait associations and reported risk alleles | An association is not a personal risk estimate or a causal diagnosis |
-| [gnomAD](https://gnomad.broadinstitute.org/) | Population-frequency context from a pinned compact extract | Coverage is incomplete; rarity and commonness alone do not classify a variant |
+| [gnomAD](https://gnomad.broadinstitute.org/) | Population-frequency context from a pinned compact extract, matched by assembly, position and allele | Coverage is incomplete; a record not verified as the matched allele's is context only; rarity and commonness alone do not classify a variant |
 | [ClinGen](https://clinicalgenome.org/) | Gene–disease validity and inheritance context, matched to each ClinVar assertion's condition by MONDO identifier | Assertions without identifiers, or naming conditions inherited differently, stay unresolved |
 | [ClinPGx](https://www.clinpgx.org/) | Supported single-rsID, genotype-specific pharmacogenomic annotations | No comprehensive star-allele, diplotype or metabolizer calling |
 
