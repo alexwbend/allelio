@@ -352,3 +352,8 @@ Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md) and the
 Allelio's code is [MIT licensed](LICENSE). Reference data and model weights
 retain their respective licenses and terms. The software is provided as-is
 for research and education, without a claim of clinical validation.
+
+Structured evidence is available with `allelio analyze input.txt --no-ai
+--json-output evidence.json` or **Export Evidence JSON** in the web report.
+See the [versioned export contract](docs/evidence-export.md) for retained source
+fields, input evidence, and interpretation limits.
