@@ -80,6 +80,15 @@ class AllelioDB:
             )
         """)
         
+        # Add source identity without discarding existing allele-aware rows.
+        # Legacy records stay NULL until refreshed from their reference source.
+        columns = self._columns("clinvar")
+        for name, sql_type in (("assembly", "TEXT"), ("chromosome", "TEXT"),
+                               ("position_vcf", "INTEGER"), ("allele_id", "TEXT"),
+                               ("variation_id", "TEXT"), ("hgnc_id", "TEXT")):
+            if name not in columns:
+                self.cursor.execute(f"ALTER TABLE clinvar ADD COLUMN {name} {sql_type}")
+
         # Create GWAS table
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS gwas (
@@ -200,14 +209,16 @@ class AllelioDB:
                 "ref_allele": (r.get("ref_allele") or ""),
                 "alt_allele": (r.get("alt_allele") or ""),
                 **{k: r.get(k) for k in ("rsid", "gene", "clinical_significance",
-                                         "conditions", "review_status", "last_evaluated")},
+                                         "conditions", "review_status", "last_evaluated",
+                                         "assembly", "chromosome", "position_vcf", "allele_id",
+                                         "variation_id", "hgnc_id")},
             }
             for r in records
         ]
         self.cursor.executemany(
             """INSERT OR REPLACE INTO clinvar
-               (rsid, ref_allele, alt_allele, gene, clinical_significance, conditions, review_status, last_evaluated)
-               VALUES (:rsid, :ref_allele, :alt_allele, :gene, :clinical_significance, :conditions, :review_status, :last_evaluated)
+               (rsid, ref_allele, alt_allele, gene, clinical_significance, conditions, review_status, last_evaluated, assembly, chromosome, position_vcf, allele_id, variation_id, hgnc_id)
+               VALUES (:rsid, :ref_allele, :alt_allele, :gene, :clinical_significance, :conditions, :review_status, :last_evaluated, :assembly, :chromosome, :position_vcf, :allele_id, :variation_id, :hgnc_id)
             """,
             rows
         )
