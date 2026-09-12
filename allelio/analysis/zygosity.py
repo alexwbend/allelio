@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Sequence
 
+from allelio.parsers.base import VCFEvidence
+
 
 class Zygosity(str, Enum):
     """How many copies of the annotated (alternate / risk) allele are present."""
@@ -192,3 +194,34 @@ def call_zygosity(genotype: Optional[str], ref: Optional[str], alt: Optional[str
         Zygosity.UNKNOWN, None, allele=alt,
         note=f"genotype {''.join(alleles)} does not match annotated alleles {ref or '?'}/{alt}",
     )
+
+
+def call_vcf_zygosity(evidence: VCFEvidence, ref: Optional[str], alt: Optional[str]) -> ZygosityCall:
+    """Count an explicitly declared SNP allele without strand inference.
+
+    This checks allele compatibility, not verified coordinate/build identity.
+    Non-SNP records require normalization and build-aware source matching first.
+    A different declared alternate can coexist with the target at a multiallelic
+    site; unlike a biallelic genotype string, it need not make the count unknown.
+    """
+    ref = (ref or "").upper()
+    alt = (alt or "").upper()
+    def unknown(reason):
+        return ZygosityCall(Zygosity.UNKNOWN, None, allele=alt or None, note=reason)
+
+    options = (evidence.reference,) + evidence.alternates
+    if not options or any(a not in _COMPLEMENT for a in options):
+        return unknown("VCF non-SNP record requires build-aware normalization")
+    if evidence.ploidy not in (1, 2) or len(evidence.alleles) != evidence.ploidy:
+        return unknown("unsupported or inconsistent VCF ploidy")
+    if any(i < 0 or i >= len(options) for i in evidence.allele_indices):
+        return unknown("invalid VCF allele index")
+    if tuple(options[i] for i in evidence.allele_indices) != evidence.alleles:
+        return unknown("VCF alleles disagree with genotype indices")
+    if ref not in _COMPLEMENT or alt not in _COMPLEMENT or ref == alt:
+        return unknown("annotation is not SNP allele-specific")
+    if ref != evidence.reference:
+        return unknown("VCF reference allele does not match annotation")
+    if alt not in evidence.alternates:
+        return unknown("annotated alternate is not declared in VCF")
+    return _count(evidence.alleles, alt)
