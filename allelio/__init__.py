@@ -1,4 +1,4 @@
-"""Allelio — Privacy-first local genomics analysis powered by AI."""
+"""Allelio — Local variant annotation with optional AI explanations."""
 
 __version__ = "0.3.0"
 __app_name__ = "Allelio"
