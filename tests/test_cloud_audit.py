@@ -82,6 +82,14 @@ def test_each_assertion_uses_its_own_gene_and_blocks_conflicting_carrier(tmp_pat
     [result] = analyze_variants([Variant('rs1','1',100,'GA')], db)
     assert [e.inheritance.inheritance for e in result.clinvar_entries] == ['autosomal recessive','autosomal dominant']
     assert result.category == 'Health Conditions'
+    assert result.inheritance.startswith('conflicting (applicable assertions differ:')
+    from allelio.ai.prompts import build_variant_prompt
+    from allelio.report import generate_html_report
+    from allelio.web.app import app  # initialize the supported application entry point
+    from allelio.web.routes import _resolution_of
+    assert result.inheritance in build_variant_prompt(result)
+    assert result.inheritance in generate_html_report([result], {}, "", {})
+    assert _resolution_of(result)['status']=='conflicting'
 
 
 def test_legacy_lookup_does_not_require_update_first(tmp_path):
@@ -142,3 +150,40 @@ def test_existing_format2_database_migrates_without_losing_rows(tmp_path):
     db.insert_gnomad_batch([_row(.9, chromosome='X')])
     rows = db.lookup_rsid('rs334')['gnomad']
     assert {(r['chromosome'],r['allele_frequency']) for r in rows} == {('11',.01),('X',.9)}
+
+
+def test_secondary_assertion_curations_are_traced(tmp_path):
+    from allelio.evidence import build_evidence_export
+    db = AllelioDB(str(tmp_path / 'all-assertions.db'))
+    db.initialize()
+    db.insert_clinvar_batch([dict(rsid='rs1', ref_allele='G', alt_allele='A', gene=g,
+        allele_id=str(i), clinical_significance='Pathogenic', conditions=g,
+        condition_ids='MONDO:'+str(i), review_status='practice guideline') for i,g in enumerate(('G1', 'G2'),1)])
+    db.insert_clingen_batch([dict(gene=g, disease=g, mondo_id='MONDO:'+str(i), moi='AR',
+        classification='Definitive', hgnc_id=None, report_url=None, classification_date=None)
+        for i,g in enumerate(('G1','G2'),1)])
+    variants=[Variant('rs1','1',100,'GA')]
+    results=analyze_variants(variants,db)
+    doc=build_evidence_export(results,variants,{},stats=results.stats)
+    cg=[c for c in doc['matching']['candidates'] if c['source']=='clingen']
+    assert {c['identity']['gene'] for c in cg}=={'G1','G2'}
+    assert all(c['decision']=='retained' for c in cg)
+    assert cg[1]['identity']['assertions'][0]['assertion']['allele_id']=='2'
+    assert doc['matching']['paths']['clingen'].startswith('traced:')
+    assert validate_evidence(doc)==[]
+
+
+def test_missing_mode_does_not_claim_a_single_conflicting_mode():
+    resolution=resolve_inheritance('A|B','MONDO:1|MONDO:2',[
+        ClinGenEntry('G','A','AR','Definitive',mondo_id='MONDO:1'),
+        ClinGenEntry('G','B',None,'Definitive',mondo_id='MONDO:2')])
+    assert resolution.inheritance=='undetermined'
+    assert not is_carrier(resolution,1,'GA')
+
+
+def test_coverage_cannot_count_an_input_twice_instead_of_another():
+    doc=json.loads((Path(__file__).parent/'fixtures/evidence_schema/valid_small.json').read_text())
+    duplicate=dict(doc['inputs'][0],input_id='input-2')
+    doc['inputs'].append(duplicate)
+    # Counts still agree; the new input has no corresponding coverage row.
+    assert any('exactly once' in e for e in validate_evidence(doc))

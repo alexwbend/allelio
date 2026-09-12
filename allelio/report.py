@@ -194,7 +194,8 @@ def _classification_context_row(variant) -> str:
     extra = ""
     if len(entries) > 1:
         others = "; ".join(
-            html_escape.escape(f"{e.clinical_significance or 'unclassified'} ({e.allele_match}, record {e.allele_id or '?'})")
+            html_escape.escape(f"{e.clinical_significance or 'unclassified'} ({e.allele_match}, record {e.allele_id or '?'})"
+                              + (f"; inheritance: {e.inheritance.inheritance}" if e.inheritance else ""))
             for e in entries[1:]
         )
         extra = f'<br><span style="color:#6b7280;">Other ClinVar records for this site: {others}</span>'

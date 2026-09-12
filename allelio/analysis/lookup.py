@@ -1,6 +1,6 @@
 """Variant lookup and analysis engine."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
 
@@ -244,6 +244,8 @@ class ClinVarEntry:
             if self.number_submitters is not None:
                 parts.append(f"{self.number_submitters} submitter{'s' if self.number_submitters != 1 else ''}")
             phrases.append("aggregates " + ", ".join(parts) + "; per-condition classifications are not in this source file")
+        if self.inheritance is not None:
+            phrases.append("this assertion's condition inheritance: " + self.inheritance.inheritance)
         return phrases
 
 
@@ -931,7 +933,7 @@ def analyze_variants_with_stats(
     genes = {
         cv.get("gene") for data in lookup_results.values() for cv in data["clinvar"] if cv.get("gene")
     }
-    genes = {g for name in genes for g in name.split(";") if g}
+    genes = {g.strip() for name in genes for g in name.split(";") if g.strip()}
     clingen_by_gene = {}
     try:
         clingen_by_gene = db.lookup_clingen_genes(sorted(genes))
@@ -1156,7 +1158,8 @@ def analyze_variants_with_stats(
         clingen_entries: List[ClinGenEntry] = []
         inheritance, inheritance_note = "not curated", None
         resolution: Optional[InheritanceResolution] = None
-        if clinvar_entry and clinvar_entry.gene:
+        if clinvar_entry:
+            curation_assessments = {}
             for entry in clinvar_entries:
                 entry_curations = []
                 for gene in (entry.gene or "").split(";"):
@@ -1167,22 +1170,56 @@ def analyze_variants_with_stats(
                 entry.inheritance = resolve_inheritance(
                     entry.conditions, entry.condition_ids, entry_curations
                 )
+                for curation in entry_curations:
+                    key = (curation.gene, curation.disease, curation.mondo_id, curation.moi, curation.classification)
+                    record = curation_assessments.setdefault(key, [curation, []])
+                    record[1].append({
+                        "assertion": tr.source_identity("clinvar", entry),
+                        "condition_ids": entry.condition_ids,
+                        "resolution_status": entry.inheritance.status,
+                        "condition_matched": curation in entry.inheritance.matched,
+                        "allele_match": entry.allele_match,
+                    })
                 if entry is clinvar_entry:
                     clingen_entries = entry_curations
             resolution = clinvar_entry.inheritance
-            matched_ids = {id(m) for m in resolution.matched}
-            for curation in clingen_entries:
-                if id(curation) in matched_ids:
-                    trace.add(rsid, "clingen", tr.source_identity("clingen", curation), tr.RETAINED,
-                              tr.STAGE_CONDITION, "condition_matched_by_mondo",
-                              f"{curation.mondo_id} is named by the assertion; resolution {resolution.status}")
+            for curation, assessments in curation_assessments.values():
+                identity = tr.source_identity("clingen", curation)
+                identity["assertions"] = assessments
+                matched = [item for item in assessments if item["condition_matched"]]
+                if matched:
+                    carried = any(item["allele_match"] == "carried" for item in matched)
+                    decision = tr.RETAINED if carried else tr.UNRESOLVED
+                    reason = "condition_matched_by_mondo" if carried else "condition_matched_allele_unresolved"
+                    note = f"{curation.mondo_id} is named by {len(matched)} assertion(s); all resolutions are recorded"
+                elif any(item["resolution_status"] in ("no_identifiers", "identifiers_not_stored") for item in assessments):
+                    decision, reason = tr.UNRESOLVED, "assertion_has_no_condition_identifiers"
+                    note = "condition applicability cannot be decided without the assertion's identifiers"
                 else:
-                    reason = ("assertion_has_no_condition_identifiers"
-                              if resolution.status in ("no_identifiers", "identifiers_not_stored")
-                              else "condition_not_named_by_assertion")
-                    trace.add(rsid, "clingen", tr.source_identity("clingen", curation), tr.REJECTED,
-                              tr.STAGE_CONDITION, reason,
-                              f"{curation.mondo_id or 'no MONDO id'} is not among the assertion's condition identifiers")
+                    decision, reason = tr.REJECTED, "condition_not_named_by_assertion"
+                    note = f"{curation.mondo_id or 'no MONDO id'} is not named by any applicable assertion"
+                trace.add(rsid, "clingen", identity, decision, tr.STAGE_CONDITION, reason, note)
+            health_assertions = [entry for entry in clinvar_entries
+                                 if _determine_category(entry, []) == VariantCategory.HEALTH_CONDITIONS.value]
+            if len(health_assertions) > 1 and any(
+                entry.inheritance.status != "resolved" or entry.inheritance.inheritance != resolution.inheritance
+                for entry in health_assertions
+            ):
+                modes = sorted({entry.inheritance.inheritance for entry in health_assertions
+                                if entry.inheritance.status == "resolved"})
+                phrase = ("conflicting (applicable assertions differ: " + ", ".join(modes) + ")"
+                          if len(modes) > 1 else "unresolved (applicable assertions lack a shared inheritance result)")
+                resolution = replace(
+                    resolution, status="conflicting" if len(modes) > 1 else "undetermined",
+                    inheritance=phrase, condition=None, condition_id=None,
+                    note="; ".join(f"ClinVar record {entry.allele_id or '?'} ({entry.gene or 'unknown gene'}): "
+                                   f"{entry.inheritance.inheritance}; {entry.inheritance.note or 'no curation'}"
+                                   for entry in health_assertions),
+                    matched=[curation for entry in health_assertions for curation in entry.inheritance.matched],
+                    conditions=[condition for entry in health_assertions for condition in entry.inheritance.conditions],
+                    unmatched_condition_ids=sorted({identifier for entry in health_assertions
+                                                    for identifier in entry.inheritance.unmatched_condition_ids}),
+                )
             inheritance, inheritance_note = resolution.inheritance, resolution.note
             if category == VariantCategory.HEALTH_CONDITIONS.value and is_carrier(
                 resolution, call.alt_copies, genotype

@@ -254,6 +254,14 @@ def resolve_inheritance(
             matched=matched, unmatched_condition_ids=unmatched, mapping=mapping, **base,
         )
 
+    unestablished_ids = wanted - {e.mondo_id for e in established}
+    if unestablished_ids and len(known_modes) < 2:
+        return InheritanceResolution(
+            NOT_ESTABLISHED, "unresolved (some condition relationships not established)",
+            note="No established relationship for: " + ", ".join(sorted(unestablished_ids))
+                 + f". {context}", matched=matched, mapping=mapping, **base,
+        )
+
     modes = sorted({e.moi for e in established if e.moi})
     described = "; ".join(_describe(e) for e in established)
     provenance = f"matched by {CONDITION_MAPPING_METHOD} {CONDITION_MAPPING_VERSION}"
@@ -267,7 +275,7 @@ def resolve_inheritance(
             RESOLVED, phrase, note=note, condition=first.disease, condition_id=first.mondo_id,
             matched=matched, unmatched_condition_ids=unmatched, mapping=mapping, **base,
         )
-    if not modes:
+    if not modes or any(not e.moi for e in established):
         return InheritanceResolution(
             CONFLICTING, "undetermined",
             note=f"ClinGen gives no mode of inheritance for the matched condition: {described}. {context}",

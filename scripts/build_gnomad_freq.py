@@ -293,7 +293,15 @@ def stream_process_vcf(url: str, output_file, count_so_far: int, array_sites: se
         total = int(resp.headers.get("content-length", 0))
         total_gb = total / (1024**3) if total else 0
         print(f"  Streaming {total_gb:.1f} GB (not saved to disk)...")
-        lines = iter_gzip_lines(resp.iter_bytes(chunk_size=1 << 20))
+        def progress_chunks():
+            received, last_report = 0, time.monotonic()
+            for chunk in resp.iter_bytes(chunk_size=1 << 20):
+                received += len(chunk)
+                if time.monotonic() - last_report >= 60:
+                    print(f"  Source progress: {received / (1024**3):.2f} / {total_gb:.2f} GB", flush=True)
+                    last_report = time.monotonic()
+                yield chunk
+        lines = iter_gzip_lines(progress_chunks())
         return emit_records(lines, output_file, count_so_far, array_sites)
 
 

@@ -176,7 +176,7 @@ class TestAnalysis:
         assert "origin: germline/somatic (germline;somatic)" in phrases
         assert "somatic clinical impact: Tier I - Strong; criteria provided, single submitter; Mar 01, 2025" in phrases
         assert "oncogenicity: Oncogenic; criteria provided, single submitter; Mar 01, 2025" in phrases
-        assert phrases[-1].startswith("aggregates 2 condition records (RCV), 3 submitters")
+        assert any(p.startswith("aggregates 2 condition records (RCV), 3 submitters") for p in phrases)
 
     def test_missing_context_reads_unknown_not_germline(self, db):
         r = _one(db, "rs8000003", "1", 2003, "GA", include_benign=True)
