@@ -412,6 +412,11 @@
             border-bottom-color: var(--primary);
         }
 
+        .gap-banner {
+            padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--gray-300);
+            border-left: 4px solid #b45309; border-radius: 8px;
+        }
+
         /* Executive Summary */
         .executive-summary {
             background: linear-gradient(135deg, var(--primary), var(--primary-light));
@@ -1111,6 +1116,7 @@
 
             <!-- Who wrote the explanations below, for this run. The status pill
                  at the top is read once at page load and can be stale by now. -->
+            <div class="gap-banner" id="vcfFilterNotice" style="display: none;" role="status"></div>
             <div class="summary-text" id="modelUsed" style="display: none;"></div>
 
             <!-- Category Tabs -->
@@ -1381,6 +1387,14 @@
             // Leave it on the last tab clicked and a fresh set of results comes
             // up reading "All" while showing only pharmacogenomics.
             currentCategory = 'all';
+
+            const filterNotice = document.getElementById('vcfFilterNotice');
+            const failedFilters = analysisResults.vcf_filter_failed_sites;
+            const hasFailures = Number.isInteger(failedFilters) && failedFilters > 0;
+            filterNotice.textContent = hasFailures
+                ? `${failedFilters.toLocaleString()} annotated positions were set aside because VCF record or sample filters failed. These are not negative findings.`
+                : '';
+            filterNotice.style.display = hasFailures ? 'block' : 'none';
 
             // Executive Summary
             const executiveSummary = document.getElementById('executiveSummary');
