@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "software": {
+    "name": "Allelio",
+    "version": "0.3.0"
+  },
+  "generated_at": "2026-09-12T00:00:00+00:00",
+  "configuration": {},
+  "provenance": {
+    "clinvar": {
+      "label": "ClinVar",
+      "release": null,
+      "release_source": null,
+      "url": null,
+      "sha256": null
+    }
+  },
+  "inputs": [],
+  "findings": [],
+  "gene_groups": [],
+  "analysis_stats": null,
+  "coverage": {
+    "scope": "parsed_inputs_only",
+    "total_rows": 0,
+    "accounted_rows": 0,
+    "counts": {},
+    "rows": [],
+    "returned_findings": 0,
+    "complete": true,
+    "limitations": "Rows absent from the input cannot be counted."
+  },
+  "limitations": [
+    "Research and education only; not a clinical interpretation."
+  ]
+}

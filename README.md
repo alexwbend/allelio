@@ -361,7 +361,9 @@ for research and education, without a claim of clinical validation.
 Structured evidence is available with `allelio analyze input.txt --no-ai
 --json-output evidence.json` or **Export Evidence JSON** in the web report.
 See the [versioned export contract](docs/evidence-export.md) for retained source
-fields, input evidence, and interpretation limits.
+fields, input evidence, and interpretation limits. A JSON Schema ships with the
+package and `allelio validate-evidence evidence.json` checks a file against it
+and the reference and count rules ([evidence schema](docs/evidence-schema.md)).
 
 Reports also show [input coverage and exclusions](docs/input-coverage.md),
 including no-calls, unsupported identifiers, duplicate conflicts, failed filters,
