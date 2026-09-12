@@ -47,3 +47,12 @@ validation or a clinical accuracy estimate. Review generated artifacts before
 sharing: source hashes and checkout revision are included for reproducibility.
 
 Source format: [VCF specification](https://samtools.github.io/hts-specs/VCFv4.3.pdf).
+
+## ClinVar source identity
+
+Reference refreshes now preserve the selected ClinVar row's assembly, chromosome,
+VCF position, AlleleID, VariationID, and HGNC identifier in SQLite and analysis
+entries. Existing allele-aware databases migrate without losing rows; old rows
+have unavailable identity fields until `allelio update` refreshes them. The
+existing GRCh38-preferred row selection remains in place, with GRCh37-only rows
+retained. This metadata addition does not perform liftover or normalization.

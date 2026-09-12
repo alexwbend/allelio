@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- ClinVar assembly, chromosome, VCF position, and source identifiers survive
+  parsing, storage, and lookup. Existing allele-aware databases migrate without
+  losing rows; missing legacy metadata stays unknown until refresh.
+
 - Optional VCF source evidence on parsed variants: ordered alleles/indices,
   phase and ploidy, raw reference declaration, and quality fields. Existing
   consumer-format constructors remain compatible. See `docs/vcf-evidence.md`
