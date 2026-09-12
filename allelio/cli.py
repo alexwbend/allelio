@@ -17,6 +17,7 @@ from allelio.analysis.lookup import analyze_variants, AnalysisStats
 from allelio.database import AllelioDB, setup_database, staleness_warning, sources_summary, provenance_of
 from allelio.parsers import parse_genotype_file_with_stats
 from allelio.report import generate_html_report
+from allelio.analysis.genes import group_findings, gene_label
 
 # See README "Known gaps: 23andMe internal IDs" and PUB-11-lite in
 # PUBLICATION_PLAN.md — printed wherever a parsed 23andMe file skipped i-ID
@@ -372,12 +373,7 @@ def analyze(
     table.add_column("Zygosity", width=22)
     
     for result in sorted(results, key=lambda x: x.significance_rank)[:top]:
-        # Extract gene name from clinvar or gwas entries
-        gene = "-"
-        if result.clinvar_entries:
-            gene = result.clinvar_entries[0].gene or "-"
-        elif result.gwas_entries:
-            gene = result.gwas_entries[0].mapped_gene or "-"
+        gene = gene_label(result) or "-"
 
         # Color code by significance
         if result.category == "Health Conditions":
@@ -400,6 +396,20 @@ def analyze(
         )
     
     console.print(table)
+    console.print("\n[bold]Findings by gene[/bold]")
+    console.print("Counts cover all returned findings; the table above shows the requested top results.")
+    console.print("A finding associated with several genes appears in each group.")
+    groups_table = Table(show_header=True, header_style="bold cyan")
+    groups_table.add_column("Gene")
+    groups_table.add_column("Findings")
+    groups_table.add_column("rsIDs")
+    groups_table.add_column("Function and interpretation")
+    for group in group_findings(results):
+        source = (" Source: " + group["function_source"] + " (" + group["function_version"] + ")") if group["function_source"] else ""
+        groups_table.add_row(escape(group["gene"]), str(group["count"]),
+                             escape(", ".join(results[i].rsid for i in group["indices"])),
+                             escape(group["function"] + source + " " + group["note"]))
+    console.print(groups_table)
     
     # Generate HTML report
     try:

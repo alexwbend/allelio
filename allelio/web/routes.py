@@ -13,11 +13,13 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from starlette.background import BackgroundTask
 
+from allelio.report_style import REPORT_CSS
 from allelio import __version__
 from allelio.parsers import parse_genotype_file
 from allelio.database.store import AllelioDB
 from allelio.database.downloader import sources_summary, provenance_of
 from allelio.analysis.lookup import analyze_variants, AnalysisStats
+from allelio.analysis.genes import gene_assignments, group_findings, gene_overview_html, gene_label
 from allelio.ai.attribution import Explanation, attribution
 from allelio.ai.engine import AIEngine, REFUSED, UNREACHABLE
 from allelio.ai.safety import get_variant_warnings
@@ -140,14 +142,8 @@ def _model_of(explanation) -> Optional[str]:
 
 
 def _gene_of(variant) -> Optional[str]:
-    """Gene symbol for a result, from ClinVar first and GWAS as a fallback."""
-    for entry in (variant.clinvar_entries or []):
-        if entry.gene:
-            return entry.gene
-    for entry in (variant.gwas_entries or []):
-        if entry.mapped_gene:
-            return entry.mapped_gene
-    return None
+    """Display all recorded ClinVar, GWAS and ClinPGx gene associations."""
+    return gene_label(variant)
 
 
 def _significance_of(variant) -> str:
@@ -327,6 +323,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
                 # did not write it, because the credit is on the card.
                 "explained_by": _model_of(explanations.get(variant.rsid)),
                 "gene": _gene_of(variant),
+                "gene_assignments": gene_assignments(variant),
                 "significance": _significance_of(variant),
                 "pubmed_id": next(
                     (e.pubmed_id for e in (variant.gwas_entries or []) if e.pubmed_id),
@@ -339,6 +336,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         payload = {
             "summary": summary,
             "results": formatted_results,
+            "gene_groups": group_findings(formatted_results),
             "total_variants": len(analysis_results),
             "reference_genotype_sites": analysis_stats.reference_genotype_sites,
             "zygosity_unknown_sites": analysis_stats.zygosity_unknown_sites,
@@ -576,8 +574,9 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
             "you carry only the reference allele (not findings).</p>"
         )
 
-    # The table below stops at a hundred rows.
-    rows = results[:100]
+    # Every finding referenced by the gene overview must remain reachable.
+    rows = [r for r in results if isinstance(r, dict)]
+    gene_overview = gene_overview_html(rows)
 
     cards = [r for r in rows if isinstance(r, dict)]
     # Count the credit over the cards that actually carry an explanation, the
@@ -609,7 +608,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
 
     # Build results table HTML
     results_html = ""
-    for result in rows:
+    for index, result in enumerate(rows):
         # These come from the uploaded file and the model, and the report is
         # opened in a browser — none of it is trusted markup.
         def field(name):
@@ -636,7 +635,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         )
 
         results_html += f"""
-        <tr>
+        <tr id="finding-{index}">
             <td>{rsid}</td>
             <td>{chrom}</td>
             <td>{pos}</td>
@@ -652,6 +651,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
     <html>
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Allelio Analysis Report</title>
         <style>
             td {{
@@ -701,6 +701,17 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
                 color: #666;
                 margin: 10px 0;
             }}
+            {REPORT_CSS}
+            body {{ max-width: 1200px; margin: 0 auto; padding: 24px; }}
+            h1 {{ padding: 24px; background: var(--report-panel); border-radius: 12px;
+                  border: 1px solid var(--report-border); border-top: 4px solid #66c8aa; }}
+            .metadata {{ color: var(--report-muted); }}
+            .summary {{ padding: 20px; }}
+            .table-scroll {{ overflow-x: auto; }}
+            th {{ background: var(--report-panel); color: var(--report-ink); font-weight: 600; }}
+            td {{ border-color: var(--report-border); }}
+            tr:hover {{ background: var(--report-mint); }}
+            @media print {{ .table-scroll {{ overflow: visible; }} }}
         </style>
     </head>
     <body>
@@ -718,7 +729,10 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
             {summary}
         </div>
         
+        {gene_overview}
+
         <h2>Detailed Results</h2>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Detailed results">
         <table>
             <thead>
                 <tr>
@@ -735,6 +749,7 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
                 {results_html}
             </tbody>
         </table>
+        </div>
         
         <p><em>Report generated by Allelio - Privacy-first local genomics analysis</em></p>
     </body>
