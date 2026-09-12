@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Set aside annotated VCF sites with failed record FILTER or sample FT before
+  matching, and report the excluded count separately from negative findings.
+
 - Separate frequency display heuristics from clinical evidence, ignore invalid
   frequency values, and prevent rank caps from increasing benign-row priority.
 

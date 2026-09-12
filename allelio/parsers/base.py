@@ -31,6 +31,7 @@ class VCFEvidence:
     filter_status: Optional[str] = None
     genotype_quality: Optional[str] = None
     depth: Optional[str] = None
+    genotype_filter: Optional[str] = None
 
     @property
     def ploidy(self) -> int:

@@ -185,6 +185,7 @@ def _parse_vcf_lines(filepath: str) -> Generator[Variant, None, None]:
                     quality=available(parts[5]), filter_status=available(parts[6]),
                     genotype_quality=available(fields.get('GQ')),
                     depth=available(fields.get('DP')),
+                    genotype_filter=available(fields.get('FT')),
                 )
                 # Yield valid variant
                 yield Variant(
