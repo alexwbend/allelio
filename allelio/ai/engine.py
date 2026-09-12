@@ -1037,7 +1037,8 @@ class AIEngine:
             f"- Chromosome: {result.chromosome or 'Unknown'}, Position: {result.position or 'Unknown'}",
             f"- Genotype: {result.genotype or 'Unknown'}",
             f"- Zygosity: {_zygosity_line(result)}",
-            f"- Inheritance (ClinGen): {getattr(result, 'inheritance', None) or 'not curated'}",
+            f"- Inheritance (ClinGen): {getattr(result, 'inheritance', None) or 'not curated'}"
+            + (f" ({getattr(result, 'inheritance_note', None)})" if getattr(result, 'inheritance_note', None) else ""),
         ]
         for e in (getattr(result, "pgx_entries", None) or []):
             lines.append(f"- Pharmacogenomics (ClinPGx, level {e.level}): {e.drugs}: {e.annotation_text}")

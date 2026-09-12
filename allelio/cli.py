@@ -388,7 +388,8 @@ def analyze(
     table.add_column("Significance", width=12)
     table.add_column("Genotype", width=12)
     table.add_column("Zygosity", width=22)
-    
+    table.add_column("Inheritance", width=22)
+
     for result in sorted(results, key=lambda x: x.significance_rank)[:top]:
         gene = gene_label(result) or "-"
 
@@ -409,6 +410,7 @@ def analyze(
             f"{result.significance_rank}",
             result.genotype or "-",
             _short_zygosity(result),
+            _short_inheritance(result),
             style=sig_style if result.significance_rank <= 4 else "",
         )
     
@@ -558,6 +560,23 @@ def serve(port: int, host: str):
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Server failed: {e}\n", style="red")
         raise click.Abort()
+
+
+def _short_inheritance(result) -> str:
+    """Table cell: the condition-level phrase, or ``-`` for GWAS-only rows.
+
+    ``AR`` / ``AD`` / ``XL`` read as in the HTML report; an unresolved or
+    conflicting condition shows its status so the reader knows the carrier
+    rule did not apply. Full provenance is in the report and the JSON.
+    """
+    if not getattr(result, "clinvar_entries", None):
+        return "-"
+    phrase = getattr(result, "inheritance", None) or "not curated"
+    return {
+        "autosomal recessive": "AR (recessive)",
+        "autosomal dominant": "AD (dominant)",
+        "X-linked": "XL (X-linked)",
+    }.get(phrase, phrase.split(" (")[0])
 
 
 def _short_zygosity(result) -> str:

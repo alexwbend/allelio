@@ -14,8 +14,8 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "T",
-      "why": "BRCA1 pathogenic (expert panel), one copy; ClinGen curates BRCA1 for a dominant (cancer predisposition) and a recessive (Fanconi anemia) condition, so one copy is not demoted to carrier status",
-      "inheritance": "mixed (dominant and recessive conditions)"
+      "why": "BRCA1 pathogenic (expert panel), one copy. ClinGen curates BRCA1 for a dominant (cancer predisposition, MONDO:0700268) and a recessive (Fanconi anemia S, MONDO:0054748) condition, but this assertion names only the dominant one, so inheritance resolves to autosomal dominant by MONDO identifier and one copy is the relevant genotype; the gene-level summary stays mixed as context",
+      "inheritance": "autosomal dominant"
     },
     "rs113993960": {
       "reported": true,
@@ -40,8 +40,8 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "C",
-      "why": "GBA1 N370S, one copy. ClinGen curates GBA1 for Gaucher disease (recessive) and Parkinson disease (dominant), so gene-level inheritance is mixed and the site stays a health condition with that note",
-      "inheritance": "mixed (dominant and recessive conditions)"
+      "why": "GBA1 N370S, one copy. The assertion names Gaucher disease (MONDO:0018150, recessive) and Parkinson disease (MONDO:0005180, dominant), both ClinGen curations, so the condition-level resolution is conflicting and the site stays a health condition, never a carrier label",
+      "inheritance": "conflicting (matched conditions differ: autosomal dominant, autosomal recessive)"
     },
     "rs334": {
       "reported": true,
@@ -49,8 +49,8 @@
       "zygosity": "heterozygous",
       "alt_copies": 1,
       "matched_allele": "A",
-      "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported",
-      "inheritance": "mixed (dominant and recessive conditions)"
+      "why": "HBB sickle-cell T>A, one copy (sickle-cell trait); the T>G likely-benign row at the same rsID must NOT be the one reported. The assertion names beta-thalassemia HBB/LCRB (recessive) and dominant beta-thalassemia, both ClinGen curations, so inheritance is conflicting, not carrier status",
+      "inheritance": "conflicting (matched conditions differ: autosomal dominant, autosomal recessive)"
     },
     "rs1800562": {
       "reported": true,
@@ -59,7 +59,7 @@
       "alt_copies": 1,
       "matched_allele": "A",
       "inheritance": "autosomal recessive",
-      "why": "HFE C282Y, one copy. ClinGen curates HFE only for a recessive condition (hemochromatosis type 1, Definitive), so one copy is carrier status, ordered a tier below the affected genotype"
+      "why": "HFE C282Y, one copy. The assertion names hemochromatosis type 1 (MONDO:0021001), which ClinGen curates as recessive (Definitive), so one copy is carrier status, ordered a tier below the affected genotype"
     },
     "rs3918290": {
       "reported": true,
