@@ -16,6 +16,7 @@ from rich.table import Table
 from allelio.analysis.lookup import analyze_variants, AnalysisStats
 from allelio.database import AllelioDB, setup_database, staleness_warning, sources_summary, provenance_of
 from allelio.parsers import parse_genotype_file_with_stats
+from allelio.evidence import build_evidence_export, write_evidence_export
 from allelio.report import generate_html_report
 from allelio.analysis.genes import group_findings, gene_label
 
@@ -112,6 +113,8 @@ def setup(no_gnomad: bool):
     default=False,
     help="Only show trait associations — exclude health conditions and risk factors",
 )
+@click.option("--json-output", type=click.Path(dir_okay=False), default=None,
+              help="Also save a versioned structured evidence JSON file.")
 def analyze(
     file: str,
     output: str,
@@ -120,6 +123,7 @@ def analyze(
     model: Optional[str],
     top: int,
     traits_only: bool,
+    json_output: Optional[str] = None,
 ):
     """Analyze a genotype file for significant variants.
     
@@ -130,6 +134,9 @@ def analyze(
     """
     console.print("\n[bold cyan]Allelio Variant Analysis[/bold cyan]\n")
     
+    if json_output and Path(json_output).resolve() in {Path(file).resolve(), Path(output).resolve()}:
+        raise click.UsageError("JSON output must differ from the input and HTML paths.")
+
     # Check if database exists
     db = AllelioDB()
     if not db.is_initialized():
@@ -417,6 +424,18 @@ def analyze(
                              escape(group["function"] + source + " " + group["note"]))
     console.print(groups_table)
     
+    if json_output:
+        try:
+            write_evidence_export(build_evidence_export(
+                results, variants, provenance_of(db),
+                {"include_benign": include_benign, "include_reference": False,
+                 "traits_only": traits_only, "frequency_adjustment": True},
+                analysis_stats,
+            ), json_output)
+        except Exception as exc:
+            raise click.ClickException(f"Failed to write evidence JSON: {exc}") from exc
+        console.print(f"Evidence JSON saved to: {json_output}")
+
     # Generate HTML report
     try:
         if traits_only:
