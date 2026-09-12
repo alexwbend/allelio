@@ -10,6 +10,7 @@ from allelio.analysis.zygosity import Zygosity, ZygosityCall, call_zygosity, gen
 from allelio.parsers.base import VCFEvidence
 from allelio.analysis.identity import vcf_identity_reason
 from allelio.analysis.frequency import valid_frequency
+from allelio.analysis.quality import vcf_filter_reason
 
 
 # ClinVar review status to star rating mapping (0-4 stars)
@@ -284,6 +285,8 @@ class AnalysisStats:
         zygosity_unknown_sites: sites reported without a zygosity call,
             because the source does not give the allele or the genotype does
             not match it on either strand.
+        vcf_filter_failed_sites: annotated sites set aside because VCF FILTER
+            or FORMAT/FT explicitly failed; not reference calls or benign findings.
         benign_sites: sites left out because every match was benign
             (unless include_benign).
     """
@@ -291,6 +294,7 @@ class AnalysisStats:
     reference_genotype_sites: int = 0
     zygosity_unknown_sites: int = 0
     benign_sites: int = 0
+    vcf_filter_failed_sites: int = 0
 
 
 def _determine_category(clinvar_entry: Optional[ClinVarEntry], gwas_entries: List[GWASEntry]) -> str:
@@ -735,6 +739,10 @@ def analyze_variants_with_stats(
         genotype = getattr(original_variant, 'genotype', None)
 
         vcf_evidence = getattr(original_variant, 'vcf_evidence', None)
+        if vcf_filter_reason(vcf_evidence):
+            # Do not let rejected genotypes enter any source-specific matcher.
+            stats.vcf_filter_failed_sites += 1
+            continue
         # Do not let non-SNP sequences reach legacy SNP/GWAS/PGx matching as
         # concatenated bases. Their complete alleles remain in source evidence.
         if vcf_evidence is not None and any(

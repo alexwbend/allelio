@@ -243,6 +243,12 @@ def analyze(
         # this person carries only the reference allele is not a finding for
         # them, and a reader should know those were seen and set aside rather
         # than missed.
+        if analysis_stats.vcf_filter_failed_sites:
+            console.print(
+                f"  [yellow]{analysis_stats.vcf_filter_failed_sites:,} annotated positions were "
+                "set aside because VCF record or sample filters failed. "
+                "These are not negative findings.[/yellow]"
+            )
         if analysis_stats.reference_genotype_sites:
             console.print(
                 f"  [dim]{analysis_stats.reference_genotype_sites:,} annotated positions where "
@@ -426,6 +432,7 @@ def analyze(
             "significant_variants": len(significant),
             "skipped_i_id_rows": parse_stats.i_id_rows if parse_stats else 0,
             "reference_genotype_sites": analysis_stats.reference_genotype_sites,
+            "vcf_filter_failed_sites": analysis_stats.vcf_filter_failed_sites,
             "zygosity_unknown_sites": analysis_stats.zygosity_unknown_sites,
         }
         

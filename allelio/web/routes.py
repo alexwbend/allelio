@@ -253,7 +253,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         )
         analysis_stats = getattr(analysis_results, "stats", None) or AnalysisStats()
 
-        if not analysis_results:
+        if not analysis_results and not analysis_stats.vcf_filter_failed_sites:
             raise HTTPException(
                 status_code=400,
                 detail="No variants found in database"
@@ -274,16 +274,19 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
 
         # rsID -> Explanation. The credit rides on the card from here to the
         # browser; nothing else on this payload decides who wrote what.
-        explanations = await ai_engine.explain_variants_batch(
+        explanations = (await ai_engine.explain_variants_batch(
             top_variants, progress_callback=on_explained
-        )
+        )) if top_variants else {}
 
         # Generate executive summary
         _progress.update(stage="Summarizing", done=0, total=0)
         try:
-            if not ai_engine.will_explain():
-                raise RuntimeError("no model server answering")
-            summary = await ai_engine.generate_summary(top_variants)
+            if not top_variants:
+                summary = "No reportable findings remain. Annotated positions with failed VCF filters were set aside; this is not a negative result."
+            else:
+                if not ai_engine.will_explain():
+                    raise RuntimeError("no model server answering")
+                summary = await ai_engine.generate_summary(top_variants)
         except Exception:
             summary = ("AI summary unavailable. Variant findings below come "
                        "straight from ClinVar and the GWAS Catalog.")
@@ -339,6 +342,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             "gene_groups": group_findings(formatted_results),
             "total_variants": len(analysis_results),
             "reference_genotype_sites": analysis_stats.reference_genotype_sites,
+            "vcf_filter_failed_sites": analysis_stats.vcf_filter_failed_sites,
             "zygosity_unknown_sites": analysis_stats.zygosity_unknown_sites,
             "analyzed_at": _get_timestamp(),
             # Which release of each reference source the findings were looked
@@ -572,6 +576,14 @@ def _generate_html_report(analysis_data: Dict[str, Any]) -> str:
         set_aside = (
             f"<p><strong>Set aside:</strong> {int(ref_sites):,} annotated positions where "
             "you carry only the reference allele (not findings).</p>"
+        )
+
+    failed_filters = analysis_data.get("vcf_filter_failed_sites") or 0
+    if failed_filters:
+        set_aside += (
+            f"<p><strong>VCF filters failed:</strong> {int(failed_filters):,} annotated "
+            "positions were set aside because record or sample filters failed. "
+            "These are not negative findings.</p>"
         )
 
     # Every finding referenced by the gene overview must remain reachable.

@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Sequence
 
+from allelio.analysis.quality import vcf_filter_reason
 from allelio.parsers.base import VCFEvidence
 
 
@@ -208,6 +209,10 @@ def call_vcf_zygosity(evidence: VCFEvidence, ref: Optional[str], alt: Optional[s
     alt = (alt or "").upper()
     def unknown(reason):
         return ZygosityCall(Zygosity.UNKNOWN, None, allele=alt or None, note=reason)
+
+    reason = vcf_filter_reason(evidence)
+    if reason:
+        return unknown(reason)
 
     options = (evidence.reference,) + evidence.alternates
     if not options or any(a not in _COMPLEMENT for a in options):
