@@ -357,3 +357,7 @@ Structured evidence is available with `allelio analyze input.txt --no-ai
 --json-output evidence.json` or **Export Evidence JSON** in the web report.
 See the [versioned export contract](docs/evidence-export.md) for retained source
 fields, input evidence, and interpretation limits.
+
+Reports also show [input coverage and exclusions](docs/input-coverage.md),
+including no-calls, unsupported identifiers, duplicate conflicts, failed filters,
+and missing annotations. These counts are not a negative genetic test.

@@ -14,7 +14,7 @@ import gzip
 from dataclasses import dataclass
 from typing import List, Generator, Optional, Tuple
 
-from .base import Variant
+from .base import ParseAudit, ParsedVariants, Variant
 
 
 @dataclass
@@ -35,7 +35,7 @@ class ParseStats:
 
 
 def _parse_23andme_lines(
-    filepath: str, stats: Optional[ParseStats] = None
+    filepath: str, stats: Optional[ParseStats] = None, audit=None
 ) -> Generator[Variant, None, None]:
     """Generate Variant objects from a 23andMe format file.
 
@@ -50,12 +50,14 @@ def _parse_23andme_lines(
     file_opener = gzip.open if filepath.endswith('.gz') else open
 
     with file_opener(filepath, 'rt', encoding='utf-8', errors='replace') as f:
-        for line in f:
-            line = line.rstrip('\n')
+        for line_number, line in enumerate(f, 1):
+            line = line.rstrip('\r\n')
 
             # Skip empty lines and comments
-            if not line or line.startswith('#'):
+            if not line.strip() or line.startswith('#'):
                 continue
+
+            entry = audit.row(line_number) if audit is not None else {}
 
             # Parse tab-delimited line
             parts = line.split('\t')
@@ -66,16 +68,22 @@ def _parse_23andme_lines(
 
             # Validate rsid format (must start with 'rs' or 'i')
             if not (rsid.startswith('rs') or rsid.startswith('i')):
+                entry['status'] = 'unsupported_identifier'
                 continue
 
             # Skip no-calls
-            if genotype == '--':
+            if genotype in ('--', '00', '0', '.', ''):
+                entry['status'] = 'no_call'
                 continue
 
             # Parse position as integer
             try:
                 position = int(position_str)
             except ValueError:
+                entry['status'] = 'invalid_position'
+                continue
+            if position <= 0:
+                entry['status'] = 'invalid_position'
                 continue
 
             if stats is not None:
@@ -85,12 +93,14 @@ def _parse_23andme_lines(
                 else:
                     stats.i_id_rows += 1
 
+            entry.update(status='parsed', rsid=rsid)
             # Yield valid variant
             yield Variant(
                 rsid=rsid,
                 chromosome=chromosome,
                 position=position,
-                genotype=genotype
+                genotype=genotype,
+                source_line=line_number,
             )
 
 
@@ -103,7 +113,8 @@ def parse_23andme(filepath: str) -> List[Variant]:
     Returns:
         List of Variant objects parsed from the file
     """
-    return list(_parse_23andme_lines(filepath))
+    audit = ParseAudit()
+    return ParsedVariants(_parse_23andme_lines(filepath, audit=audit), audit)
 
 
 def parse_23andme_with_stats(filepath: str) -> Tuple[List[Variant], ParseStats]:
@@ -123,5 +134,6 @@ def parse_23andme_with_stats(filepath: str) -> Tuple[List[Variant], ParseStats]:
         the row counts collected while parsing it.
     """
     stats = ParseStats()
-    variants = list(_parse_23andme_lines(filepath, stats))
+    audit = ParseAudit()
+    variants = ParsedVariants(_parse_23andme_lines(filepath, stats, audit), audit)
     return variants, stats
