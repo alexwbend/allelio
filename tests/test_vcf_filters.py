@@ -113,6 +113,8 @@ def test_web_returns_exclusion_count_when_all_findings_filtered(monkeypatch):
         files={'file': ('input.vcf', b'synthetic', 'text/plain')})
     assert response.status_code == 200, response.text
     payload = response.json()
+    assert payload['evidence_export']['schema_version'] == '1.0'
+    assert payload['evidence_export']['analysis_stats']['vcf_filter_failed_sites'] == 2
     assert payload['vcf_filter_failed_sites'] == 2 and payload['results'] == []
     assert 'not a negative result' in payload['summary']
 
