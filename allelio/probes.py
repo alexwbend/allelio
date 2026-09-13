@@ -36,10 +36,17 @@ def input_context(path):
             if not line.startswith('#'):
                 if line.strip(): break
                 continue
-            if '23andMe' in line or line.strip()=='# Allelio product: 23andme-raw': products.add('23andme-raw')
-            builds.update('GRCh'+n for n in re.findall(r'(?:GRCh|[Bb]uild\s+)(37|38)\b',line))
+            if re.search(r'\b23andme\b', line, re.IGNORECASE):
+                products.add('23andme-raw')
+            declaration = re.match(r'#\s*Allelio product:\s*(.*?)\s*$', line, re.IGNORECASE)
+            if declaration:
+                products.add(declaration.group(1).lower())
+            # Unsupported declarations must still participate in conflict
+            # detection; filtering to supported builds here discards evidence.
+            builds.update('GRCh'+n for n in re.findall(
+                r'\b(?:GRCh|build\s+)(\d+)\b', line, re.IGNORECASE))
     return (next(iter(products)) if len(products)==1 else None,
-            next(iter(builds)) if len(builds)==1 else None)
+            next(iter(builds)) if len(builds)==1 and builds <= {'GRCh37', 'GRCh38'} else None)
 
 
 def recover_probes(variants, path, mapping, db):
