@@ -19,6 +19,9 @@ state `# Allelio product: 23andme-raw`) and declare the build in that header.
 Conflicting/missing declarations remain unresolved. Filenames are never used to
 infer product/build. Adding a header is an assertion that the context was checked,
 not a way to convert coordinates between builds.
+Build declarations are case-insensitive. Unsupported numeric builds still count
+as conflicting evidence: a header containing both build 36 and build 38 cannot
+authorize recovery. Explicit `Allelio product:` declarations must also agree.
 
 The inspectable `allelio-probes/1` JSON format requires `source`, `version`,
 `license`, `source_url`, `product`, `assembly`, `strand` and an `entries` list.
@@ -46,3 +49,24 @@ A real mapping needs documented origin and redistribution permission/reuse terms
 before it can be shipped; a nonempty license label alone is not legal verification.
 User-supplied mappings are explicit local inputs and are never downloaded.
 Successful synthetic recovery is a software check, not diagnostic validation.
+
+### Production-source investigation (2026-09-13)
+
+The reviewed public sources do not yet establish a redistributable mapping from
+23andMe internal IDs to allele identities. 23andMe's identifier documentation
+above explicitly allows internal IDs without a clear rsID. Its
+[platform methods](https://permalinks.23andme.com/pdf/23_21-PRSMethodology_May2020.pdf)
+describe custom content supplementing the underlying Illumina arrays, so a public
+base-array manifest alone does not establish the identity of that custom content.
+Illumina documents access to
+[custom product files through the ordering MyIllumina account](https://knowledge.illumina.com/microarray/general/microarray-general-reference_material-list/000001531).
+That access documentation does not establish redistribution permission for an
+Allelio mapping. No production mapping has been imported from these sources.
+
+A candidate must identify the exact supported product and reference build,
+provide the internal-ID-to-rsID relationship and allele orientation with traceable
+source evidence, and include terms permitting the intended reuse. Retain the
+source version and checksum alongside any conversion. Validate its identities
+against the installed reference and retain conflicts as unresolved. Do not fill
+missing relationships by matching coordinates alone. Issue #28 remains open for
+this data dependency; it does not require changes to the default recovery policy.
