@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- Local run manifests and offline annotation replay with input, package and
+  reference fingerprints, explicit runtime/options, and separate optional AI
+  provenance. Includes a synthetic example and installed-wheel replay checks.
+
 ### Fixed
 
 - Set aside annotated VCF sites with failed record FILTER or sample FT before

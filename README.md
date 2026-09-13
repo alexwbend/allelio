@@ -368,3 +368,9 @@ and the reference and count rules ([evidence schema](docs/evidence-schema.md)).
 Reports also show [input coverage and exclusions](docs/input-coverage.md),
 including no-calls, unsupported identifiers, duplicate conflicts, failed filters,
 and missing annotations. These counts are not a negative genetic test.
+
+### Reproducible annotation runs
+
+Use `allelio record-run` and `allelio replay-run` to record a local run manifest
+and check the same annotation against unchanged inputs and references, offline.
+See [the synthetic replay example and contract](docs/reproducible-runs.md).
