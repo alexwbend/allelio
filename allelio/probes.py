@@ -24,6 +24,18 @@ def load_mapping(path):
             raise ValueError('Mapping entries need positive coordinates and supported chromosomes.')
         if any(not isinstance(row.get(k),str) or not row[k] for k in ('ref','alt')):
             raise ValueError('Mapping entries need explicit REF and ALT.')
+        anchor = row.get('reference_anchor')
+        if anchor is not None:
+            if (not isinstance(anchor, dict)
+                    or anchor.get('assembly') not in ('GRCh37', 'GRCh38')
+                    or anchor.get('chromosome') != row['chromosome']
+                    or type(anchor.get('position')) is not int or anchor['position'] <= 0
+                    or (anchor.get('assembly') == value['assembly'] and anchor['position'] != row['position'])
+                    or anchor.get('ref') != row['ref'] or anchor.get('alt') != row['alt']
+                    or not re.fullmatch(r'\d+', str(row.get('allele_id', '')))
+                    or anchor.get('allele_id') != row['allele_id']
+                    or not re.fullmatch(r'[0-9a-f]{64}', str(anchor.get('source_sha256', '')))):
+                raise ValueError('Reference anchor requires the same explicit ClinVar allele, chromosome and alleles, with source checksum.')
     return value
 
 
@@ -65,7 +77,8 @@ def recover_probes(variants, path, mapping, db):
         reason=None; identity=None
         if not context_ok: reason='missing_or_conflicting_product_build'
         elif not rows: reason='probe_not_mapped'
-        elif len({(r['rsid'],r['chromosome'],r['position'],r['ref'],r['alt']) for r in rows})!=1:
+        elif len({(r['rsid'],r['chromosome'],r['position'],r['ref'],r['alt'],
+                   str(r.get('allele_id')), json.dumps(r.get('reference_anchor'), sort_keys=True)) for r in rows})!=1:
             reason='conflicting_mapping'; recovery['status']='conflicting'
         else:
             row=rows[0]; ref,alt=row['ref'],row['alt']
@@ -79,12 +92,22 @@ def recover_probes(variants, path, mapping, db):
                           'position':row['position'],'ref':ref,'alt':alt}
                 # Require an unambiguous installed source anchor. Multiple
                 # locations/alleles are outside this first bounded recovery path.
+                records = db.lookup_rsid(row['rsid'])['clinvar']
                 anchors={(r.get('assembly'),r.get('chromosome'),r.get('position_vcf'),r.get('ref_allele'),r.get('alt_allele'))
-                         for r in db.lookup_rsid(row['rsid'])['clinvar']}
-                if anchors!={(build,row['chromosome'],row['position'],ref,alt)}:
+                         for r in records}
+                expected = (build,row['chromosome'],row['position'],ref,alt)
+                reference_anchor = row.get('reference_anchor')
+                paired = False
+                if reference_anchor:
+                    expected = (reference_anchor['assembly'], row['chromosome'],
+                                reference_anchor['position'], ref, alt)
+                    paired = bool(records) and all(str(r.get('allele_id')) == str(row['allele_id']) for r in records)
+                if anchors!={expected} or (reference_anchor and not paired):
                     reason='reference_identity_unresolved'
                 else:
                     recovery.update(status='recovered',reason='explicit_mapping_and_reference_match',identity=identity)
+                    if reference_anchor:
+                        recovery['reference_anchor'] = dict(reference_anchor)
                     output.append(replace(variant,rsid=row['rsid'],probe_recovery=recovery));continue
         recovery['reason']=reason
         output.append(replace(variant,probe_recovery=recovery))
