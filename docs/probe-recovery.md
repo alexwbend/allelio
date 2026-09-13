@@ -49,12 +49,18 @@ conflicting mapping decisions without adding them to total row counts.
 
 ## Availability and reuse
 
-No production mapping is bundled or advertised as complete. The only shipped
-mapping is deliberately synthetic and covered by this repository's MIT license.
-A real mapping needs documented origin and redistribution permission/reuse terms
-before it can be shipped; a nonempty license label alone is not legal verification.
-User-supplied mappings are explicit local inputs and are never downloaded.
-Successful synthetic recovery is a software check, not diagnostic validation.
+A real, deliberately narrow mapping is available in
+[`data/probe-mappings`](../data/probe-mappings/README.md): one documented F2 probe,
+`i3002432` → `rs1799963`, for declared GRCh37 23andMe raw data. The FDA decision
+summary establishes the alias and G20210A change; ClinVar establishes its explicit
+reference placements. The mapping directory records provenance, source checksums,
+reuse basis, preparation decisions and usage. It is never enabled automatically.
+Other internal IDs remain unresolved unless a separately verified mapping is
+explicitly supplied. The invented challenge mapping remains synthetic.
+
+A new mapping still needs documented origin and reuse terms; a nonempty license
+label alone is not verification. User-supplied maps are local inputs and never
+downloaded. Successful recovery is a software check, not diagnostic validation.
 
 ### Verify native-build reference placements
 
@@ -82,21 +88,28 @@ match the prepared reference identity and AlleleID or recovery abstains.
 
 ### Production-source investigation (2026-09-13)
 
-The reviewed public sources do not yet establish a redistributable mapping from
-23andMe internal IDs to allele identities. 23andMe's identifier documentation
-above explicitly allows internal IDs without a clear rsID. Its
-[platform methods](https://permalinks.23andme.com/pdf/23_21-PRSMethodology_May2020.pdf)
-describe custom content supplementing the underlying Illumina arrays, so a public
-base-array manifest alone does not establish the identity of that custom content.
-Illumina documents access to
-[custom product files through the ordering MyIllumina account](https://knowledge.illumina.com/microarray/general/microarray-general-reference_material-list/000001531).
-That access documentation does not establish redistribution permission for an
-Allelio mapping. No production mapping has been imported from these sources.
+Targeted searches for a specific probe uncovered the FDA's
+[DEN160026 decision summary](https://www.accessdata.fda.gov/cdrh_docs/reviews/DEN160026.pdf),
+page 1, explicitly linking `i3002432`, `rs1799963` and the F2 G20210A change.
+The curated mapping above uses that primary evidence; it does not infer an alias
+from coincident coordinates or copy a community alias list.
 
-A candidate must identify the exact supported product and reference build,
-provide the internal-ID-to-rsID relationship and allele orientation with traceable
-source evidence, and include terms permitting the intended reuse. Retain the
-source version and checksum alongside any conversion. Validate its identities
-against the installed reference and retain conflicts as unresolved. Do not fill
-missing relationships by matching coordinates alone. Issue #28 remains open for
-this data dependency; it does not require changes to the default recovery policy.
+Broader candidates remain unsuitable for a complete mapping:
+
+- Snappy's `data/iidaliases.json` contains rsID aliases, but its
+  [third-party notice](https://github.com/zhaofengli/snappy/blob/2d5255f86352e1a048d13fa895fc9f991efb0d98/THIRDPARTY.md)
+  assigns the SNPedia data noncommercial share-alike terms separately from its
+  code license. The alias file also lacks explicit build and assay alleles.
+- Public base-array manifests do not define all vendor custom content. The
+  [vendor methods](https://permalinks.23andme.com/pdf/23_21-PRSMethodology_May2020.pdf)
+  describe that added content; Illumina's
+  [ordering-account access documentation](https://knowledge.illumina.com/microarray/general/microarray-general-reference_material-list/000001531)
+  does not grant redistribution rights for a vendor custom manifest.
+- Public paired array/sequencing research datasets can test concordance, but a
+  matching observed genotype alone does not establish a complete assay definition.
+  No participant data or empirically inferred mappings are included here.
+
+Expand this collection only when each added relationship has equivalent explicit
+identity, allele, build and reuse evidence. Keep conflicts and unsupported contexts
+unresolved. Bounded coverage is intentional; it is not a claim that all internal
+IDs can be resolved.

@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- An opt-in, one-probe F2 mapping (`i3002432` to `rs1799963`) backed by an
+  explicit FDA alias and assay change, with checksummed ClinVar placements,
+  reuse documentation and replay regressions. Other internal IDs remain unresolved.
+
 - Synthetic stage-by-stage annotation benchmarks with manifest-linked outputs
   and bounded, explicitly aligned tool comparisons.
 - Frozen-evidence explanation arms, blinded case exports and validated rating
