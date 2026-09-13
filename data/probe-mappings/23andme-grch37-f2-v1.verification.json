@@ -1,0 +1,17 @@
+{
+  "input_rows": 1,
+  "admitted_rows": 1,
+  "source": {
+    "source": "ClinVar",
+    "file": "variant_summary.txt.gz",
+    "sha256": "0946d1661f102f39e4a5b37db1e04be2990478eb547cceb21ffb0ba23c7ee78f",
+    "input_mapping_sha256": "f63e7b4a8cb258daf174ffc4a603736b752591d62ea0ec771a1124539f09bf2f"
+  },
+  "decisions": [
+    {
+      "probe": "i3002432",
+      "rsid": "rs1799963",
+      "reason": "explicit_paired_placements"
+    }
+  ]
+}

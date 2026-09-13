@@ -1,0 +1,63 @@
+{
+  "schema": "allelio-probes/1",
+  "source": "Allelio curated F2 probe identity from FDA DEN160026 and ClinVar",
+  "version": "2026-09-13.1",
+  "license": "MIT (Allelio curation); public factual identifiers and reference placements; see README.md",
+  "source_url": "https://www.accessdata.fda.gov/cdrh_docs/reviews/DEN160026.pdf",
+  "product": "23andme-raw",
+  "assembly": "GRCh37",
+  "strand": "+",
+  "scope": "One documented F2 probe only. No claim of complete chip coverage or diagnostic validity.",
+  "evidence_sources": [
+    {
+      "role": "probe alias and assayed G20210A change",
+      "url": "https://www.accessdata.fda.gov/cdrh_docs/reviews/DEN160026.pdf",
+      "version": "Corrected decision summary 2017-11-02",
+      "page": 1,
+      "sha256": "75d13a55ece6f130684cf3a5654229d6a3ea8e476e85c7ffff2f81fea29c2591"
+    },
+    {
+      "role": "corroborating vendor marker and typical G / variant A alleles",
+      "url": "https://medical.23andme.com/wp-content/uploads/2023/02/Jamie-Hereditary-Thrombophilia-2-variants-F5-and-F2-sample-report-1.pdf",
+      "page": 2,
+      "accessed": "2026-09-13"
+    },
+    {
+      "role": "explicit reference-build allele placements",
+      "url": "https://www.ncbi.nlm.nih.gov/clinvar/variation/13310/",
+      "version": "ClinVar variant_summary.txt.gz 2026-09-06",
+      "sha256": "0946d1661f102f39e4a5b37db1e04be2990478eb547cceb21ffb0ba23c7ee78f"
+    },
+    {
+      "role": "raw-data reference and strand convention; input must independently declare context",
+      "url": "https://customercare.23andme.com/hc/en-us/articles/212883767-Which-Reference-Genome-and-Strand-Does-23andMe-Use",
+      "accessed": "2026-09-13"
+    }
+  ],
+  "entries": [
+    {
+      "probe": "i3002432",
+      "rsid": "rs1799963",
+      "chromosome": "11",
+      "position": 46761055,
+      "ref": "G",
+      "alt": "A",
+      "allele_id": "28349",
+      "reference_anchor": {
+        "assembly": "GRCh38",
+        "chromosome": "11",
+        "position": 46739505,
+        "ref": "G",
+        "alt": "A",
+        "allele_id": "28349",
+        "source_sha256": "0946d1661f102f39e4a5b37db1e04be2990478eb547cceb21ffb0ba23c7ee78f"
+      }
+    }
+  ],
+  "reference_source": {
+    "source": "ClinVar",
+    "file": "variant_summary.txt.gz",
+    "sha256": "0946d1661f102f39e4a5b37db1e04be2990478eb547cceb21ffb0ba23c7ee78f",
+    "input_mapping_sha256": "f63e7b4a8cb258daf174ffc4a603736b752591d62ea0ec771a1124539f09bf2f"
+  }
+}
