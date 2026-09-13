@@ -71,3 +71,27 @@ def test_recovery_counts_are_validated(probe_case):
     assert validate_evidence(evidence)==[]
     evidence['coverage']['probe_recovery_counts']['recovered']=5
     assert any('probe_recovery_counts' in error for error in validate_evidence(evidence))
+
+
+@pytest.mark.parametrize('declaration', [
+    '# build 36',
+    '# GRCh39',
+    '# BUILD 37',
+    '# Allelio product: ancestry-raw',
+])
+def test_conflicting_context_is_not_silently_discarded(probe_case, declaration):
+    source = probe_case[0]
+    source.write_text(declaration + '\n' + source.read_text())
+    _, evidence, _ = run(probe_case)
+    observation = evidence['inputs'][0]
+    assert observation['rsid'] == 'i1'
+    assert observation['probe_recovery']['reason'] == 'missing_or_conflicting_product_build'
+    assert not evidence['findings']
+
+
+@pytest.mark.parametrize('declaration', ['GRCh38', 'build 38', 'BUILD 38'])
+def test_equivalent_build_declarations_can_agree(probe_case, declaration):
+    source = probe_case[0]
+    source.write_text('# ' + declaration + '\n' + source.read_text())
+    _, evidence, _ = run(probe_case)
+    assert evidence['inputs'][0]['rsid'] == 'rs1'
