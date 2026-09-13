@@ -50,8 +50,8 @@ conflicting mapping decisions without adding them to total row counts.
 ## Availability and reuse
 
 A real, deliberately narrow mapping is available in
-[`data/probe-mappings`](../data/probe-mappings/README.md): one documented F2 probe,
-`i3002432` → `rs1799963`, for declared GRCh37 23andMe raw data. The FDA decision
+[`data/probe-mappings`](../data/probe-mappings/README.md): two documented F2/GBA1 probes,
+`i3002432` → `rs1799963` and `i4000415` → `rs76763715`, for declared GRCh37 23andMe raw data. The FDA decision
 summary establishes the alias and G20210A change; ClinVar establishes its explicit
 reference placements. The mapping directory records provenance, source checksums,
 reuse basis, preparation decisions and usage. It is never enabled automatically.

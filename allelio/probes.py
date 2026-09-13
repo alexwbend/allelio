@@ -90,18 +90,21 @@ def recover_probes(variants, path, mapping, db):
             else:
                 identity={'rsid':row['rsid'],'assembly':build,'chromosome':row['chromosome'],
                           'position':row['position'],'ref':ref,'alt':alt}
-                # Require an unambiguous installed source anchor. Multiple
-                # locations/alleles are outside this first bounded recovery path.
+                # Require an unambiguous installed source anchor. A prepared
+                # cross-build mapping names an AlleleID, so other legitimate
+                # alleles sharing the rsID do not invalidate that exact anchor.
                 records = db.lookup_rsid(row['rsid'])['clinvar']
-                anchors={(r.get('assembly'),r.get('chromosome'),r.get('position_vcf'),r.get('ref_allele'),r.get('alt_allele'))
-                         for r in records}
                 expected = (build,row['chromosome'],row['position'],ref,alt)
                 reference_anchor = row.get('reference_anchor')
                 paired = False
                 if reference_anchor:
-                    expected = (reference_anchor['assembly'], row['chromosome'],
+                    records = [r for r in records
+                               if str(r.get('allele_id')) == str(row['allele_id'])]
+                    expected = (reference_anchor['assembly'], reference_anchor['chromosome'],
                                 reference_anchor['position'], ref, alt)
-                    paired = bool(records) and all(str(r.get('allele_id')) == str(row['allele_id']) for r in records)
+                    paired = bool(records)
+                anchors={(r.get('assembly'),r.get('chromosome'),r.get('position_vcf'),r.get('ref_allele'),r.get('alt_allele'))
+                         for r in records}
                 if anchors!={expected} or (reference_anchor and not paired):
                     reason='reference_identity_unresolved'
                 else:

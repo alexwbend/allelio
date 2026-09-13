@@ -128,6 +128,16 @@ def test_native_build_recovery_uses_explicit_same_allele_placements(probe_case):
     assert replay_run(manifest, *probe_case[:2], probe_map=probe_case[2])[0]['annotation_replayed']
 
 
+def test_other_allele_at_same_rsid_does_not_block_explicit_pair(probe_case):
+    reference, prepare = paired_case(probe_case)
+    with reference.open('a') as stream:
+        stream.write('2\t1\tGRCh37\t1\t90\tG\tT\n')
+        stream.write('2\t1\tGRCh38\t1\t100\tG\tT\n')
+    prepared, report = prepare(probe_case[2], reference)
+    assert report['admitted_rows'] == 1
+    assert prepared['entries'][0]['allele_id'] == '1'
+
+
 @pytest.mark.parametrize('alteration', ['native_position', 'different_allele', 'different_id', 'multiple_locations'])
 def test_reference_preparation_rejects_ambiguous_or_changed_placements(probe_case, alteration):
     reference, prepare = paired_case(probe_case)

@@ -49,8 +49,12 @@ def prepare_reference_mapping(mapping_path, clinvar_path):
             native_record = next(iter(matches))
             # Match the importer's GRCh38 preference, preserving distinct
             # AlleleIDs and locations rather than choosing the first row.
-            ids_with_38 = {r[0] for r in records if r[1] == 'GRCh38'}
-            selected = {r for r in records if r[1] == 'GRCh38' or r[0] not in ids_with_38}
+            # Follow the one native placement's AlleleID across builds. An
+            # rsID may legitimately contain several alternate alleles; those
+            # must not make the explicitly matched allele ambiguous.
+            same_allele = {r for r in records if r[0] == native_record[0]}
+            has_any_38 = any(r[1] == 'GRCh38' for r in records)
+            selected = {r for r in same_allele if r[1] == 'GRCh38' or not has_any_38}
             reason = 'reference_identity_ambiguous'
             if len(selected) == 1:
                 reference = next(iter(selected))
