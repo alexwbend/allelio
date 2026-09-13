@@ -9,7 +9,7 @@ authors:
   - family-names: "Bendella"
     given-names: "Wassim Alex"
     orcid: "https://orcid.org/0009-0000-8956-6761"
-version: 0.2.1
+version: 0.4.0
 date-released: "2026-09-09"
 license: MIT
 repository-code: "https://github.com/alexwbend/allelio"

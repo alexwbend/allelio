@@ -41,6 +41,16 @@
       "sha256": "448f9619ee5b0f43cbc28a8e2afb5e7234c7105153b9ed74e3232664bedc2667",
       "arweave_tx": "Y6CFf6w28h4_DlMXJd-U4EohDYpzA9HnyZwOVWYKf8c",
       "arweave_url": "https://arweave.net/Y6CFf6w28h4_DlMXJd-U4EohDYpzA9HnyZwOVWYKf8c",
+      "bitcoin_anchor_notice": {
+        "status": "email-reported; timestamp proof not obtained",
+        "reported_block": 966805,
+        "reported_timestamp_utc": "2026-09-13T10:20:43Z",
+        "reported_file": "gnomad_v4.1.1_array_freq_format2.tsv",
+        "block_hash": "000000000000000000001e57e4d239400b6e156252459d713b9d315d72b85d2b",
+        "block_timestamp_verified": true,
+        "artifact_binding_verified": false,
+        "note": "The block and timestamp were checked independently. The email notice did not include a timestamp proof linking an artifact digest to the block. Its uncompressed .tsv filename is not evidence of byte identity with this compressed .tsv.gz snapshot."
+      },
       "license": "CC0 1.0",
       "license_url": "https://gnomad.broadinstitute.org/policies",
       "note": "Allele-aware consumer-array frequency extract; source provenance in data/gnomad_manifest.json."
