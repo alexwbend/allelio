@@ -95,3 +95,59 @@ def test_equivalent_build_declarations_can_agree(probe_case, declaration):
     source.write_text('# ' + declaration + '\n' + source.read_text())
     _, evidence, _ = run(probe_case)
     assert evidence['inputs'][0]['rsid'] == 'rs1'
+
+
+def paired_case(probe_case):
+    from allelio.probe_reference import prepare_reference_mapping
+    source, db, path, mapping = probe_case
+    source.write_text(source.read_text().replace('build 38', 'build 37').replace('100', '90'))
+    mapping['assembly'] = 'GRCh37'
+    mapping['entries'][0]['position'] = 90
+    path.write_text(json.dumps(mapping))
+    reference = path.parent / 'clinvar.tsv'
+    reference.write_text('#AlleleID\tRS# (dbSNP)\tAssembly\tChromosome\tPositionVCF\tReferenceAlleleVCF\tAlternateAlleleVCF\n'
+                         '1\t1\tGRCh37\t1\t90\tG\tA\n'
+                         '1\t1\tGRCh38\t1\t100\tG\tA\n')
+    return reference, prepare_reference_mapping
+
+
+def test_native_build_recovery_uses_explicit_same_allele_placements(probe_case):
+    reference, prepare = paired_case(probe_case)
+    prepared, report = prepare(probe_case[2], reference)
+    assert report['admitted_rows'] == 1
+    probe_case[3].update(prepared)
+    manifest, evidence, _ = run(probe_case)
+    observation = evidence['inputs'][0]
+    recovery = observation['probe_recovery']
+    assert observation['rsid'] == 'rs1'
+    assert recovery['identity']['assembly'] == 'GRCh37'
+    assert recovery['identity']['position'] == 90
+    assert recovery['reference_anchor']['assembly'] == 'GRCh38'
+    assert recovery['reference_anchor']['position'] == 100
+    assert recovery['observed_genotype'] == 'AG'
+    assert replay_run(manifest, *probe_case[:2], probe_map=probe_case[2])[0]['annotation_replayed']
+
+
+@pytest.mark.parametrize('alteration', ['native_position', 'different_allele', 'different_id', 'multiple_locations'])
+def test_reference_preparation_rejects_ambiguous_or_changed_placements(probe_case, alteration):
+    reference, prepare = paired_case(probe_case)
+    text = reference.read_text()
+    if alteration == 'native_position': text = text.replace('\t90\t', '\t91\t')
+    if alteration == 'different_allele': text = text.replace('100\tG\tA', '100\tC\tT')
+    if alteration == 'different_id': text = text.replace('1\t1\tGRCh38', '2\t1\tGRCh38')
+    if alteration == 'multiple_locations': text += '1\t1\tGRCh38\t1\t101\tG\tA\n'
+    reference.write_text(text)
+    prepared, report = prepare(probe_case[2], reference)
+    assert prepared['entries'] == []
+    assert report['admitted_rows'] == 0
+
+
+def test_reference_anchor_cannot_match_another_installed_allele(probe_case):
+    reference, prepare = paired_case(probe_case)
+    prepared, _ = prepare(probe_case[2], reference)
+    prepared['entries'][0]['allele_id'] = '2'
+    prepared['entries'][0]['reference_anchor']['allele_id'] = '2'
+    probe_case[3].update(prepared)
+    _, evidence, _ = run(probe_case)
+    assert evidence['inputs'][0]['rsid'] == 'i1'
+    assert evidence['inputs'][0]['probe_recovery']['reason'] == 'reference_identity_unresolved'
