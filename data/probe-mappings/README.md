@@ -8,15 +8,28 @@ revision, or a person's complete genotype. Unknown probes remain unresolved.
 The installed reference must match ClinVar AlleleID 28349, GRCh38 chromosome 11,
 position 46739505, G>A. No coordinate conversion is applied to the input.
 
+`23andme-grch37-f2-gba1-v1.json` is the next conservative catalogue revision.
+It retains that F2 entry and adds `i4000415` → `rs76763715`, GBA1 N370S,
+GRCh37 chromosome 1 position 155205634 T>C, anchored to ClinVar AlleleID 19329
+at GRCh38 position 155235843 T>C. The FDA decision identifies N370S with the
+rsID; the vendor report identifies the same named variant with the internal
+marker, alleles, positive strand and build 37. ClinVar supplies paired placements
+for the same AlleleID. A different T>G allele sharing the rsID is not admitted.
+
 ## Evidence chain
 
 1. The FDA's [DEN160026 decision summary](https://www.accessdata.fda.gov/cdrh_docs/reviews/DEN160026.pdf),
    corrected November 2, 2017, page 1, explicitly identifies the tested F2 G20210A
    change with both `rs1799963` and `i3002432`. This establishes the alias and
    specific assayed change independently of any coordinate lookup.
+   The same decision identifies GBA1 N370S as `rs76763715`.
 2. The manufacturer's [illustrative sample report](https://medical.23andme.com/wp-content/uploads/2023/02/Jamie-Hereditary-Thrombophilia-2-variants-F5-and-F2-sample-report-1.pdf),
    page 2, corroborates the marker and distinguishes typical G from variant A.
    This is an illustrative vendor report, not an individual research participant.
+   Its [Parkinson's illustrative report](https://medical.23andme.com/wp-content/uploads/2017/09/Parkinson_one_N370S_nocall_G2019S.pdf)
+   names N370S marker `i4000415`, typical T and variant C, and states positive
+   strand/build 37. Together with the FDA's N370S rsID, this establishes the
+   second alias and assay context without a coordinate-derived alias.
 3. [ClinVar variation 13310](https://www.ncbi.nlm.nih.gov/clinvar/variation/13310/)
    publishes the explicit GRCh37 and GRCh38 G>A placements. The mapping was
    prepared against the complete 2026-09-06 variant-summary extract, requiring
@@ -55,7 +68,7 @@ From a source checkout, use the prepared file explicitly:
 ```sh
 allelio record-run input.txt --database ~/.allelio/data/allelio.db \
   --manifest run.json --evidence-output evidence.json \
-  --probe-map data/probe-mappings/23andme-grch37-f2-v1.json
+  --probe-map data/probe-mappings/23andme-grch37-f2-gba1-v1.json
 ```
 
 For a package installation, download the prepared JSON from this repository and

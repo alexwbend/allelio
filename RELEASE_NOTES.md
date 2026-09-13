@@ -17,7 +17,8 @@ clinically validated diagnostic system.
   configuration and optional probe-mapping fingerprints.
 - Developmental stage benchmarks and blinded explanation-review materials.
   These tools do not constitute independent clinical validation.
-- Optional recovery of one documented 23andMe probe, `i3002432` to `rs1799963`,
+- Optional recovery of two documented 23andMe probes: `i3002432` to `rs1799963`
+  and `i4000415` to `rs76763715`,
   when the user supplies the versioned map and the input declares the supported
   product/build context. Other internal probes remain unresolved.
 - The published gnomAD v4.1.1 format-2 extract now provides allele-aware

@@ -1,0 +1,61 @@
+{
+  "schema": "allelio-probes/1",
+  "source": "Allelio curated F2 and GBA1 probe identities from FDA, vendor, and ClinVar sources",
+  "version": "2026-09-13.2",
+  "license": "MIT (Allelio curation); public factual identifiers and reference placements; see README.md",
+  "source_url": "https://www.accessdata.fda.gov/cdrh_docs/reviews/DEN160026.pdf",
+  "product": "23andme-raw",
+  "assembly": "GRCh37",
+  "strand": "+",
+  "scope": "Two documented probes only. No claim of complete chip coverage or diagnostic validity.",
+  "evidence_sources": [
+    {
+      "role": "F2 probe alias and assayed G20210A change; GBA1 N370S rsID and assayed change",
+      "url": "https://www.accessdata.fda.gov/cdrh_docs/reviews/DEN160026.pdf",
+      "version": "Corrected decision summary 2017-11-02",
+      "pages": [1, 11],
+      "sha256": "75d13a55ece6f130684cf3a5654229d6a3ea8e476e85c7ffff2f81fea29c2591"
+    },
+    {
+      "role": "vendor F2 marker and typical G / variant A alleles",
+      "url": "https://medical.23andme.com/wp-content/uploads/2023/02/Jamie-Hereditary-Thrombophilia-2-variants-F5-and-F2-sample-report-1.pdf",
+      "page": 2,
+      "accessed": "2026-09-13"
+    },
+    {
+      "role": "vendor GBA1 N370S marker i4000415, typical T / variant C alleles, positive strand and build 37",
+      "url": "https://medical.23andme.com/wp-content/uploads/2017/09/Parkinson_one_N370S_nocall_G2019S.pdf",
+      "pages": [2, 3],
+      "accessed": "2026-09-13"
+    },
+    {
+      "role": "explicit reference-build allele placements",
+      "url": "https://www.ncbi.nlm.nih.gov/clinvar/",
+      "version": "ClinVar variant_summary.txt.gz 2026-09-06",
+      "sha256": "0946d1661f102f39e4a5b37db1e04be2990478eb547cceb21ffb0ba23c7ee78f"
+    },
+    {
+      "role": "raw-data reference and strand convention; input must independently declare context",
+      "url": "https://customercare.23andme.com/hc/en-us/articles/212883767-Which-Reference-Genome-and-Strand-Does-23andMe-Use",
+      "accessed": "2026-09-13"
+    }
+  ],
+  "entries": [
+    {
+      "probe": "i3002432",
+      "rsid": "rs1799963",
+      "chromosome": "11",
+      "position": 46761055,
+      "ref": "G",
+      "alt": "A"
+    },
+    {
+      "probe": "i4000415",
+      "rsid": "rs76763715",
+      "chromosome": "1",
+      "position": 155205634,
+      "ref": "T",
+      "alt": "C"
+    }
+  ]
+}
