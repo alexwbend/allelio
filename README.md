@@ -171,7 +171,7 @@ Reference datasets have their own terms, separate from Allelio's code license.
 
 | Input | Supported handling | Main limits |
 |---|---|---|
-| 23andMe tab-delimited raw text | rsID, chromosome, position and genotype parsing | Internal `i` probe IDs are not resolved; array coverage is incomplete |
+| 23andMe tab-delimited raw text | rsID, chromosome, position and genotype parsing | Internal `i` probes are unresolved by default; one documented F2 probe has opt-in recovery; array coverage is incomplete |
 | AncestryDNA tab-delimited raw text | rsID and allele-column parsing | The file layout matters, not its `.txt` or `.csv` extension; arbitrary CSV is not supported |
 | VCF | rsID-based records, explicit alleles and genotype evidence; haploid/diploid calls | First sample only; no general liftover, sequence normalization or comprehensive structural-variant interpretation |
 
@@ -378,7 +378,7 @@ See [the synthetic replay example and contract](docs/reproducible-runs.md).
 ### Developmental verification tools
 
 - [Network-boundary experiments](docs/network-boundary.md), including a web annotation-only switch.
-- [Explicit custom-probe recovery](docs/probe-recovery.md) with user-supplied mappings; no production mapping is bundled.
+- [Explicit custom-probe recovery](docs/probe-recovery.md), including a [one-probe F2 mapping](data/probe-mappings/README.md) backed by FDA and ClinVar evidence.
 - [Stage-by-stage synthetic benchmark](docs/regression-benchmark.md).
 - [Frozen-evidence explanation evaluation and blinded rating support](docs/explanation-evaluation.md).
 
