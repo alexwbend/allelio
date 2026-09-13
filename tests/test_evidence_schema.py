@@ -237,3 +237,28 @@ class TestInstalledWheel:
                              cwd=str(tmp_path), env={"PYTHONPATH": str(tmp_path / "site"), "PATH": ""})
         assert run.returncode == 0, run.stderr
         assert run.stdout.strip().endswith(f"evidence-{schema.DEFAULT_SCHEMA_VERSION}.json")
+
+    def test_run_replay_in_clean_installed_package(self, wheel, tmp_path):
+        with zipfile.ZipFile(wheel) as archive:
+            archive.extractall(tmp_path / 'installed')
+        script = '''
+import socket
+from pathlib import Path
+from allelio.database.store import AllelioDB
+from allelio.runs import record_run, replay_run, validate_manifest
+
+def denied(*a, **kw): raise AssertionError('Unexpected network attempt')
+socket.socket.connect = denied
+socket.getaddrinfo = denied
+source=Path('synthetic.txt'); source.write_text('rs1\\t1\\t100\\tAG\\n')
+db=AllelioDB('synthetic.db'); db.initialize()
+db.insert_clinvar_batch([dict(rsid='rs1', gene='SYNTHETIC', clinical_significance='Pathogenic')]); db.close()
+manifest, evidence, _ = record_run(source, 'synthetic.db')
+validate_manifest(manifest)
+assert replay_run(manifest, source, 'synthetic.db')[0]['annotation_replayed']
+print('installed replay passed')
+'''
+        result = subprocess.run([sys.executable, '-c', script], cwd=str(tmp_path),
+            env={'PYTHONPATH': str(tmp_path / 'installed'), 'PATH': ''}, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        assert 'installed replay passed' in result.stdout

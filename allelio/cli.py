@@ -3,6 +3,7 @@
 import asyncio
 import os
 import socket
+import sqlite3
 from pathlib import Path
 from typing import Optional
 
@@ -807,6 +808,77 @@ def validate_evidence_command(file: str):
             console.print(f"  {escape(line)}")
         raise SystemExit(1)
     console.print(f"[bold green]✓[/bold green] {escape(file)} is valid evidence JSON (schema {DEFAULT_SCHEMA_VERSION})")
+
+
+@allelio.command('record-run')
+@click.argument('file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--database', required=True, type=click.Path(exists=True, dir_okay=False), help='Installed references; never downloaded or migrated.')
+@click.option('--manifest', required=True, type=click.Path(dir_okay=False), help='Local manifest destination (contains an input fingerprint).')
+@click.option('--evidence-output', type=click.Path(dir_okay=False), help='Save genotype-bearing evidence locally.')
+@click.option('--explanations-output', type=click.Path(dir_okay=False), help='Generate local-model explanations and save them locally.')
+@click.option('--model', default=None)
+@click.option('--top', type=click.IntRange(min=0), default=20)
+@click.option('--include-benign', is_flag=True)
+@click.option('--include-reference', is_flag=True)
+@click.option('--no-frequency-adjustment', is_flag=True)
+@click.option('--traits-only', is_flag=True)
+@click.option('--detailed-trace', is_flag=True)
+def record_run_command(file, database, manifest, evidence_output, explanations_output, model, top,
+                       include_benign, include_reference, no_frequency_adjustment, traits_only, detailed_trace):
+    """Record an annotation run for verified offline replay. AI is opt-in."""
+    from allelio.runs import record_run, validate_manifest
+    _run_output_paths([file, database], [manifest, evidence_output, explanations_output])
+    try:
+        document, evidence, explanations = record_run(file, database,
+            {'include_benign': include_benign, 'include_reference': include_reference,
+             'frequency_adjustment': not no_frequency_adjustment, 'traits_only': traits_only,
+             'detailed_trace': detailed_trace}, explain=bool(explanations_output), model=model, top=top)
+        validate_manifest(document)
+        if evidence_output:
+            write_evidence_export(evidence, evidence_output)
+        if explanations_output:
+            write_evidence_export({key: {'text': e.text, 'model': e.model, 'fallback': not bool(e.model)}
+                                   for key, e in explanations.items()}, explanations_output)
+        write_evidence_export(document, manifest)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        raise click.ClickException(str(exc)) from exc
+    console.print('Run recorded locally. Keep its input fingerprint private unless deliberately sharing it.')
+
+
+def _run_output_paths(inputs, outputs):
+    """Protect inputs, hard/symbolic links and SQLite sidecars from output writes."""
+    outputs = [Path(p) for p in outputs if p]
+    protected = [Path(p).resolve() for p in inputs]
+    protected += [Path(str(p) + suffix) for p in protected for suffix in ('-wal', '-shm', '-journal')]
+    for index, path in enumerate(outputs):
+        for other in protected + outputs[:index]:
+            if path.resolve() == other.resolve() or (path.exists() and other.exists() and path.samefile(other)):
+                raise click.UsageError('Run outputs must differ from inputs, the database and each other.')
+
+
+@allelio.command('replay-run')
+@click.argument('manifest', type=click.Path(exists=True, dir_okay=False))
+@click.option('--input', 'file', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.option('--database', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.option('--verify-only', is_flag=True, help='Check prerequisites without replaying annotation.')
+@click.option('--evidence-output', type=click.Path(dir_okay=False))
+def replay_run_command(manifest, file, database, verify_only, evidence_output):
+    """Verify and replay annotation locally. Never download or contact a model."""
+    import json
+    from allelio.runs import replay_run
+    _run_output_paths([manifest, file, database], [evidence_output])
+    if verify_only and evidence_output:
+        raise click.UsageError('--evidence-output requires an annotation replay.')
+    try:
+        result, evidence = replay_run(json.loads(Path(manifest).read_text()), file, database, verify_only)
+        if evidence_output:
+            write_evidence_export(evidence, evidence_output)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        raise click.ClickException(str(exc)) from exc
+    console.print('Prerequisites verified.' if verify_only else 'Annotation replay matches the recorded run.')
+    if result['runtime_differences']:
+        console.print('Runtime versions differ: ' + ', '.join(result['runtime_differences']))
+    console.print('AI explanations were not replayed; model availability and stochastic output are separate.')
 
 
 main = allelio
