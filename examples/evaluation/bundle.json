@@ -1,0 +1,20 @@
+{
+  "schema": "allelio-evaluation/1",
+  "split": "evaluation",
+  "data_kind": "synthetic",
+  "reuse_rights": "MIT; invented by Allelio contributors, no patient or external source material",
+  "cases": [
+    {
+      "id": "evaluation-1",
+      "evidence": "evidence.json",
+      "run_manifest": "run.json",
+      "finding_id": "finding-1"
+    },
+    {
+      "id": "evaluation-2",
+      "evidence": "evidence.json",
+      "run_manifest": "run.json",
+      "finding_id": "finding-2"
+    }
+  ]
+}

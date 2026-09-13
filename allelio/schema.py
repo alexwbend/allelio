@@ -185,6 +185,18 @@ def semantic_errors(document: Dict[str, Any]) -> List[str]:
             if group.get("finding_ids") != expected:
                 errors.append(f"gene_groups/{index}/finding_ids: does not match the listed finding indices")
 
+    if isinstance(coverage, dict) and "probe_recovery_counts" in coverage:
+        expected_recoveries = Counter(item["probe_recovery"]["status"] for item in inputs
+                                      if isinstance(item.get("probe_recovery"), dict))
+        if expected_recoveries != Counter(coverage["probe_recovery_counts"]):
+            errors.append("coverage/probe_recovery_counts: does not match parsed recovery decisions")
+        for index, row in enumerate(coverage.get("rows") or []):
+            original = input_map.get(row.get("input_id"))
+            if original:
+                status = (original.get("probe_recovery") or {}).get("status")
+                if row.get("probe_recovery_status") != status:
+                    errors.append(f"coverage/rows/{index}/probe_recovery_status: does not match its input")
+
     # Matching: candidate counts are conserved and sites reference what they list.
     if isinstance(matching, dict) and matching:
         counts = matching.get("counts") or {}

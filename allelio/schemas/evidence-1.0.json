@@ -291,6 +291,9 @@
             "alleles"
           ],
           "description": "Original VCF record evidence. reference_declaration is the raw header value, not a certified assembly."
+        },
+        "probe_recovery": {
+          "$ref": "#/$defs/probe_recovery"
         }
       },
       "required": [
@@ -1199,6 +1202,14 @@
               },
               "status": {
                 "type": "string"
+              },
+              "probe_recovery_status": {
+                "enum": [
+                  "recovered",
+                  "unresolved",
+                  "conflicting",
+                  null
+                ]
               }
             },
             "required": [
@@ -1215,6 +1226,24 @@
         },
         "limitations": {
           "type": "string"
+        },
+        "probe_recovery_counts": {
+          "type": "object",
+          "properties": {
+            "recovered": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unresolved": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "conflicting": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": [
@@ -1447,6 +1476,58 @@
         "candidates"
       ],
       "description": "Candidate-level matching trace. Counts are over reference records, not rows or findings."
+    },
+    "probe_recovery": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "original_probe": {
+          "type": "string"
+        },
+        "observed_genotype": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "assembly": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "recovered",
+            "unresolved",
+            "conflicting"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "identity": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "original_probe",
+        "observed_genotype",
+        "source",
+        "version",
+        "assembly",
+        "status",
+        "reason",
+        "identity"
+      ]
     }
   }
 }

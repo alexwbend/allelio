@@ -1,0 +1,127 @@
+{
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "allelio-ratings/1"
+    },
+    "blinded_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "raters": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ratings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rater_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scores": {
+            "type": "object",
+            "properties": {
+              "factual_support": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3,
+                "description": "0 unsupported; 1 mostly unsupported; 2 mostly supported; 3 fully supported; null means unrated"
+              },
+              "unsupported_certainty": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3,
+                "description": "0 none; 1 minor; 2 material; 3 severe; null means unrated"
+              },
+              "material_omissions": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3,
+                "description": "0 none; 1 minor; 2 material; 3 severe; null means unrated"
+              },
+              "severity": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3,
+                "description": "0 no consequential error; 1 minor; 2 material; 3 severe; null means unrated"
+              },
+              "uncertainty_communication": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3,
+                "description": "0 absent; 1 weak; 2 adequate; 3 clear; null means unrated"
+              },
+              "readability": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3,
+                "description": "0 unreadable; 1 difficult; 2 adequate; 3 clear; null means unrated"
+              }
+            },
+            "required": [
+              "factual_support",
+              "unsupported_certainty",
+              "material_omissions",
+              "severity",
+              "uncertainty_communication",
+              "readability"
+            ],
+            "additionalProperties": false
+          },
+          "disputed": {
+            "type": "boolean"
+          },
+          "comment": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "rater_id",
+          "scores",
+          "disputed",
+          "comment"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "blinded_sha256",
+    "raters",
+    "ratings"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

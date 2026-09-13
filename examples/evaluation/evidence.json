@@ -1,0 +1,470 @@
+{
+  "schema_version": "1.0",
+  "software": {
+    "name": "Allelio",
+    "version": "0.3.0"
+  },
+  "generated_at": "2026-09-13T08:40:53.262122+00:00",
+  "configuration": {
+    "include_benign": false,
+    "include_reference": false,
+    "frequency_adjustment": true,
+    "traits_only": false,
+    "detailed_trace": false,
+    "pgx_min_level": "2B"
+  },
+  "provenance": {
+    "clinvar": {
+      "release": "synthetic-evaluation/1",
+      "sha256": null
+    },
+    "gwas": {
+      "release": null,
+      "sha256": null
+    },
+    "gnomad": {
+      "release": null,
+      "sha256": null
+    },
+    "clingen": {
+      "release": null,
+      "sha256": null
+    },
+    "clinpgx": {
+      "release": null,
+      "sha256": null
+    }
+  },
+  "inputs": [
+    {
+      "rsid": "rs99001",
+      "chromosome": "1",
+      "position": 123,
+      "genotype": "AG",
+      "vcf_evidence": null,
+      "source_line": 1,
+      "probe_recovery": null,
+      "input_id": "input-1"
+    },
+    {
+      "rsid": "rs99002",
+      "chromosome": "2",
+      "position": 456,
+      "genotype": "CT",
+      "vcf_evidence": null,
+      "source_line": 2,
+      "probe_recovery": null,
+      "input_id": "input-2"
+    }
+  ],
+  "findings": [
+    {
+      "rsid": "rs99001",
+      "chromosome": "1",
+      "position": 123,
+      "genotype": "AG",
+      "clinvar_entries": [
+        {
+          "rsid": "rs99001",
+          "gene": "EVALUATION_A",
+          "clinical_significance": "Pathogenic",
+          "conditions": "Invented condition A",
+          "review_status": null,
+          "review_stars": 0,
+          "ref_allele": "G",
+          "alt_allele": "A",
+          "assembly": "GRCh38",
+          "chromosome": "1",
+          "position_vcf": 123,
+          "allele_id": "1",
+          "variation_id": null,
+          "hgnc_id": null,
+          "condition_ids": null,
+          "inheritance": {
+            "status": "not_curated",
+            "inheritance": "not curated",
+            "note": null,
+            "condition": null,
+            "condition_id": null,
+            "matched": [],
+            "conditions": [
+              {
+                "name": "Invented condition A",
+                "mondo_id": null,
+                "identifiers": []
+              }
+            ],
+            "unmatched_condition_ids": [],
+            "gene_inheritance": "not curated",
+            "gene_note": null,
+            "mapping": {
+              "method": "mondo-exact",
+              "version": "1.1"
+            }
+          },
+          "classification_type": "unknown",
+          "origin": null,
+          "origin_simple": null,
+          "rcv_accessions": null,
+          "number_submitters": null,
+          "variant_type": null,
+          "name": null,
+          "somatic_clinical_impact": null,
+          "somatic_review_status": null,
+          "somatic_last_evaluated": null,
+          "oncogenicity": null,
+          "oncogenicity_review_status": null,
+          "oncogenicity_last_evaluated": null,
+          "allele_match": "carried",
+          "allele_match_note": "1 copy of A",
+          "display_rank": 1.0
+        }
+      ],
+      "gwas_entries": [],
+      "gnomad_entry": null,
+      "gnomad_entries": [],
+      "category": "Health Conditions",
+      "significance_rank": 1.0,
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "A",
+      "strand_flipped": false,
+      "zygosity_note": null,
+      "allele_role": "alternate",
+      "clingen_entries": [],
+      "inheritance": "not curated",
+      "inheritance_note": null,
+      "inheritance_resolution": {
+        "status": "not_curated",
+        "inheritance": "not curated",
+        "note": null,
+        "condition": null,
+        "condition_id": null,
+        "matched": [],
+        "conditions": [
+          {
+            "name": "Invented condition A",
+            "mondo_id": null,
+            "identifiers": []
+          }
+        ],
+        "unmatched_condition_ids": [],
+        "gene_inheritance": "not curated",
+        "gene_note": null,
+        "mapping": {
+          "method": "mondo-exact",
+          "version": "1.1"
+        }
+      },
+      "pgx_entries": [],
+      "finding_id": "finding-1",
+      "input_ids": [
+        "input-1"
+      ],
+      "candidate_ids": [
+        "candidate-1"
+      ]
+    },
+    {
+      "rsid": "rs99002",
+      "chromosome": "2",
+      "position": 456,
+      "genotype": "CT",
+      "clinvar_entries": [
+        {
+          "rsid": "rs99002",
+          "gene": "EVALUATION_B",
+          "clinical_significance": "Uncertain significance",
+          "conditions": "Invented condition B",
+          "review_status": null,
+          "review_stars": 0,
+          "ref_allele": "C",
+          "alt_allele": "T",
+          "assembly": "GRCh38",
+          "chromosome": "2",
+          "position_vcf": 456,
+          "allele_id": "2",
+          "variation_id": null,
+          "hgnc_id": null,
+          "condition_ids": null,
+          "inheritance": {
+            "status": "not_curated",
+            "inheritance": "not curated",
+            "note": null,
+            "condition": null,
+            "condition_id": null,
+            "matched": [],
+            "conditions": [
+              {
+                "name": "Invented condition B",
+                "mondo_id": null,
+                "identifiers": []
+              }
+            ],
+            "unmatched_condition_ids": [],
+            "gene_inheritance": "not curated",
+            "gene_note": null,
+            "mapping": {
+              "method": "mondo-exact",
+              "version": "1.1"
+            }
+          },
+          "classification_type": "unknown",
+          "origin": null,
+          "origin_simple": null,
+          "rcv_accessions": null,
+          "number_submitters": null,
+          "variant_type": null,
+          "name": null,
+          "somatic_clinical_impact": null,
+          "somatic_review_status": null,
+          "somatic_last_evaluated": null,
+          "oncogenicity": null,
+          "oncogenicity_review_status": null,
+          "oncogenicity_last_evaluated": null,
+          "allele_match": "carried",
+          "allele_match_note": "1 copy of T",
+          "display_rank": 7.0
+        }
+      ],
+      "gwas_entries": [],
+      "gnomad_entry": null,
+      "gnomad_entries": [],
+      "category": "Unknown",
+      "significance_rank": 7.0,
+      "zygosity": "heterozygous",
+      "alt_copies": 1,
+      "matched_allele": "T",
+      "strand_flipped": false,
+      "zygosity_note": null,
+      "allele_role": "alternate",
+      "clingen_entries": [],
+      "inheritance": "not curated",
+      "inheritance_note": null,
+      "inheritance_resolution": {
+        "status": "not_curated",
+        "inheritance": "not curated",
+        "note": null,
+        "condition": null,
+        "condition_id": null,
+        "matched": [],
+        "conditions": [
+          {
+            "name": "Invented condition B",
+            "mondo_id": null,
+            "identifiers": []
+          }
+        ],
+        "unmatched_condition_ids": [],
+        "gene_inheritance": "not curated",
+        "gene_note": null,
+        "mapping": {
+          "method": "mondo-exact",
+          "version": "1.1"
+        }
+      },
+      "pgx_entries": [],
+      "finding_id": "finding-2",
+      "input_ids": [
+        "input-2"
+      ],
+      "candidate_ids": [
+        "candidate-2"
+      ]
+    }
+  ],
+  "gene_groups": [
+    {
+      "key": "symbol:EVALUATION_A",
+      "hgnc_id": null,
+      "gene": "EVALUATION_A",
+      "symbols": [
+        "EVALUATION_A"
+      ],
+      "indices": [
+        0
+      ],
+      "count": 1,
+      "function": "A sourced function summary is not available in this release.",
+      "function_source": null,
+      "function_version": null,
+      "note": "Interpret this finding using its own evidence.",
+      "finding_ids": [
+        "finding-1"
+      ]
+    },
+    {
+      "key": "symbol:EVALUATION_B",
+      "hgnc_id": null,
+      "gene": "EVALUATION_B",
+      "symbols": [
+        "EVALUATION_B"
+      ],
+      "indices": [
+        1
+      ],
+      "count": 1,
+      "function": "A sourced function summary is not available in this release.",
+      "function_source": null,
+      "function_version": null,
+      "note": "Interpret this finding using its own evidence.",
+      "finding_ids": [
+        "finding-2"
+      ]
+    }
+  ],
+  "analysis_stats": {
+    "annotated_sites": 2,
+    "reference_genotype_sites": 0,
+    "zygosity_unknown_sites": 0,
+    "benign_sites": 0,
+    "vcf_filter_failed_sites": 0,
+    "dispositions": {
+      "rs99001": "reported",
+      "rs99002": "reported"
+    },
+    "duplicate_rows": 0,
+    "conflicting_input_sites": 0
+  },
+  "coverage": {
+    "scope": "input_data_rows",
+    "total_rows": 2,
+    "accounted_rows": 2,
+    "counts": {
+      "reported": 2
+    },
+    "probe_recovery_counts": {},
+    "rows": [
+      {
+        "line": 1,
+        "input_id": "input-1",
+        "rsid": "rs99001",
+        "status": "reported",
+        "probe_recovery_status": null
+      },
+      {
+        "line": 2,
+        "input_id": "input-2",
+        "rsid": "rs99002",
+        "status": "reported",
+        "probe_recovery_status": null
+      }
+    ],
+    "returned_findings": 2,
+    "complete": true,
+    "limitations": "Rows absent from the input cannot be counted. Coverage is not a negative genetic test or clinical sensitivity estimate."
+  },
+  "matching": {
+    "schema": "candidate-trace/1",
+    "candidate_count": 2,
+    "counts": {
+      "retained": 2
+    },
+    "by_source": {
+      "clinvar": {
+        "retained": 2
+      }
+    },
+    "sites_with_candidates": 2,
+    "listed_candidate_count": 2,
+    "detailed": false,
+    "paths": {
+      "clinvar": "traced: filter, identity, allele, applicability decisions per record",
+      "gwas": "traced: risk-allele decisions per association; strand inference noted",
+      "clinpgx": "traced: evidence-level threshold and genotype match per annotation row",
+      "gnomad": "traced: frequency-record identity per allele row",
+      "clingen": "traced: each curation is assessed against every applicable ClinVar assertion; assertion identities and resolutions are recorded"
+    },
+    "sites": [
+      {
+        "rsid": "rs99001",
+        "input_ids": [
+          "input-1"
+        ],
+        "finding_id": "finding-1",
+        "disposition": "reported",
+        "candidate_count": 1,
+        "counts": {
+          "retained": 1
+        },
+        "candidate_ids": [
+          "candidate-1"
+        ],
+        "candidates_listed": true
+      },
+      {
+        "rsid": "rs99002",
+        "input_ids": [
+          "input-2"
+        ],
+        "finding_id": "finding-2",
+        "disposition": "reported",
+        "candidate_count": 1,
+        "counts": {
+          "retained": 1
+        },
+        "candidate_ids": [
+          "candidate-2"
+        ],
+        "candidates_listed": true
+      }
+    ],
+    "candidates": [
+      {
+        "candidate_id": "candidate-1",
+        "rsid": "rs99001",
+        "source": "clinvar",
+        "identity": {
+          "allele_id": "1",
+          "assembly": "GRCh38",
+          "chromosome": "1",
+          "position_vcf": 123,
+          "ref_allele": "G",
+          "alt_allele": "A",
+          "gene": "EVALUATION_A",
+          "clinical_significance": "Pathogenic"
+        },
+        "decision": "retained",
+        "stage": "allele",
+        "reason": "allele_carried",
+        "note": "1 copy of A",
+        "finding_id": "finding-1"
+      },
+      {
+        "candidate_id": "candidate-2",
+        "rsid": "rs99002",
+        "source": "clinvar",
+        "identity": {
+          "allele_id": "2",
+          "assembly": "GRCh38",
+          "chromosome": "2",
+          "position_vcf": 456,
+          "ref_allele": "C",
+          "alt_allele": "T",
+          "gene": "EVALUATION_B",
+          "clinical_significance": "Uncertain significance"
+        },
+        "decision": "retained",
+        "stage": "allele",
+        "reason": "allele_carried",
+        "note": "1 copy of T",
+        "finding_id": "finding-2"
+      }
+    ],
+    "limitations": [
+      "Candidate counts are over reference records considered, not input rows (see coverage) or findings.",
+      "A retained candidate at a site without a finding was set aside by a later rule; the site disposition says which.",
+      "Candidate IDs are local to this document and carry no genomic identity of their own; the identity field is what the source gave.",
+      "Traces record Allelio's matching decisions only; no AI-generated reasoning is included.",
+      "Candidates at reference-genotype sites are counted but listed only in a detailed export."
+    ]
+  },
+  "limitations": [
+    "Research and education only; not a clinical interpretation.",
+    "Document-local IDs do not assert normalized genomic identity.",
+    "Source records are annotations retained by matching, not all database candidates.",
+    "Missing and non-finite numeric values are null, not zero.",
+    "Coverage records parsing exclusions when an input audit is available; absent findings are not negative results.",
+    "The matching section records why each candidate source record was retained, rejected, or left unresolved; its counts are over records, not rows or findings."
+  ]
+}
