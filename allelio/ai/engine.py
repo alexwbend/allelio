@@ -517,6 +517,7 @@ class AIEngine:
         self.last_error: Optional[str] = None
         # Filled in by check_connection, and the only listing anything asks for.
         self.served_models: List[str] = []
+        self.model_digest: Optional[str] = None
         # Matched against, but never shown: see _aliases_of.
         self.served_aliases: List[str] = []
         # Set by explain() when a reasoning model's response carried a
@@ -531,6 +532,7 @@ class AIEngine:
         Returns:
             True if it answers, False otherwise
         """
+        self.model_digest = None
         if self.client is None:
             return False
         
@@ -584,6 +586,13 @@ class AIEngine:
             self.model = self.served_models[0]
             self._model_named = True
 
+        entries = response.get("models", []) if isinstance(response, dict) else getattr(response, "models", [])
+        for entry in entries or []:
+            name = (entry.get("model") or entry.get("name")) if isinstance(entry, dict) else (getattr(entry, "model", None) or getattr(entry, "name", None))
+            digest = entry.get("digest") if isinstance(entry, dict) else getattr(entry, "digest", None)
+            if name and _tagged(str(name)).lower() == _tagged(self.model).lower():
+                if isinstance(digest, str) and re.fullmatch(r"(?:sha256:)?[0-9a-fA-F]{64}", digest):
+                    self.model_digest = digest
         self.available = True
         return True
     
