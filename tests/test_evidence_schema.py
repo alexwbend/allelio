@@ -258,6 +258,13 @@ validate_manifest(manifest)
 assert replay_run(manifest, source, 'synthetic.db')[0]['annotation_replayed']
 print('installed replay passed')
 '''
+        script += (
+            "from allelio.evaluation import generate_evaluation, summarize_ratings\n"
+            f"generate_evaluation({str(ROOT / 'examples/evaluation/bundle.json')!r}, 'evaluation-output')\n"
+            "assert summarize_ratings('evaluation-output/blinded-cases.json', 'evaluation-output/ratings-template.json')['missing_rows'] == 0\n"
+            "from allelio.benchmark import run_benchmark\n"
+            f"assert run_benchmark({str(ROOT / 'examples/challenges/bundle.json')!r}, 'benchmark-output')['passed']\n"
+        )
         result = subprocess.run([sys.executable, '-c', script], cwd=str(tmp_path),
             env={'PYTHONPATH': str(tmp_path / 'installed'), 'PATH': ''}, capture_output=True, text=True)
         assert result.returncode == 0, result.stderr

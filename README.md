@@ -374,3 +374,12 @@ and missing annotations. These counts are not a negative genetic test.
 Use `allelio record-run` and `allelio replay-run` to record a local run manifest
 and check the same annotation against unchanged inputs and references, offline.
 See [the synthetic replay example and contract](docs/reproducible-runs.md).
+
+### Developmental verification tools
+
+- [Network-boundary experiments](docs/network-boundary.md), including a web annotation-only switch.
+- [Explicit custom-probe recovery](docs/probe-recovery.md) with user-supplied mappings; no production mapping is bundled.
+- [Stage-by-stage synthetic benchmark](docs/regression-benchmark.md).
+- [Frozen-evidence explanation evaluation and blinded rating support](docs/explanation-evaluation.md).
+
+These tools exercise software behavior; they do not establish independent clinical validation.

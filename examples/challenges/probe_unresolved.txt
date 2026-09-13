@@ -1,0 +1,2 @@
+# Allelio product: 23andme-raw
+i1	1	100	AG

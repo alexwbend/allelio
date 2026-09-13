@@ -1,0 +1,80 @@
+{
+  "schema": "allelio-run/1",
+  "created_at": "2026-09-13T08:40:53.270083+00:00",
+  "software": {
+    "package": "allelio",
+    "version": "0.3.0",
+    "content_sha256": "f5d9b962d177d45614c79ec72c3aab7330ef358b5a1a3a402738d9fb732c982a"
+  },
+  "runtime": {
+    "python": "3.9.6",
+    "implementation": "CPython",
+    "sqlite": "3.51.0",
+    "packages": {
+      "click": "8.1.8",
+      "jsonschema": "4.17.3",
+      "httpx": "0.28.1",
+      "ollama": "0.6.1"
+    }
+  },
+  "input": {
+    "sha256": "9c51d95df112193960d456761fccda051bbf639d6c9fd2491e76754579177651"
+  },
+  "probe_mapping_sha256": null,
+  "references": {
+    "logical_sha256": "d5491dfb3a718f93d554bb899158ff3e5c7d348b47fdfbc853ef9c49c3fe450e",
+    "sources": {
+      "clinvar": {
+        "release": "synthetic-evaluation/1",
+        "sha256": null
+      },
+      "gwas": {
+        "release": null,
+        "sha256": null
+      },
+      "gnomad": {
+        "release": null,
+        "sha256": null
+      },
+      "clingen": {
+        "release": null,
+        "sha256": null
+      },
+      "clinpgx": {
+        "release": null,
+        "sha256": null
+      }
+    }
+  },
+  "options": {
+    "include_benign": false,
+    "include_reference": false,
+    "frequency_adjustment": true,
+    "traits_only": false,
+    "detailed_trace": false,
+    "pgx_min_level": "2B"
+  },
+  "annotation_sha256": "ad0480bf18feaa1344743e7940496ad35ed4b2056b515be2d3854b1cac7d4806",
+  "explanations": {
+    "requested": false,
+    "prompt_template_sha256": "c9d33791e18ea62ac9dd07b4e62e1f0808bb2447c1ce16d2d4507725cb97f99e",
+    "configured_model": null,
+    "backend": null,
+    "model": null,
+    "model_digest": null,
+    "connection_status": null,
+    "generation": {
+      "top": 20,
+      "max_tokens": null,
+      "timeout_seconds": null,
+      "temperature": null,
+      "seed": null,
+      "repetitions": 1
+    },
+    "outputs": 0,
+    "model_outputs": 0,
+    "fallback_outputs": 0,
+    "fallback_status": "not_requested",
+    "replay": "annotation_only; model outputs are not reproduced or embedded"
+  }
+}
