@@ -1,0 +1,418 @@
+{
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "allelio-run/1"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "software": {
+      "type": "object",
+      "properties": {
+        "package": {
+          "const": "allelio"
+        },
+        "version": {
+          "type": "string"
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "package",
+        "version",
+        "content_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "python": {
+          "type": "string"
+        },
+        "implementation": {
+          "type": "string"
+        },
+        "sqlite": {
+          "type": "string"
+        },
+        "packages": {
+          "type": "object",
+          "properties": {
+            "click": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "jsonschema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "httpx": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ollama": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "click",
+            "jsonschema",
+            "httpx",
+            "ollama"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "python",
+        "implementation",
+        "sqlite",
+        "packages"
+      ],
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "references": {
+      "type": "object",
+      "properties": {
+        "logical_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sources": {
+          "type": "object",
+          "properties": {
+            "clinvar": {
+              "type": "object",
+              "properties": {
+                "release": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "release",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            "gwas": {
+              "type": "object",
+              "properties": {
+                "release": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "release",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            "gnomad": {
+              "type": "object",
+              "properties": {
+                "release": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "release",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            "clingen": {
+              "type": "object",
+              "properties": {
+                "release": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "release",
+                "sha256"
+              ],
+              "additionalProperties": false
+            },
+            "clinpgx": {
+              "type": "object",
+              "properties": {
+                "release": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sha256": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "release",
+                "sha256"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "clinvar",
+            "gwas",
+            "gnomad",
+            "clingen",
+            "clinpgx"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "logical_sha256",
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "include_benign": {
+          "type": "boolean"
+        },
+        "include_reference": {
+          "type": "boolean"
+        },
+        "frequency_adjustment": {
+          "type": "boolean"
+        },
+        "traits_only": {
+          "type": "boolean"
+        },
+        "detailed_trace": {
+          "type": "boolean"
+        },
+        "pgx_min_level": {
+          "enum": [
+            "1A",
+            "1B",
+            "2A",
+            "2B",
+            "3",
+            "4"
+          ]
+        }
+      },
+      "required": [
+        "include_benign",
+        "include_reference",
+        "frequency_adjustment",
+        "traits_only",
+        "detailed_trace",
+        "pgx_min_level"
+      ],
+      "additionalProperties": false
+    },
+    "annotation_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "explanations": {
+      "type": "object",
+      "properties": {
+        "requested": {
+          "type": "boolean"
+        },
+        "prompt_template_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "backend": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "connection_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "generation": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "timeout_seconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "temperature": {
+              "type": "null"
+            },
+            "seed": {
+              "type": "null"
+            },
+            "repetitions": {
+              "const": 1
+            }
+          },
+          "required": [
+            "top",
+            "max_tokens",
+            "timeout_seconds",
+            "temperature",
+            "seed",
+            "repetitions"
+          ],
+          "additionalProperties": false
+        },
+        "outputs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model_outputs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fallback_outputs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fallback_status": {
+          "enum": [
+            "not_requested",
+            "not_generated",
+            "none",
+            "all",
+            "partial"
+          ]
+        },
+        "replay": {
+          "type": "string"
+        },
+        "configured_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "requested",
+        "prompt_template_sha256",
+        "backend",
+        "model",
+        "model_digest",
+        "connection_status",
+        "generation",
+        "outputs",
+        "model_outputs",
+        "fallback_outputs",
+        "fallback_status",
+        "replay",
+        "configured_model"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema",
+    "created_at",
+    "software",
+    "runtime",
+    "input",
+    "references",
+    "options",
+    "annotation_sha256",
+    "explanations"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

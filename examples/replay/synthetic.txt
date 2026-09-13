@@ -1,0 +1,3 @@
+# Deliberately synthetic replay fixture; not a person's genotype.
+rs1	1	100	AG
+rs2	2	200	CC
