@@ -30,6 +30,12 @@ See `examples/challenges/mapping.json` for an invented example.
 
 Recovery requires a unique mapping, matching input coordinate and observed
 alleles, and one unambiguous installed ClinVar allele identity for that rsID.
+For a native-build mapping whose ClinVar allele is stored on the other build,
+an optional `reference_anchor` must identify that same ClinVar `allele_id`,
+chromosome and unchanged REF/ALT at its explicitly published reference position.
+The native observation is not rewritten or lifted to another build. Both
+placements are retained in the recovery evidence; conflicting source records,
+changed alleles and strand flips remain unresolved.
 Multiple locations/alleles at the mapped rsID remain unsupported in this first
 path. No coordinate-only lookup, liftover, allele normalization, strand flip,
 indel recovery or mitochondrial recovery is attempted. Palindromic SNP allele
@@ -49,6 +55,30 @@ A real mapping needs documented origin and redistribution permission/reuse terms
 before it can be shipped; a nonempty license label alone is not legal verification.
 User-supplied mappings are explicit local inputs and are never downloaded.
 Successful synthetic recovery is a software check, not diagnostic validation.
+
+### Verify native-build reference placements
+
+The importer normally prefers GRCh38 records, even for a build-37 input. Use
+the local preparation tool to pair explicitly published ClinVar placements:
+
+```sh
+python3 scripts/prepare_probe_reference.py sourced-mapping.json variant_summary.txt.gz \
+  --output verified-probe-mapping
+```
+
+The input must already contain sourced probe-to-variant relationships with
+native assembly, chromosome, coordinate and explicit assay alleles. An rsID-only
+alias list is not an acceptable input. The tool checks the native placement,
+selects the reference placement using the importer's GRCh38 preference, and
+requires an unchanged chromosome/REF/ALT for the same AlleleID. It writes a
+decision for every mapping row and hashes both input files. No mapping is
+written when no rows pass. This verifies reference compatibility, not the
+vendor alias itself or its reuse rights. It neither downloads reference data
+nor establishes missing assay evidence from a coordinate match.
+
+Use the resulting `mapping.json` with `record-run --probe-map`; replay requires
+the exact same prepared mapping. The installed ClinVar records must still
+match the prepared reference identity and AlleleID or recovery abstains.
 
 ### Production-source investigation (2026-09-13)
 
