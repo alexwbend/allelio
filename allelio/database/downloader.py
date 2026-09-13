@@ -39,27 +39,19 @@ GNOMAD_MANIFEST_URL = (
     "https://raw.githubusercontent.com/alexwbend/allelio/main/data/gnomad_manifest.json"
 )
 
-# Last-resort fallback used only if the manifest can't be fetched or parsed.
-# Mirrors data/gnomad_manifest.json in the repo. `sha256` stays null until the
-# extract is published; when null, the integrity check is skipped with a
-# warning rather than blocking setup.
+# Last-resort fallback; keep identity and verified URLs aligned with the manifest.
 DEFAULT_GNOMAD_MANIFEST = {
-    "schema": 1,
+    "schema": 2,
     "source": "gnomAD",
     "version": "v4.1.1",
-    # Format 1: rsID-keyed, no allele, position, or assembly per row. Read
-    # as unverified context until a format 2 extract is published.
-    "format": 1,
-    "assembly": None,
-    "file": "gnomad_v4.1.1_array_freq.tsv.gz",
-    "sha256": "38b450846eddfa76a1e710f7e6dfdecb92763afe3430ae21778ee717a506ff5d",
+    "format": 2,
+    "assembly": "GRCh38",
+    "file": "gnomad_v4.1.1_array_freq_format2.tsv.gz",
+    "sha256": "448f9619ee5b0f43cbc28a8e2afb5e7234c7105153b9ed74e3232664bedc2667",
     "urls": [
-        # Permaweb (Arweave via Permavault) — content-addressed, never 404s.
-        "https://arweave.net/sZmCL2kLlKvSTo_ob4p9by5q9HUBlBYBR2yEIsOsjos",
-        # GitHub release mirror (fallback).
-        "https://github.com/alexwbend/allelio/releases/download/"
-        "v0.2.1-data/gnomad_v4.1.1_array_freq.tsv.gz",
-    ],
+        "https://arweave.net/Y6CFf6w28h4_DlMXJd-U4EohDYpzA9HnyZwOVWYKf8c",
+        "https://github.com/alexwbend/allelio/releases/download/v0.3.0-data/gnomad_v4.1.1_array_freq_format2.tsv.gz"
+    ]
 }
 
 # GWAS URL — the versioned FTP `releases/latest` path (verified 2026-08-31).
@@ -581,7 +573,13 @@ def setup_database(
         gnomad_path = data_dir / "gnomad_freq.tsv.gz"
         gnomad_manifest = fetch_gnomad_manifest(log=log)
 
-        if not force_download and gnomad_path.exists() and gnomad_path.stat().st_size > 1_000_000:
+        cached_matches = False
+        expected_sha = gnomad_manifest.get("sha256")
+        if not force_download and expected_sha and gnomad_path.is_file():
+            cached_matches = sha256_file(str(gnomad_path)).lower() == str(expected_sha).lower()
+            if not cached_matches:
+                _log("       Cached gnomAD does not match the current manifest — refreshing.")
+        if cached_matches:
             gnomad_mb = gnomad_path.stat().st_size / (1024 * 1024)
             _log(f"[6/{total_steps}] gnomAD already downloaded ({gnomad_mb:.0f} MB) — skipping download.")
             gnomad_downloaded = True
