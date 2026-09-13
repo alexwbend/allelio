@@ -22,6 +22,53 @@ from allelio.database.downloader import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+@pytest.mark.parametrize('cached,checksum,force,downloads', [
+    (b'old', True, False, 1),
+    (b'new', True, False, 0),
+    (b'new', False, False, 1),
+    (b'new', True, True, 1),
+])
+def test_setup_only_reuses_cache_verified_against_current_manifest(
+    tmp_path, monkeypatch, cached, checksum, force, downloads
+):
+    from allelio.database.store import AllelioDB
+
+    old_or_new = cached * 400_000  # Exceeds the former size-only cache check.
+    current = b'new' * 400_000
+    path = tmp_path / 'gnomad_freq.tsv.gz'
+    path.write_bytes(old_or_new)
+    manifest = {'urls': ['https://example.test/frequencies'], 'version': 'new',
+                'sha256': hashlib.sha256(current).hexdigest() if checksum else None}
+    monkeypatch.setattr(downloader, 'fetch_gnomad_manifest', lambda **kw: manifest)
+    monkeypatch.setattr(downloader, 'parse_clinvar', lambda path: iter(()))
+    seen = []
+    def parse(path):
+        seen.append(Path(path).read_bytes())
+        return iter(())
+    monkeypatch.setattr(downloader, 'parse_gnomad', parse)
+    monkeypatch.setattr(downloader, 'gnomad_file_header', lambda path: {'format': '2', 'assembly': 'GRCh38'})
+    calls = []
+    def download(url, dest, *args, **kwargs):
+        if url == downloader.GWAS_URL:
+            raise RuntimeError('GWAS intentionally unavailable in this test')
+        if url == manifest['urls'][0]:
+            calls.append(url)
+            Path(dest).write_bytes(current)
+        else:
+            Path(dest).write_bytes(b'clinvar stub')
+        return {}
+    monkeypatch.setattr(downloader, 'download_file', download)
+    db = AllelioDB(str(tmp_path / 'test.db'))
+    try:
+        downloader.setup_database(db, data_dir=str(tmp_path), include_clingen=False,
+                                  include_clinpgx=False, force_download=force)
+        assert len(calls) == downloads
+        assert seen == [current]
+        assert db.get_metadata('gnomad_sha256') == hashlib.sha256(current).hexdigest()
+    finally:
+        db.close()
+
+
 # --------------------------------------------------------------------------
 # Checksum
 # --------------------------------------------------------------------------
@@ -172,7 +219,7 @@ class TestManifestPinning:
         manifest = json.loads(path.read_text())
         # The committed file is what the raw URL serves; its core fields must
         # match the built-in fallback so the two never disagree at publish time.
-        for key in ("source", "version", "file"):
+        for key in ("schema", "source", "version", "format", "assembly", "file", "sha256", "urls"):
             assert manifest[key] == DEFAULT_GNOMAD_MANIFEST[key]
         assert manifest["urls"], "manifest must list at least one URL"
 

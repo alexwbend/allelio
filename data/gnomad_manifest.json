@@ -1,20 +1,49 @@
 {
-  "schema": 1,
+  "schema": 2,
   "source": "gnomAD",
   "version": "v4.1.1",
-  "format": 1,
-  "assembly": null,
-  "file": "gnomad_v4.1.1_array_freq.tsv.gz",
-  "sha256": "38b450846eddfa76a1e710f7e6dfdecb92763afe3430ae21778ee717a506ff5d",
-  "tx": "sZmCL2kLlKvSTo_ob4p9by5q9HUBlBYBR2yEIsOsjos",
-  "urls": [
-    "https://arweave.net/sZmCL2kLlKvSTo_ob4p9by5q9HUBlBYBR2yEIsOsjos",
-    "https://github.com/alexwbend/allelio/releases/download/v0.2.1-data/gnomad_v4.1.1_array_freq.tsv.gz"
+  "format": 2,
+  "assembly": "GRCh38",
+  "file": "gnomad_v4.1.1_array_freq_format2.tsv.gz",
+  "sha256": "448f9619ee5b0f43cbc28a8e2afb5e7234c7105153b9ed74e3232664bedc2667",
+  "rows": 689646,
+  "source_urls": [
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr1.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr2.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr3.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr4.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr5.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr6.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr7.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr8.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr9.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr10.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr11.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr12.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr13.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr14.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr15.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr16.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr17.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr18.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr19.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr20.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr21.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chr22.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chrX.vcf.bgz",
+    "https://storage.googleapis.com/gcp-public-data--gnomad/release/4.1.1/vcf/genomes/gnomad.genomes.v4.1.1.sites.chrY.vcf.bgz"
   ],
-  "_notes": {
-    "purpose": "Mutable pointer for Allelio's gnomAD frequency extract. Editing this file is how a data refresh happens without a code change: the downloader fetches it, tries each URL in order, and verifies the checksum.",
-    "publishing": "1) Build the extract with scripts/build_gnomad_freq.py (gnomAD v4.1.1, trimmed to consumer-array rsIDs). 2) Upload it to the permaweb via Permavault and prepend the Arweave/gateway URL to `urls` (content-addressed, never 404s). 3) Mirror it on the GitHub release below. 4) Set `sha256` to the file's hex digest (the build script prints it). Until `sha256` is set, the downloader still works but skips the integrity check with a warning.",
-    "license": "gnomAD is CC0 (public domain) — safe to redistribute permanently on the permaweb.",
-    "format": "Format 1 rows are keyed by rsID alone and carry no chromosome, position, REF, ALT or assembly; Allelio shows their frequencies as unverified context and does not let them adjust ranking. A format 2 extract (scripts/build_gnomad_freq.py, one row per alternate allele with an '## Assembly:' header) restores the display adjustment. Before publishing one, record here: format 2, the assembly, the gnomAD release, the source VCF URLs, the SHA-256 the build script prints, and the CC0 terms."
-  }
+  "license": "CC0 1.0",
+  "license_url": "https://gnomad.broadinstitute.org/policies",
+  "selection": {
+    "method": "published-extract-rsids",
+    "legacy_sha256": "38b450846eddfa76a1e710f7e6dfdecb92763afe3430ae21778ee717a506ff5d",
+    "selected_rsids": 603137,
+    "represented_rsids": 603137
+  },
+  "urls": [
+    "https://arweave.net/Y6CFf6w28h4_DlMXJd-U4EohDYpzA9HnyZwOVWYKf8c",
+    "https://github.com/alexwbend/allelio/releases/download/v0.3.0-data/gnomad_v4.1.1_array_freq_format2.tsv.gz"
+  ],
+  "tx": "Y6CFf6w28h4_DlMXJd-U4EohDYpzA9HnyZwOVWYKf8c"
 }
