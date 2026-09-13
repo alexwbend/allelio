@@ -1,0 +1,3 @@
+# Allelio product: 23andme-raw
+# build 38
+i1	1	100	AG

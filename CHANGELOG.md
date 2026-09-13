@@ -10,6 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Synthetic stage-by-stage annotation benchmarks with manifest-linked outputs
+  and bounded, explicitly aligned tool comparisons.
+- Frozen-evidence explanation arms, blinded case exports and validated rating
+  summaries retaining missing/disputed observations and agreement denominators.
+- Opt-in probe recovery for declared input contexts and versioned user-supplied
+  mappings, preserving original observations and existing conflict accounting.
+- Observed loopback integration experiments and a web annotation-only option;
+  unexpected parser/analysis errors no longer echo raw exception details.
+
 - Local run manifests and offline annotation replay with input, package and
   reference fingerprints, explicit runtime/options, and separate optional AI
   provenance. Includes a synthetic example and installed-wheel replay checks.

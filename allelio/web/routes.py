@@ -9,7 +9,7 @@ from html import escape
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from starlette.background import BackgroundTask
 
@@ -219,7 +219,7 @@ def _significance_of(variant) -> str:
 
 
 @router.post("/api/analyze")
-async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
+async def analyze_file(file: UploadFile = File(...), no_ai: bool = Form(False)) -> Dict[str, Any]:
     """
     Analyze uploaded genotype file.
     
@@ -234,7 +234,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         # Construction only parses and resolves; nothing is contacted yet, so an
         # empty upload still gets its 400 without waiting on a connect timeout.
         try:
-            ai_engine = AIEngine()
+            ai_engine = None if no_ai else AIEngine()
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
@@ -246,11 +246,12 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         if not content:
             raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-        await ai_engine.check_connection()
+        if ai_engine is not None:
+            await ai_engine.check_connection()
         # Refused, not unreachable: the same answer construction gives a remote
         # address, for the same reason. Reporting it as a run with no
         # explanations would hide why there are none.
-        if ai_engine.status == REFUSED:
+        if ai_engine is not None and ai_engine.status == REFUSED:
             raise HTTPException(status_code=400, detail=ai_engine.refusal)
         # Nothing to switch off here any more. A listing that contradicts the
         # configured name, a server that is not there, and one that will not
@@ -321,7 +322,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
         # browser; nothing else on this payload decides who wrote what.
         explanations = (await ai_engine.explain_variants_batch(
             top_variants, progress_callback=on_explained
-        )) if top_variants else {}
+        )) if top_variants and ai_engine is not None else {}
 
         # Generate executive summary
         _progress.update(stage="Summarizing", done=0, total=0)
@@ -329,7 +330,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
             if not top_variants:
                 summary = "No reportable findings remain. See input coverage for exclusions; this is not a negative result."
             else:
-                if not ai_engine.will_explain():
+                if ai_engine is None or not ai_engine.will_explain():
                     raise RuntimeError("no model server answering")
                 summary = await ai_engine.generate_summary(top_variants)
         except Exception:
@@ -425,7 +426,7 @@ async def analyze_file(file: UploadFile = File(...)) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Analysis failed: {str(e)}"
+            detail="Analysis failed. Check the input format and installed reference data."
         )
     finally:
         # Clean up temp file

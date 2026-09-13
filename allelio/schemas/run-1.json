@@ -400,6 +400,13 @@
         "configured_model"
       ],
       "additionalProperties": false
+    },
+    "probe_mapping_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
     }
   },
   "required": [

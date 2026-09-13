@@ -1080,6 +1080,7 @@
                 <button class="ghost" id="deleteSavedButton">Delete</button>
             </div>
             <div class="card">
+                <label><input type="checkbox" id="annotationOnly" /> Annotation only (skip the model server)</label>
                 <div class="upload-zone" id="uploadZone">
                     <div class="upload-icon">📤</div>
                     <div class="upload-text">
@@ -1091,7 +1092,7 @@
                     </div>
                     <button class="upload-button">Choose File</button>
                     <input type="file" id="fileInput" class="file-input" accept=".txt,.csv,.vcf" />
-                    <div class="privacy-badge">🔒 Your data never leaves this computer</div>
+                    <div class="privacy-badge">🔒 Allelio processes your file locally</div>
                 </div>
             </div>
         </div>
@@ -1270,6 +1271,7 @@
         async function handleFileSelect(file) {
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('no_ai', document.getElementById('annotationOnly').checked ? 'true' : 'false');
 
             // Hide upload section, show progress
             document.getElementById('uploadSection').classList.add('hidden');

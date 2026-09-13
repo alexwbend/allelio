@@ -8,6 +8,7 @@ def build_coverage(inputs, results, stats):
     dispositions = getattr(stats, 'dispositions', {})
     reported = {r.rsid for r in results}
     rows = []
+    recovery_counts = Counter()
     seen = set()
     for index, variant in enumerate(inputs):
         rsid = getattr(variant, 'rsid', str(variant))
@@ -17,8 +18,12 @@ def build_coverage(inputs, results, stats):
         if status not in ('conflicting_input', 'unsupported_identifier') and rsid in seen:
             status = 'duplicate_row'
         seen.add(rsid)
+        recovery = getattr(variant, 'probe_recovery', None)
+        if recovery:
+            recovery_counts[recovery['status']] += 1
         rows.append({'line': getattr(variant, 'source_line', None),
-                     'input_id': 'input-' + str(index + 1), 'rsid': rsid, 'status': status})
+                     'input_id': 'input-' + str(index + 1), 'rsid': rsid, 'status': status,
+                     'probe_recovery_status': recovery['status'] if recovery else None})
     if audit is not None:
         rows.extend(dict(row) for row in audit.rows if row['status'] != 'parsed')
         rows.sort(key=lambda row: row['line'] or 0)
@@ -31,6 +36,7 @@ def build_coverage(inputs, results, stats):
         'total_rows': total,
         'accounted_rows': len(rows),
         'counts': counts,
+        'probe_recovery_counts': dict(sorted(recovery_counts.items())),
         'rows': rows,
         'returned_findings': len(results),
         'complete': len(rows) == total and not counts.get('unaccounted'),

@@ -1,0 +1,144 @@
+{
+  "schema": "allelio-challenges/1",
+  "version": "synthetic-challenges/1",
+  "data_kind": "synthetic",
+  "license": "MIT",
+  "references": "references.json",
+  "cases": [
+    {
+      "id": "consumer",
+      "input": "consumer.txt",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "matched",
+        "source_selection": "selected",
+        "reporting": "reported"
+      }
+    },
+    {
+      "id": "ancestry",
+      "input": "ancestry.txt",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "matched",
+        "source_selection": "selected",
+        "reporting": "reported"
+      }
+    },
+    {
+      "id": "vcf",
+      "input": "vcf.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "matched",
+        "source_selection": "selected",
+        "reporting": "reported"
+      }
+    },
+    {
+      "id": "no_call",
+      "input": "no_call.txt",
+      "expected": {
+        "parsing": "excluded",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "filtered",
+      "input": "filtered.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "excluded",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "duplicate_conflict",
+      "input": "duplicate_conflict.txt",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "conflicting",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "ambiguous_identity",
+      "input": "ambiguous_identity.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "abstained",
+        "source_selection": "abstained",
+        "reporting": "reported"
+      }
+    },
+    {
+      "id": "inheritance",
+      "input": "inheritance.txt",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "matched",
+        "source_selection": "selected",
+        "reporting": "reported"
+      },
+      "checks": {
+        "source_selection": {
+          "findings/0/inheritance": "autosomal recessive",
+          "findings/0/category": "Carrier Status"
+        }
+      }
+    },
+    {
+      "id": "multiallelic_frequency",
+      "input": "multiallelic_frequency.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "matched",
+        "source_selection": "selected",
+        "reporting": "reported"
+      },
+      "checks": {
+        "source_selection": {
+          "findings/0/gnomad_entry/alt_allele": "A",
+          "findings/0/gnomad_entry/allele_frequency": 1e-05
+        }
+      }
+    },
+    {
+      "id": "probe_recovered",
+      "input": "probe_recovered.txt",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "recovered",
+        "identity_matching": "matched",
+        "source_selection": "selected",
+        "reporting": "reported"
+      },
+      "mapping": "mapping.json"
+    },
+    {
+      "id": "probe_unresolved",
+      "input": "probe_unresolved.txt",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "abstained",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      },
+      "mapping": "mapping.json"
+    }
+  ]
+}

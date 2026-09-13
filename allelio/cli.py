@@ -229,7 +229,7 @@ def analyze(
         if parse_stats and parse_stats.i_id_rows:
             console.print(f"  [yellow]⚠[/yellow] {_I_ID_GAP_NOTE.format(count=parse_stats.i_id_rows)}\n")
     except Exception as e:
-        console.print(f"\n[bold red]✗[/bold red] Failed to parse file: {e}\n", style="red")
+        console.print(f"\n[bold red]✗[/bold red] Failed to parse file. Check the input format.\n", style="red")
         raise click.Abort()
     
     # Run analysis
@@ -274,7 +274,7 @@ def analyze(
                 "does not match it).[/dim]"
             )
     except Exception as e:
-        console.print(f"\n[bold red]✗[/bold red] Analysis failed: {e}\n", style="red")
+        console.print(f"\n[bold red]✗[/bold red] Analysis failed. Check the input format and installed references.\n", style="red")
         raise click.Abort()
     
     coverage = build_coverage(variants, results, analysis_stats)
@@ -814,6 +814,7 @@ def validate_evidence_command(file: str):
 @click.argument('file', type=click.Path(exists=True, dir_okay=False))
 @click.option('--database', required=True, type=click.Path(exists=True, dir_okay=False), help='Installed references; never downloaded or migrated.')
 @click.option('--manifest', required=True, type=click.Path(dir_okay=False), help='Local manifest destination (contains an input fingerprint).')
+@click.option('--probe-map', type=click.Path(exists=True, dir_okay=False), help='Explicit versioned probe mapping; requires declared input product/build.')
 @click.option('--evidence-output', type=click.Path(dir_okay=False), help='Save genotype-bearing evidence locally.')
 @click.option('--explanations-output', type=click.Path(dir_okay=False), help='Generate local-model explanations and save them locally.')
 @click.option('--model', default=None)
@@ -824,15 +825,15 @@ def validate_evidence_command(file: str):
 @click.option('--traits-only', is_flag=True)
 @click.option('--detailed-trace', is_flag=True)
 def record_run_command(file, database, manifest, evidence_output, explanations_output, model, top,
-                       include_benign, include_reference, no_frequency_adjustment, traits_only, detailed_trace):
+                       include_benign, include_reference, no_frequency_adjustment, traits_only, detailed_trace, probe_map):
     """Record an annotation run for verified offline replay. AI is opt-in."""
     from allelio.runs import record_run, validate_manifest
-    _run_output_paths([file, database], [manifest, evidence_output, explanations_output])
+    _run_output_paths([file, database] + ([probe_map] if probe_map else []), [manifest, evidence_output, explanations_output])
     try:
         document, evidence, explanations = record_run(file, database,
             {'include_benign': include_benign, 'include_reference': include_reference,
              'frequency_adjustment': not no_frequency_adjustment, 'traits_only': traits_only,
-             'detailed_trace': detailed_trace}, explain=bool(explanations_output), model=model, top=top)
+             'detailed_trace': detailed_trace}, explain=bool(explanations_output), model=model, top=top, probe_map=probe_map)
         validate_manifest(document)
         if evidence_output:
             write_evidence_export(evidence, evidence_output)
@@ -860,17 +861,18 @@ def _run_output_paths(inputs, outputs):
 @click.argument('manifest', type=click.Path(exists=True, dir_okay=False))
 @click.option('--input', 'file', required=True, type=click.Path(exists=True, dir_okay=False))
 @click.option('--database', required=True, type=click.Path(exists=True, dir_okay=False))
+@click.option('--probe-map', type=click.Path(exists=True, dir_okay=False))
 @click.option('--verify-only', is_flag=True, help='Check prerequisites without replaying annotation.')
 @click.option('--evidence-output', type=click.Path(dir_okay=False))
-def replay_run_command(manifest, file, database, verify_only, evidence_output):
+def replay_run_command(manifest, file, database, verify_only, evidence_output, probe_map):
     """Verify and replay annotation locally. Never download or contact a model."""
     import json
     from allelio.runs import replay_run
-    _run_output_paths([manifest, file, database], [evidence_output])
+    _run_output_paths([manifest, file, database] + ([probe_map] if probe_map else []), [evidence_output])
     if verify_only and evidence_output:
         raise click.UsageError('--evidence-output requires an annotation replay.')
     try:
-        result, evidence = replay_run(json.loads(Path(manifest).read_text()), file, database, verify_only)
+        result, evidence = replay_run(json.loads(Path(manifest).read_text()), file, database, verify_only, probe_map=probe_map)
         if evidence_output:
             write_evidence_export(evidence, evidence_output)
     except (ValueError, OSError, sqlite3.Error) as exc:
@@ -880,6 +882,9 @@ def replay_run_command(manifest, file, database, verify_only, evidence_output):
         console.print('Runtime versions differ: ' + ', '.join(result['runtime_differences']))
     console.print('AI explanations were not replayed; model availability and stochastic output are separate.')
 
+
+from allelio.tooling_cli import register as _register_tooling
+_register_tooling(allelio)
 
 main = allelio
 
