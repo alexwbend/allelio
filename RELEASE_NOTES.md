@@ -1,71 +1,56 @@
-# Allelio v0.2.0 — Smarter Ranking & Redesigned Reports
+# Allelio v0.4.0 — Traceable Evidence
 
-**Evidence-quality weighting, reorganized sections, and tab navigation**
+This release turns Allelio's annotation output into a more explicit, reproducible
+evidence workflow. It is an alpha research and educational release, not a
+clinically validated diagnostic system.
 
-This release brings two major improvements: ClinVar review star ratings now influence variant ranking so expert-reviewed findings rise to the top, and HTML reports have been reorganized with a new tab navigation bar for faster browsing.
+## Highlights
 
----
+- Versioned evidence JSON and a shipped schema, including source records,
+  matching decisions, exclusions, coverage and gene groups.
+- Conservative VCF identity handling with declared-build, coordinate, allele,
+  ploidy and filter checks. Unsupported cases abstain instead of being guessed.
+- Condition-specific inheritance and allele-specific population-frequency
+  context, kept separate from source classification and display ranking.
+- Deterministic gene grouping in the CLI, web interface, HTML and evidence export.
+- Offline run manifests and annotation replay with software, input, reference,
+  configuration and optional probe-mapping fingerprints.
+- Developmental stage benchmarks and blinded explanation-review materials.
+  These tools do not constitute independent clinical validation.
+- Optional recovery of one documented 23andMe probe, `i3002432` to `rs1799963`,
+  when the user supplies the versioned map and the input declares the supported
+  product/build context. Other internal probes remain unresolved.
+- The published gnomAD v4.1.1 format-2 extract now provides allele-aware
+  frequencies through verified Arweave and GitHub mirrors.
 
-## What's new
+## Install and verify
 
-### Review quality now affects variant ranking
+Create a fresh Python 3.9–3.12 virtual environment, install the release artifact,
+and run:
 
-Previously, Allelio treated all ClinVar entries equally regardless of how thoroughly they'd been reviewed. A variant classified as "pathogenic" by a single submitter got the same weight as one confirmed by an expert panel.
-
-Now, Allelio maps each variant's ClinVar review status to a 0–4 star rating:
-
-| Stars | Meaning |
-|-------|---------|
-| ★★★★ | Practice guideline |
-| ★★★☆ | Reviewed by expert panel |
-| ★★☆☆ | Multiple submitters, no conflicts |
-| ★☆☆☆ | Single submitter or conflicting interpretations |
-| ☆☆☆☆ | No assertion criteria provided |
-
-Higher-star variants sort above lower-star variants within the same significance tier (e.g., two "pathogenic" variants will be ordered by review quality). Star ratings never override clinical significance — a 4-star benign variant will never outrank a 0-star pathogenic one.
-
-### Star ratings in your report
-
-HTML reports now display a visual star rating on each variant card, color-coded for quick scanning: green for well-reviewed (3–4 stars), amber for moderate (1–2 stars), and gray for unreviewed. The Review Quality row only appears on ClinVar-backed variant cards — GWAS-only cards stay clean.
-
-### Reorganized report sections
-
-Report sections are now ordered by clinical actionability rather than alphabetically:
-
-1. Health Conditions
-2. Risk Factors
-3. Pharmacogenomics
-4. Traits
-5. Carrier Status
-
-This puts the most medically relevant findings at the top of your report.
-
-### Tab navigation
-
-A sticky navigation bar at the top of the report lets you jump between sections instantly. Only sections that contain results are shown — no empty tabs cluttering the view. Each tab displays a variant count badge so you can see at a glance where findings are concentrated. The tab bar is hidden when printing.
-
-### Smarter AI explanations
-
-The local AI model now receives review quality context alongside clinical data, producing explanations that account for how well-established a finding is.
-
----
-
-## Upgrading
-
-If you're upgrading from v0.1.0, no database re-download is needed — Allelio already stores the review status field. Just update the package:
-
-```bash
-pip install --upgrade allelio
+```sh
+allelio --version
+allelio setup
+allelio info
+allelio analyze examples/example_23andme.txt --no-ai --output example_report.html
 ```
 
----
+The source archive contains the examples. A wheel installation contains the
+runtime package but not repository examples; use your own supported input or a
+separately downloaded source archive for that final command.
 
-## What's next
+Reference setup downloads rolling third-party data and can take 15–30 minutes.
+Optional-source failures are reported and leave the remaining sources usable;
+ClinVar is required. Saved reports and evidence exports contain genetic data and
+are not encrypted by Allelio.
 
-The v0.2 roadmap continues with gnomAD population frequency integration, gene-level variant grouping, zygosity-aware interpretation, and improved AI prompts with richer clinical context. See the [ROADMAP](ROADMAP.md) for details.
+## Reproducibility and limits
 
----
+Use `record-run` and `replay-run` for a fixed local reference database. Replay
+checks annotation, not stochastic model text. The synthetic challenge and
+explanation bundles are development fixtures, not held-out patients or
+independent assessments. No independent reviewer ratings are included in this
+release.
 
-## Important disclaimer
-
-Allelio is for educational and informational purposes only. It is not a medical device and does not provide medical advice. Always consult qualified healthcare professionals before making health decisions based on genetic information.
+See the README and `docs/` for supported input boundaries, reference provenance,
+probe-recovery evidence, privacy checks and evaluation instructions.

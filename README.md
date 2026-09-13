@@ -381,5 +381,6 @@ See [the synthetic replay example and contract](docs/reproducible-runs.md).
 - [Explicit custom-probe recovery](docs/probe-recovery.md), including a [one-probe F2 mapping](data/probe-mappings/README.md) backed by FDA and ClinVar evidence.
 - [Stage-by-stage synthetic benchmark](docs/regression-benchmark.md).
 - [Frozen-evidence explanation evaluation and blinded rating support](docs/explanation-evaluation.md).
+- [Independent evaluation handoff](docs/independent-evaluation-package.md), including held-out labels, an aligned local VEP comparison and human review gates.
 
 These tools exercise software behavior; they do not establish independent clinical validation.

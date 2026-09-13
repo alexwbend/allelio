@@ -115,6 +115,26 @@ class TestDownloadFileProvenance:
         # A later run that skips the download recovers the same facts.
         assert downloader.read_provenance(str(dest))["release"] == "2026-09-06"
 
+    def test_interrupted_refresh_preserves_cached_file(self, tmp_dir, monkeypatch):
+        class Interrupted(_FakeResponse):
+            def iter_bytes(self, chunk_size=65536):
+                yield b"partial"
+                raise OSError("connection lost")
+
+        monkeypatch.setattr(
+            downloader.httpx, "stream",
+            lambda *a, **k: Interrupted(b"partial-and-more", "Sun, 06 Sep 2026 14:42:05 GMT"),
+        )
+        monkeypatch.setattr("time.sleep", lambda seconds: None)
+        dest = Path(tmp_dir) / "reference.gz"
+        dest.write_bytes(b"last-known-good")
+
+        with pytest.raises(RuntimeError, match="Download failed"):
+            downloader.download_file("https://example/x.gz", str(dest))
+
+        assert dest.read_bytes() == b"last-known-good"
+        assert not Path(str(dest) + ".part").exists()
+
 
 def _clinvar_gz(path: Path):
     header = (Path(__file__).parent / "fixtures/clinvar_context/variant_summary_unsplit.tsv").read_text().splitlines()[0]
