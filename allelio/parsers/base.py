@@ -54,6 +54,7 @@ class Variant:
     genotype: str
     vcf_evidence: Optional[VCFEvidence] = None
     source_line: Optional[int] = field(default=None, compare=False)
+    probe_recovery: Optional[dict] = field(default=None, compare=False)
 
 
 class ParseAudit:

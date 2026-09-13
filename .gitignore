@@ -80,3 +80,6 @@ paper.bib
 # Internal publication strategy, working protocols, and development reports
 PUBLICATION_STRATEGY.md
 docs/research/
+
+# Deliberately invented developmental challenge inputs, not patient files.
+!examples/challenges/*.vcf

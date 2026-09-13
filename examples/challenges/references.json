@@ -1,0 +1,94 @@
+{
+  "clinvar": [
+    {
+      "chromosome": "1",
+      "position_vcf": 100,
+      "assembly": "GRCh38",
+      "ref_allele": "G",
+      "alt_allele": "A",
+      "gene": "SYNTHETIC",
+      "clinical_significance": "Pathogenic",
+      "conditions": "Synthetic condition",
+      "condition_ids": "MONDO:0000001",
+      "review_status": "practice guideline",
+      "rsid": "rs1",
+      "allele_id": "1"
+    },
+    {
+      "chromosome": "1",
+      "position_vcf": 200,
+      "assembly": "GRCh38",
+      "ref_allele": "G",
+      "alt_allele": "A",
+      "gene": "SYNTHETIC",
+      "clinical_significance": "Pathogenic",
+      "conditions": "Synthetic condition",
+      "condition_ids": "MONDO:0000001",
+      "review_status": "practice guideline",
+      "rsid": "rs2",
+      "allele_id": "2"
+    },
+    {
+      "chromosome": "1",
+      "position_vcf": 300,
+      "assembly": "GRCh38",
+      "ref_allele": "G",
+      "alt_allele": "A",
+      "gene": "SYNTHETIC",
+      "clinical_significance": "Pathogenic",
+      "conditions": "Synthetic condition",
+      "condition_ids": "MONDO:0000001",
+      "review_status": "practice guideline",
+      "rsid": "rs3",
+      "allele_id": "3"
+    },
+    {
+      "chromosome": "1",
+      "position_vcf": 300,
+      "assembly": "GRCh38",
+      "ref_allele": "G",
+      "alt_allele": "C",
+      "gene": "SYNTHETIC",
+      "clinical_significance": "Benign",
+      "conditions": "Synthetic condition",
+      "condition_ids": "MONDO:0000001",
+      "review_status": "practice guideline",
+      "rsid": "rs3",
+      "allele_id": "4"
+    }
+  ],
+  "clingen": [
+    {
+      "gene": "SYNTHETIC",
+      "disease": "Synthetic condition",
+      "mondo_id": "MONDO:0000001",
+      "moi": "AR",
+      "classification": "Definitive",
+      "hgnc_id": null,
+      "report_url": null,
+      "classification_date": null
+    }
+  ],
+  "gnomad": [
+    {
+      "rsid": "rs3",
+      "assembly": "GRCh38",
+      "chromosome": "1",
+      "position": 300,
+      "ref_allele": "G",
+      "alt_allele": "A",
+      "allele_frequency": 1e-05,
+      "source_version": "synthetic/1"
+    },
+    {
+      "rsid": "rs3",
+      "assembly": "GRCh38",
+      "chromosome": "1",
+      "position": 300,
+      "ref_allele": "G",
+      "alt_allele": "C",
+      "allele_frequency": 0.4,
+      "source_version": "synthetic/1"
+    }
+  ]
+}

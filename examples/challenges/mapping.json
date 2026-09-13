@@ -1,0 +1,20 @@
+{
+  "schema": "allelio-probes/1",
+  "source": "Allelio synthetic challenges",
+  "version": "1",
+  "license": "MIT",
+  "source_url": "synthetic:allelio-challenges/1",
+  "product": "23andme-raw",
+  "assembly": "GRCh38",
+  "strand": "+",
+  "entries": [
+    {
+      "probe": "i1",
+      "rsid": "rs1",
+      "chromosome": "1",
+      "position": 100,
+      "ref": "G",
+      "alt": "A"
+    }
+  ]
+}
