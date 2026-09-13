@@ -337,6 +337,7 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
 
     dest_path = Path(dest_path)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
+    partial_path = dest_path.with_name(dest_path.name + ".part")
 
     for attempt in range(1, max_retries + 1):
         try:
@@ -349,7 +350,7 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
 
                 downloaded = 0
                 last_pct = -1
-                with open(dest_path, "wb") as f:
+                with open(partial_path, "wb") as f:
                     for chunk in response.iter_bytes(chunk_size=65536):
                         if chunk:
                             f.write(chunk)
@@ -365,9 +366,13 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
                                     _log(f"       ... {dl_mb:.0f} MB / {total_mb:.0f} MB ({pct}%)")
 
             # Verify complete download
-            actual_size = dest_path.stat().st_size
+            actual_size = partial_path.stat().st_size
             if total_bytes > 0 and actual_size < total_bytes:
                 raise RuntimeError(f"Incomplete download: got {actual_size:,} of {total_bytes:,} bytes")
+
+            # Publish only a complete download. A failed refresh therefore
+            # cannot truncate the cached reference that backs the current DB.
+            partial_path.replace(dest_path)
 
             provenance = {
                 "url": url,
@@ -381,6 +386,7 @@ def download_file(url: str, dest_path: str, progress_callback: Optional[Callable
             return provenance  # Success
 
         except Exception as e:
+            partial_path.unlink(missing_ok=True)
             if attempt < max_retries:
                 wait = attempt * 10
                 _log(f"       Download interrupted ({e}). Retrying in {wait}s... (attempt {attempt + 1}/{max_retries})")
@@ -452,6 +458,17 @@ def setup_database(
     # Initialize database tables
     _log(f"[1/{total_steps}] Creating database tables...")
     db.initialize()
+    # A forced refresh downloads optional sources beside their last good
+    # indexed copy. Remember whether each source was already usable so a
+    # network/format failure cannot erase truthful provenance for rows that
+    # remain in the database.
+    prior_stats = db.get_stats()
+    prior_available = {
+        "gwas": prior_stats.get("gwas_entries", 0) > 0,
+        "gnomad": prior_stats.get("gnomad_entries", 0) > 0,
+        "clingen": prior_stats.get("clingen_entries", 0) > 0,
+        "clinpgx": prior_stats.get("clinpgx_entries", 0) > 0,
+    }
 
     # Download ClinVar (skip if already downloaded and >100MB)
     clinvar_path = data_dir / "variant_summary.txt.gz"
@@ -519,9 +536,7 @@ def setup_database(
                         gwas_prov["release"] = stamped
                         gwas_prov["release_source"] = "gwas-filename"
                 else:
-                    # No TSV found — maybe the zip contains the data directly
-                    zf.extractall(str(data_dir))
-                    _log(f"       Extracted {len(zf.namelist())} files")
+                    raise ValueError("GWAS archive contains no TSV file")
             # Clean up zip
             gwas_zip_path.unlink(missing_ok=True)
             gwas_downloaded = True
@@ -750,7 +765,7 @@ def setup_database(
     _record_source_provenance(db, "clinvar", clinvar_prov)
     if gwas_downloaded:
         _record_source_provenance(db, "gwas", gwas_prov)
-    else:
+    elif not prior_available["gwas"]:
         db.set_metadata("gwas_version", "unavailable")
         db.set_metadata("gwas_release", "unavailable")
     # Provenance from the manifest, not hardcoded — so the frequency layer is
@@ -768,7 +783,7 @@ def setup_database(
             db.set_metadata("gnomad_sha256", str(gnomad_sha))
         if gnomad_manifest.get("urls"):
             db.set_metadata("gnomad_url", str(gnomad_manifest["urls"][0]))
-    else:
+    elif not prior_available["gnomad"]:
         # Either skipped by flag or failed to download: say so, rather than
         # leaving the key absent and the release reading "unknown".
         db.set_metadata("gnomad_version", "unavailable")
@@ -776,13 +791,13 @@ def setup_database(
 
     if include_clingen and clingen_downloaded:
         _record_source_provenance(db, "clingen", clingen_prov)
-    else:
+    elif not prior_available["clingen"]:
         db.set_metadata("clingen_version", "unavailable")
         db.set_metadata("clingen_release", "unavailable")
 
     if include_clinpgx and clinpgx_downloaded:
         _record_source_provenance(db, "clinpgx", clinpgx_prov)
-    else:
+    elif not prior_available["clinpgx"]:
         db.set_metadata("clinpgx_version", "unavailable")
         db.set_metadata("clinpgx_release", "unavailable")
 

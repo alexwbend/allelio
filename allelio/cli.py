@@ -49,7 +49,7 @@ def allelio():
     "--no-gnomad",
     is_flag=True,
     default=False,
-    help="Skip gnomAD population frequency download (saves ~1-2 GB)",
+    help="Skip the compact gnomAD population frequency download (about 30 MB)",
 )
 def setup(no_gnomad: bool):
     """Download and index ClinVar, GWAS, and gnomAD databases.

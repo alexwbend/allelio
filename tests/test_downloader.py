@@ -15,6 +15,40 @@ from allelio.database.store import AllelioDB
 from allelio import cli
 
 
+def test_failed_optional_refresh_keeps_last_good_provenance(tmp_path, monkeypatch):
+    """An interrupted update must not relabel retained rows as unavailable."""
+    db = AllelioDB(db_path=str(tmp_path / "test.db"))
+    db.initialize()
+    db.insert_gwas_batch([{
+        "rsid": "rs1", "trait": "old", "p_value": None,
+        "odds_ratio": None, "mapped_gene": None, "study": None,
+        "pubmed_id": None, "link": None,
+    }])
+    db.set_metadata("gwas_release", "2026-09-01")
+    db.set_metadata("gwas_version", "2026-09-01")
+
+    monkeypatch.setattr(downloader, "parse_clinvar", lambda path: iter(()))
+
+    def fail_gwas(url, destination, *args, **kwargs):
+        if url == downloader.GWAS_URL:
+            raise RuntimeError("offline")
+        Path(destination).write_bytes(b"clinvar placeholder")
+        return {}
+
+    monkeypatch.setattr(downloader, "download_file", fail_gwas)
+    downloader.setup_database(
+        db,
+        data_dir=str(tmp_path),
+        include_gnomad=False,
+        include_clingen=False,
+        include_clinpgx=False,
+        force_download=True,
+    )
+
+    assert db.get_stats()["gwas_entries"] == 1
+    assert db.get_metadata("gwas_release") == "2026-09-01"
+
+
 class TestGwasUrl:
     """The GWAS Catalog moved off the retiring v1 API to the versioned FTP path."""
 

@@ -8,10 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-13 — Traceable Evidence
+
 ### Added
 
-- An opt-in, one-probe F2 mapping (`i3002432` to `rs1799963`) backed by an
-  explicit FDA alias and assay change, with checksummed ClinVar placements,
+- An opt-in, two-probe F2/GBA1 catalogue (`i3002432` to `rs1799963` and
+  `i4000415` to `rs76763715`) backed by primary FDA/vendor assay evidence,
+  with checksummed ClinVar placements,
   reuse documentation and replay regressions. Other internal IDs remain unresolved.
 
 - Synthetic stage-by-stage annotation benchmarks with manifest-linked outputs
