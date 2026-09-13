@@ -13,7 +13,7 @@
       "arweave_url": "https://arweave.net/sZmCL2kLlKvSTo_ob4p9by5q9HUBlBYBR2yEIsOsjos",
       "bitcoin_anchor_block": 965344,
       "license": "CC0",
-      "note": "Consumer-array frequency extract that the tool ships and loads; see data/gnomad_manifest.json."
+      "note": "Legacy format-1 extract preserved for reproducibility; superseded by format 2."
     },
     {
       "source": "ClinVar",
@@ -28,6 +28,22 @@
       "bitcoin_anchor_block": 965447,
       "license": "public domain (NCBI/NIH, available without restriction)",
       "note": "variant_summary.txt.gz. Weekly rolling release; this is an insurance/reproducibility snapshot, NOT loaded by the tool (which fetches ClinVar live)."
+    },
+    {
+      "source": "gnomAD",
+      "version": "v4.1.1",
+      "format": 2,
+      "assembly": "GRCh38",
+      "file": "gnomad_v4.1.1_array_freq_format2.tsv.gz",
+      "date": "2026-09-13",
+      "size_bytes": 28530090,
+      "rows": 689646,
+      "sha256": "448f9619ee5b0f43cbc28a8e2afb5e7234c7105153b9ed74e3232664bedc2667",
+      "arweave_tx": "Y6CFf6w28h4_DlMXJd-U4EohDYpzA9HnyZwOVWYKf8c",
+      "arweave_url": "https://arweave.net/Y6CFf6w28h4_DlMXJd-U4EohDYpzA9HnyZwOVWYKf8c",
+      "license": "CC0 1.0",
+      "license_url": "https://gnomad.broadinstitute.org/policies",
+      "note": "Allele-aware consumer-array frequency extract; source provenance in data/gnomad_manifest.json."
     }
   ]
 }
