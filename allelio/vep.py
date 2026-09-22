@@ -50,9 +50,11 @@ def _parsing(input_bytes, raw_bytes, assembly):
     if not lines or not lines[0].startswith('##fileformat=VCFv4.'):
         return 'unsupported', 'consumer_array_or_non_vcf_input'
     headers = [line for line in lines if line.startswith('#CHROM\t')]
-    if len(headers) != 1 or len(headers[0].split('\t')) != 10:
+    expected_header = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT']
+    if (len(headers) != 1 or len(headers[0].split('\t')) != 10
+            or headers[0].split('\t')[:9] != expected_header):
         return 'unsupported', 'requires_one_sample_vcf'
-    if '##reference=' + assembly not in lines:
+    if [line for line in lines if line.startswith('##reference=')] != ['##reference=' + assembly]:
         return 'unsupported', 'requires_explicit_matching_reference'
     records = [line.split('\t') for line in lines if line and not line.startswith('#')]
     if not records:
@@ -93,7 +95,10 @@ def _parsing(input_bytes, raw_bytes, assembly):
         emitted.add(original)
     # The benchmark parsing outcome means at least one retained input. Retain
     # raw output separately; it is not an assertion that every row parsed.
-    return ('parsed' if emitted else 'excluded'), None
+    return ('parsed' if emitted else 'excluded'), {
+        'input_records': len(records), 'emitted_records': len(emitted),
+        'omitted_records': len(originals - emitted),
+    }
 
 
 def import_vep(manifest_path, output):
@@ -122,8 +127,10 @@ def import_vep(manifest_path, output):
         verified.append(resource['sha256'])
     # An empty plugin list is explicit. Plugins must also have pinned resources.
     plugins = manifest.get('plugins')
-    if not isinstance(plugins, list) or any(p not in verified for p in plugins):
-        raise ValueError('Plugins must list pinned resource hashes, or be explicitly empty.')
+    plugin_hashes = [r['sha256'] for r in resources if r.get('kind') == 'plugin']
+    if (not isinstance(plugins, list) or any(not isinstance(p, str) for p in plugins)
+            or len(set(plugins)) != len(plugins) or sorted(plugins) != sorted(plugin_hashes)):
+        raise ValueError('Plugins must list exactly the pinned plugin resource hashes, or be explicitly empty.')
     cases = manifest.get('cases')
     if not isinstance(cases, list) or not cases:
         raise ValueError('At least one development case is required.')
@@ -144,6 +151,8 @@ def import_vep(manifest_path, output):
         if approval.get('approved') is not True or sorted(approval.get('resource_sha256', [])) != sorted(verified):
             raise ValueError('Approval must bind the exact VEP resource fingerprints.')
         reference_sha = _sha(approval.get('allelio_references_sha256'))
+        if _sha(approval.get('input_sha256')) != case['input']['sha256']:
+            raise ValueError('Alignment approval must bind the exact input fingerprint.')
         command = case.get('command')
         if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
             raise ValueError('Record the command as an argument list.')
@@ -157,12 +166,14 @@ def import_vep(manifest_path, output):
         input_bytes = _resource(root, case['input'])
         raw_bytes = _resource(root, case['raw_output'])
         log_bytes = _resource(root, case['log'])
-        parsing, reason = _parsing(input_bytes, raw_bytes, assembly)
+        parsing, detail = _parsing(input_bytes, raw_bytes, assembly)
+        reason = detail if parsing == 'unsupported' else None
+        counts = detail if parsing != 'unsupported' else None
         outcomes = dict.fromkeys(STAGES, 'unsupported')
         outcomes['parsing'] = parsing
         rows.append({'id': case_id, 'input_sha256': case['input']['sha256'],
                      'references_sha256': reference_sha, 'outcomes': outcomes,
-                     'scope_reason': reason, 'raw_output': case_id + '/vep.jsonl',
+                     'scope_reason': reason, 'parsing_counts': counts, 'raw_output': case_id + '/vep.jsonl',
                      'raw_output_sha256': case['raw_output']['sha256'],
                      'alignment': approval,
                      'unsupported_stages': {stage: 'No validated equivalent stage mapping.'

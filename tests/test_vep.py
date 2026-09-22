@@ -31,7 +31,7 @@ def bundle(tmp_path):
                      'exit_code': 0,
                      'alignment': {'reviewer': 'synthetic-test-only', 'date': '2026-09-22',
                                    'rationale': 'Test of metadata validation; no real approval.',
-                                   'approved': True, 'resource_sha256': [r['sha256'] for r in resources],
+                                   'approved': True, 'input_sha256': source['sha256'], 'resource_sha256': [r['sha256'] for r in resources],
                                    'allelio_references_sha256': 'a' * 64}}]}
     return tmp_path, manifest
 
@@ -48,6 +48,8 @@ def replace_resource(bundle, key, text):
     resource = manifest['cases'][0][key]
     (root / resource['path']).write_text(text)
     resource['sha256'] = hashlib.sha256(text.encode()).hexdigest()
+    if key == 'input':
+        manifest['cases'][0]['alignment']['input_sha256'] = resource['sha256']
 
 
 def test_raw_provenance_and_shared_denominators(bundle):
@@ -141,3 +143,54 @@ def test_command_assembly_must_match(bundle):
     bundle[1]['cases'][0]['command'][-1] = 'GRCh37'
     with pytest.raises(ValueError, match='assembly'):
         run(bundle)
+
+
+def test_partial_output_has_explicit_omission_count(bundle):
+    root, _ = bundle
+    source = (root / 'input.vcf').read_text()
+    second = '1\t101\trs124\tC\tT\t.\tPASS\t.\tGT\t1/1\n'
+    replace_resource(bundle, 'input', source + second)
+    row = run(bundle)['cases'][0]
+    assert row['outcomes']['parsing'] == 'parsed'
+    assert row['parsing_counts'] == {'input_records': 2, 'emitted_records': 1, 'omitted_records': 1}
+
+
+def test_conflicting_reference_headers_are_not_shared_scope(bundle):
+    root, _ = bundle
+    source = (root / 'input.vcf').read_text().replace('##reference=GRCh38', '##reference=GRCh38\n##reference=GRCh37')
+    replace_resource(bundle, 'input', source)
+    row = run(bundle)['cases'][0]
+    assert row['outcomes']['parsing'] == 'unsupported'
+    assert row['parsing_counts'] is None
+
+
+def test_approval_cannot_be_reused_for_changed_input(bundle):
+    root, manifest = bundle
+    old_hash = manifest['cases'][0]['input']['sha256']
+    replace_resource(bundle, 'input', (root / 'input.vcf').read_text() + '\n')
+    manifest['cases'][0]['alignment']['input_sha256'] = old_hash
+    with pytest.raises(ValueError, match='input fingerprint'):
+        run(bundle)
+
+
+def test_cache_resource_cannot_impersonate_plugin(bundle):
+    bundle[1]['plugins'] = [bundle[1]['resources'][1]['sha256']]
+    with pytest.raises(ValueError, match='plugin resource'):
+        run(bundle)
+
+
+def test_declared_plugin_cannot_be_omitted_from_inventory(bundle):
+    root, manifest = bundle
+    data = b'synthetic plugin'
+    (root / 'plugin').write_bytes(data)
+    sha = hashlib.sha256(data).hexdigest()
+    manifest['resources'].append({'kind': 'plugin', 'version': 'synthetic', 'path': 'plugin', 'sha256': sha})
+    manifest['cases'][0]['alignment']['resource_sha256'].append(sha)
+    with pytest.raises(ValueError, match='plugin resource'):
+        run(bundle)
+
+
+def test_wrong_vcf_column_order_is_unsupported(bundle):
+    root, _ = bundle
+    replace_resource(bundle, 'input', (root / 'input.vcf').read_text().replace('POS\tID', 'ID\tPOS'))
+    assert run(bundle)['cases'][0]['outcomes']['parsing'] == 'unsupported'
