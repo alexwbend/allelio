@@ -109,7 +109,7 @@ def compare_benchmarks(left,right):
         for row in cases:
             if any(not re.fullmatch(r'[0-9a-f]{64}',str(row.get(k,''))) for k in ('input_sha256','references_sha256')):
                 raise ValueError('Comparison requires explicit input and reference SHA-256 fingerprints.')
-            if set(row.get('outcomes',{}))!=set(STAGES) or any(row['outcomes'][s] not in allowed[s] for s in STAGES):
+            if set(row.get('outcomes',{}))!=set(STAGES) or any(row['outcomes'][s] not in allowed[s] | {'unsupported'} for s in STAGES):
                 raise ValueError('Comparison outcomes must use supported stage definitions.')
     other={r['id']:r for r in right['cases']};paired=[];excluded=[]
     for row in left['cases']:
@@ -123,6 +123,11 @@ def compare_benchmarks(left,right):
                 excluded.append({'id':row['id'],'stage':stage,'reason':'not_shared_supported_scope'})
             else: paired.append({'id':row['id'],'stage':stage,'left':a,'right':b,'agreement':a==b})
     excluded.extend({'id':key,'reason':'absent_in_primary_tool'} for key in other)
+    stages = {stage: {'paired_opportunities': sum(p['stage'] == stage for p in paired),
+                      'agreements': sum(p['stage'] == stage and p['agreement'] for p in paired),
+                      'excluded_opportunities': sum(e.get('stage') == stage or 'stage' not in e for e in excluded)}
+              for stage in STAGES}
     return {'schema':'allelio-benchmark-comparison/1','tools':[left['tool'],right['tool']],
+            'stages': stages,
             'paired_opportunities':len(paired),'agreements':sum(p['agreement'] for p in paired),
             'pairs':paired,'excluded':excluded,'limitation':'Aligned software comparison only; not clinical validation.'}

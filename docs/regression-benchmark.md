@@ -39,6 +39,11 @@ The comparison records tool versions and raw agreement denominators. Producing
 another tool's aligned export is a separate, explicit adapter task; the benchmark
 does not guess alignment from rsIDs or run another program automatically.
 
+The development-only [`import-vep` adapter](vep-comparison.md) preserves frozen
+offline VEP output and currently maps only a narrow VCF parsing scope. Every
+stage accepts `unsupported`; these opportunities are excluded, not failures.
+Comparison exports also report paired, agreeing and excluded counts per stage.
+
 The fixtures are public invented developmental cases, not held-out patients or
 independent clinical reference material. Source lookup agreement does not establish
 clinical validity. External reference material is not accepted by this first
