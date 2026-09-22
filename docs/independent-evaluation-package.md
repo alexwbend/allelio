@@ -46,6 +46,11 @@ Before execution, an independent reviewer must approve the exact shared cases,
 reference alignment and expected outcomes. No VEP cache or independently curated
 labels are bundled with Allelio, so this comparison is prepared but not complete.
 
+The [development-only VEP importer](vep-comparison.md) now preserves raw artifacts
+and validates declared provenance for a narrow parsing comparison. Identity and
+source-selection mapping and an actual approved VEP run remain pending; it does
+not unlock held-out execution or complete issue #48.
+
 ## Blinded explanation review
 
 Generate frozen template/model outputs using `evaluate-explanations` as described
