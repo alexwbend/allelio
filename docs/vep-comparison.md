@@ -22,8 +22,10 @@ including coordinates, alleles, filter and sample fields. Repeated or foreign
 output records fail the import. A successful run emitting at least one original
 record is `parsed`; zero records is `excluded`, matching the existing coarse
 case-level benchmark definition. It does **not** measure per-record recall or
-assert that every input record was retained. Raw output remains available to
-inspect omissions. Nonzero execution status is an import error, not an exclusion.
+assert that every input record was retained. Each supported case includes `parsing_counts` with input, emitted and omitted
+record counts; unsupported cases have null counts. Raw output remains available
+to inspect omissions. Conflicting or repeated reference declarations and malformed
+VCF column headers are outside shared scope. Nonzero execution status is an import error, not an exclusion.
 
 Consumer arrays, ambiguous builds, indels, multiallelic sites, missing genotypes,
 filters and duplicate inputs are explicitly unsupported by this initial mapping.
@@ -71,6 +73,7 @@ Example shape below uses placeholders, **not** valid hashes or an approval:
     "exit_code": 0,
     "alignment": {
       "approved": true,
+      "input_sha256": "INPUT_SHA256",
       "reviewer": "REVIEWER_SUPPLIED_ID",
       "date": "REVIEW_DATE",
       "rationale": "REVIEWER_AUTHORED_SCOPE_AND_REFERENCE_ALIGNMENT",
@@ -81,13 +84,16 @@ Example shape below uses placeholders, **not** valid hashes or an approval:
 }
 ```
 
-`plugins` is an explicit list of resource hashes, empty when none were used. Add
+`plugins` must list exactly the hashes of resources whose `kind` is `plugin`,
+without duplicates; it is empty when none were used. Software/cache hashes cannot
+stand in for plugin code. Add
 resources with versioned source identities for all custom annotations. Preserve
 the actual command as separate argument strings and combined execution logs.
 Do not fill in a reviewer identity or approval on their behalf. The reference
 fingerprint is the `references.logical_sha256` from the approved Allelio run;
 it must not be copied merely to make a comparison pair. The approval binds that
-fingerprint to the complete VEP resource set and exact case manifest. The adapter
+fingerprint to the complete VEP resource set and the exact input SHA-256. A
+changed input requires a renewed approval declaration. The adapter
 checks these declarations and file integrity; it cannot authenticate reviewers,
 prove semantic alignment, verify historical execution, or prove network isolation.
 
