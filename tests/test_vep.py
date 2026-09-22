@@ -194,3 +194,20 @@ def test_wrong_vcf_column_order_is_unsupported(bundle):
     root, _ = bundle
     replace_resource(bundle, 'input', (root / 'input.vcf').read_text().replace('POS\tID', 'ID\tPOS'))
     assert run(bundle)['cases'][0]['outcomes']['parsing'] == 'unsupported'
+
+
+def test_failed_export_is_removed_and_retry_succeeds(bundle, monkeypatch):
+    from allelio import vep
+    root, _ = bundle
+    original = vep.write_evidence_export
+    def fail(document, path):
+        path.write_text('partial JSON')
+        raise OSError('simulated disk failure')
+    monkeypatch.setattr(vep, 'write_evidence_export', fail)
+    with pytest.raises(OSError, match='simulated disk failure'):
+        run(bundle)
+    assert not (root / 'output').exists()
+    assert not list(root.glob('.allelio-vep-*'))
+    monkeypatch.setattr(vep, 'write_evidence_export', original)
+    assert run(bundle)['cases'][0]['outcomes']['parsing'] == 'parsed'
+    assert not list(root.glob('.allelio-vep-*'))

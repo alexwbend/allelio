@@ -6,6 +6,7 @@ never promoted to Allelio source-selection or allele-matching observations.
 import hashlib
 import json
 import re
+import tempfile
 from pathlib import Path
 
 from allelio.benchmark import STAGES, local_file
@@ -190,12 +191,19 @@ def import_vep(manifest_path, output):
     output = Path(output)
     if output.exists():
         raise ValueError('Use a new output directory to preserve prior runs.')
-    output.mkdir(parents=True)
-    (output / 'import-manifest.json').write_bytes(manifest_bytes)
-    for case_id, blobs in artifacts.items():
-        directory = output / case_id
-        directory.mkdir()
-        for filename, blob in zip(('input.txt', 'vep.jsonl', 'vep.log'), blobs):
-            (directory / filename).write_bytes(blob)
-    write_evidence_export(report, output / 'benchmark.json')
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # A sibling directory keeps publication on the same filesystem. Failed
+    # writes are cleaned up, leaving the requested output available for retry.
+    with tempfile.TemporaryDirectory(prefix='.allelio-vep-', dir=output.parent) as staging:
+        staged = Path(staging)
+        (staged / 'import-manifest.json').write_bytes(manifest_bytes)
+        for case_id, blobs in artifacts.items():
+            directory = staged / case_id
+            directory.mkdir()
+            for filename, blob in zip(('input.txt', 'vep.jsonl', 'vep.log'), blobs):
+                (directory / filename).write_bytes(blob)
+        write_evidence_export(report, staged / 'benchmark.json')
+        if output.exists() or output.is_symlink():
+            raise ValueError('Use a new output directory to preserve prior runs.')
+        staged.rename(output)
     return report
