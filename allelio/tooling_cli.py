@@ -7,6 +7,18 @@ from allelio.evidence import write_evidence_export
 
 
 def register(group):
+    @group.command('import-vep')
+    @click.argument('manifest', type=click.Path(exists=True, dir_okay=False))
+    @click.option('--output', required=True, type=click.Path(file_okay=False))
+    def import_vep_command(manifest, output):
+        """Preserve and adapt a frozen development-only offline VEP run."""
+        from allelio.vep import import_vep
+        try:
+            report = import_vep(manifest, output)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"Imported {len(report['cases'])} development cases; parsing-only scope. Independent evaluation remains pending.")
+
     @group.command('benchmark')
     @click.argument('bundle',type=click.Path(exists=True,dir_okay=False))
     @click.option('--output',required=True,type=click.Path(file_okay=False))
