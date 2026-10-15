@@ -1,6 +1,6 @@
 """Allelio — Local variant annotation with optional AI explanations."""
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __app_name__ = "Allelio"
 
 DISCLAIMER = (
