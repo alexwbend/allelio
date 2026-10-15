@@ -42,7 +42,7 @@ but was not ready to merge without corrections.
   publishable manifest/checksum.
 - **Validation budget:** PR synchronization no longer launches the full CI
   matrix automatically. Opening, reopening, marking ready, main updates and
-  explicit dispatch remain supported; CodeRabbit review requests are unaffected.
+  explicit dispatch remain supported.
 
 ## Checks against actual data
 
