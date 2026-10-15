@@ -48,7 +48,7 @@ variant interpretation or genetic counseling.
 
 ### Install from the repository
 
-Use Python 3.9 or later. CI currently checks Python 3.9–3.12.
+Use Python 3.9 or later. CI currently checks Python 3.9–3.14.
 
 ```bash
 git clone https://github.com/alexwbend/allelio.git
