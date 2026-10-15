@@ -83,3 +83,6 @@ docs/research/
 
 # Deliberately invented developmental challenge inputs, not patient files.
 !examples/challenges/*.vcf
+
+# Local scratch: renders and screenshots can carry personal details
+tmp/
