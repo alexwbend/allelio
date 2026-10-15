@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-15
+
+### Added
+
+- `allelio import-vep` verifies and preserves an existing development run of
+  Ensembl VEP and writes a `benchmark.json` that `allelio benchmark --compare`
+  accepts. This is the first, bounded part of #48: it does not run VEP or
+  download caches, it compares only single-sample biallelic SNP VCFs with a
+  declared GRCh37 or GRCh38 reference, and it ships no real VEP run. See
+  `docs/vep-comparison.md`.
+
+### Changed
+
+- CI and the package classifiers now cover Python 3.13 and 3.14.
+
+### Fixed
+
+- `CITATION.cff` carried the wrong release date for 0.4.0 (2026-09-09; it
+  shipped 2026-09-13). It now describes this release.
+
 ## [0.4.0] - 2026-09-13 — Traceable Evidence
 
 ### Added
