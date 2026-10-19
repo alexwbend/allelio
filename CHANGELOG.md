@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-## [0.4.1] - YYYY-MM-DD
+## [0.4.1] - 2026-10-19
 
 ### Added
 
@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - CI and the package classifiers now cover Python 3.13 and 3.14.
+- Releases are published to PyPI from release tags through trusted
+  publishing, so `pip install allelio` works.
 
 ### Fixed
 

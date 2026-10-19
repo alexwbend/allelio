@@ -10,7 +10,7 @@ authors:
     given-names: "Wassim Alex"
     orcid: "https://orcid.org/0009-0000-8956-6761"
 version: 0.4.1
-date-released: "YYYY-MM-DD"  # set to the v0.4.1 tag date before tagging
+date-released: "2026-10-19"
 license: MIT
 repository-code: "https://github.com/alexwbend/allelio"
 url: "https://github.com/alexwbend/allelio"
