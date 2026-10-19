@@ -33,6 +33,14 @@ jobs:
             echo "Tag v$tag does not match pyproject.toml version $version" >&2
             exit 1
           fi
+          if ! grep -q "^version: $version$" CITATION.cff; then
+            echo "CITATION.cff does not describe version $version" >&2
+            exit 1
+          fi
+          if grep -n "YYYY-MM-DD" CITATION.cff CHANGELOG.md; then
+            echo "Set the release date in CITATION.cff and CHANGELOG.md before tagging" >&2
+            exit 1
+          fi
 
       - name: Build sdist and wheel
         run: |

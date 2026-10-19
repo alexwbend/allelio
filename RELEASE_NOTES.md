@@ -1,33 +1,32 @@
-# Allelio v0.4.0 — Traceable Evidence
+# Allelio v0.4.1
 
-This release turns Allelio's annotation output into a more explicit, reproducible
-evidence workflow. It is an alpha research and educational release, not a
-clinically validated diagnostic system.
+A maintenance release on top of v0.4.0 (Traceable Evidence). It adds a bounded
+way to bring an existing Ensembl VEP run into Allelio's benchmark comparison,
+extends support to Python 3.13 and 3.14, and corrects the citation metadata.
+It is still an alpha research and educational release, not a clinically
+validated diagnostic system.
 
-## Highlights
+## What changed
 
-- Versioned evidence JSON and a shipped schema, including source records,
-  matching decisions, exclusions, coverage and gene groups.
-- Conservative VCF identity handling with declared-build, coordinate, allele,
-  ploidy and filter checks. Unsupported cases abstain instead of being guessed.
-- Condition-specific inheritance and allele-specific population-frequency
-  context, kept separate from source classification and display ranking.
-- Deterministic gene grouping in the CLI, web interface, HTML and evidence export.
-- Offline run manifests and annotation replay with software, input, reference,
-  configuration and optional probe-mapping fingerprints.
-- Developmental stage benchmarks and blinded explanation-review materials.
-  These tools do not constitute independent clinical validation.
-- Optional recovery of two documented 23andMe probes: `i3002432` to `rs1799963`
-  and `i4000415` to `rs76763715`,
-  when the user supplies the versioned map and the input declares the supported
-  product/build context. Other internal probes remain unresolved.
-- The published gnomAD v4.1.1 format-2 extract now provides allele-aware
-  frequencies through verified Arweave and GitHub mirrors.
+- `allelio import-vep` verifies and preserves an existing development run of
+  Ensembl VEP and writes a `benchmark.json` that `allelio benchmark --compare`
+  accepts. It does not run VEP or download caches, it compares only
+  single-sample biallelic SNP VCFs with a declared GRCh37 or GRCh38 reference,
+  and no real VEP run ships with the release. See `docs/vep-comparison.md`.
+- CI and the package classifiers now cover Python 3.9 through 3.14.
+- `CITATION.cff` now describes this release. The 0.4.0 entry had carried the
+  wrong release date.
+- Releases are now published to PyPI, so `pip install allelio` works.
+
+The v0.4.0 evidence workflow (versioned evidence JSON, conservative VCF
+identity checks, condition-specific inheritance, allele-aware gnomAD
+frequencies, gene grouping, offline run manifests and replay) is unchanged.
+See `CHANGELOG.md` for the full history.
 
 ## Install and verify
 
-Create a fresh Python 3.9–3.12 virtual environment, install the release artifact,
-and run:
+Create a fresh Python 3.9 to 3.14 virtual environment, install Allelio from
+PyPI (`pip install allelio==0.4.1`) or from the release artifact, and run:
 
 ```sh
 allelio --version
