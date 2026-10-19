@@ -1,6 +1,8 @@
 # Allelio
 
 [![Tests](https://github.com/alexwbend/allelio/actions/workflows/tests.yml/badge.svg)](https://github.com/alexwbend/allelio/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/allelio.svg)](https://pypi.org/project/allelio/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23476934.svg)](https://doi.org/10.5281/zenodo.23476934)
 
 **Explore genetic variants locally, with traceable annotations, gene-level views, and optional AI explanations.**
 

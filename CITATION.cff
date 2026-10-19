@@ -11,6 +11,7 @@ authors:
     orcid: "https://orcid.org/0009-0000-8956-6761"
 version: 0.4.1
 date-released: "2026-10-19"
+doi: 10.5281/zenodo.23476934
 license: MIT
 repository-code: "https://github.com/alexwbend/allelio"
 url: "https://github.com/alexwbend/allelio"
@@ -23,9 +24,8 @@ keywords:
   - large language models
   - ClinVar
   - GWAS
-# Once PUB-7 (Zenodo archival release) is done, add:
-#   identifiers:
-#     - type: doi
-#       value: 10.5281/zenodo.XXXXXXX
-#       description: "Archived release on Zenodo"
-# and, once the JOSS paper is accepted, a preferred-citation entry pointing at it.
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23476934
+    description: "All archived versions on Zenodo (always resolves to the latest)"
+# Once the JOSS paper is accepted, add a preferred-citation entry pointing at it.

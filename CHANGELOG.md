@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `CITATION.cff` and the README now carry the Zenodo DOI
+  (10.5281/zenodo.23476934), which always resolves to the latest archived
+  release.
+
 ## [0.4.1] - 2026-10-19
 
 ### Added
