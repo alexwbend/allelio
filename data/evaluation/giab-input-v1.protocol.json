@@ -1,0 +1,51 @@
+{
+  "schema": "allelio-public-input-protocol/1",
+  "role": "bounded_raw_input_compatibility",
+  "review_date": "2026-10-21",
+  "source": {
+    "dataset": "NIST Genome in a Bottle HG002",
+    "release": "v5.0q draft assembly-based benchmark",
+    "assembly": "GRCh38",
+    "url": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/v5.0q/HG002_GRCh38_v5.0q_smvar.vcf.gz",
+    "published_md5": "c71acc71069bf7cd7f51eb8fb0c1a1ab",
+    "checksum_url": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/v5.0q/checksum.md5",
+    "checksum_document_sha256": "db03cf9d4dfd4917a2a26f5d069ac658272cb0cdbe1387666317ad330b5c5c70",
+    "readme_url": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/v5.0q/NIST_HG002_v5.0q_variant-benchmarksets_README.md",
+    "readme_sha256": "14d71c9f54a7a9fcf93cb1eabe5298468e8f0bb8f60844345a6f08a53cbfb4b0"
+  },
+  "selection": {
+    "contig_aliases": ["22", "chr22"],
+    "start_1based_inclusive": 20000001,
+    "end_1based_inclusive": 21000000,
+    "rule": "VCF POS inside interval; not allele overlap or a benchmark BED intersection",
+    "maximum_selected_rows": 20000,
+    "transformation": "Retain all original header bytes and complete selected rows unchanged; no identifier, genotype, allele, build or sample edits. No result-based selection."
+  },
+  "references": {
+    "role": "Previously frozen minimal ClinVar-only source-reference database; other sources empty",
+    "logical_sha256": "ea38f06a5f00a543797fb038a16d4898c9abfabf14e0ffcc20519b2fc1a68f27",
+    "reconstruction": "docs/clinvar-reference-evaluation.md; retain the references.db from the frozen reference evaluation"
+  },
+  "annotation_options": {
+    "include_benign": false,
+    "include_reference": false,
+    "frequency_adjustment": true,
+    "traits_only": false,
+    "detailed_trace": false,
+    "pgx_min_level": "2B"
+  },
+  "rights_and_privacy": {
+    "terms": "NIST data-use policy in the pinned release README; preserve acknowledgment and applicable notices, identify date/nature of extraction. Not relicensed as MIT or CC0.",
+    "consent_basis_url": "https://www.nist.gov/programs-projects/faqs-genome-bottle",
+    "identifiability": "Public broad PGP consent does not make HG002 anonymous. No profile enrichment, names, phenotypes or individual health interpretations.",
+    "local_only": "Original VCF, original headers, selected rows, evidence, logs, run and replay artifacts remain outside Git, CI and hosted AI agents.",
+    "public_candidate": "Reviewed protocol, exact source citations/version/URLs, integrity hashes and aggregate processing counts only. Hashes are provenance, not anonymization."
+  },
+  "citations": [
+    "https://doi.org/10.1038/sdata.2016.25",
+    "https://doi.org/10.1038/s41587-019-0054-x",
+    "https://doi.org/10.1101/2025.09.21.677443",
+    "https://doi.org/10.64898/2026.09.23.752440"
+  ],
+  "interpretation": "Input handling and conserved accounting only. No benchmark BED is applied; the smvar VCF includes structural variants. No variant-call accuracy, pathogenicity, population, clinical, whole-genome or consumer-array performance estimate. Execution/accounting success is separate from input support; zero findings are not a negative genetic test."
+}
