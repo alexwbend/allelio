@@ -53,7 +53,7 @@ preparation/review; they do not authenticate reviewers or prove historical execu
 
 ## Pinned sparse-cache execution
 
-The [execution protocol](../data/evaluation/vep-parsing-v1.protocol.json) freezes
+The [execution protocol](../data/evaluation/vep-parsing-v2.protocol.json) freezes
 VEP 116.3's exact official Linux arm64 image digest and archive, cache contents,
 commands, inputs and denominators before case execution. Use the
 [invented cases](../examples/vep-parsing/README.md): six shared cases/seven input
@@ -97,6 +97,9 @@ source bytes, and every extracted cache file. It creates a dedicated cache volum
 and refuses to overwrite one. The runner checks the installed cache inventory
 before each case and after completion. Each container has networking disabled,
 a read-only root filesystem/cache and no host mounts; invented input enters stdin.
+The same pinned reference FASTA/index bytes are copied into private container
+tmpfs and passed explicitly to VEP, permitting its lock/index writes without
+changing the original cache. No source sequence or input allele is repaired.
 Retain command arguments, inspected execution policy, output/logs, software/cache
 archives, Allelio evidence, import and comparison artifacts. Public CI uses invented
 unit fixtures only and does not download or execute VEP. No participant input is
@@ -107,6 +110,14 @@ hash identifies this retained artifact. A new export must still verify the same
 OCI digest/blobs; document a new resource/protocol revision rather than replacing
 recorded hashes. Source download archives can also change packaging; verify exact
 files and disclose any revision. Retain the first run, including discrepancies.
+
+The [first attempt](../data/evaluation/vep-parsing-v1.failed.json), using the
+[original protocol](../data/evaluation/vep-parsing-v1.protocol.json), stopped after
+one case with VEP exit 2: it could not create a FASTA lock inside the read-only
+cache. Ten cases were not executed and no comparison was completed. Revision 2
+corrects only that execution setup via the identical temporary FASTA copy.
+Inputs, expectations, image and cache are unchanged. The original failure and
+local artifacts are retained; this reuse is disclosed development work.
 
 ## Import manifest
 

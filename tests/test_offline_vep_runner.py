@@ -95,7 +95,7 @@ def test_full_local_adapter_run_and_retained_artifact_mutation(tmp_path,monkeypa
     metadata={'image':runner.IMAGE,'resources':copy.deepcopy(protocol['resources'])}
     for r in metadata['resources']:
         (resources/r['path']).write_bytes(('synthetic '+r['kind']).encode()); r['sha256']=runner.sha(resources/r['path'])
-    inventory={'synthetic':'fixture'}
+    inventory={'homo_sapiens/84_GRCh38/'+name:digest for name,digest in protocol['fasta_copy_sha256'].items()}
     (resources/'cache-inventory.json').write_text(json.dumps(inventory))
     (resources/'runtime.json').write_text(json.dumps(metadata))
     protocol.update(runtime_metadata_sha256=runner.sha(resources/'runtime.json'),resources=metadata['resources'],
@@ -128,3 +128,11 @@ def test_full_local_adapter_run_and_retained_artifact_mutation(tmp_path,monkeypa
         assert sum(c['parsing_counts']['input_records'] for c in report['cases'] if c['parsing_counts'])==7
         assert sum(s['excluded_opportunities'] for s in report['comparison']['stages'].values())==49
         assert 'diploid_het/execution.json' in report['supporting_artifact_hashes']
+
+
+def test_fasta_lock_setup_keeps_original_cache_readonly():
+    protocol=json.loads(runner.PROTOCOL.read_text())
+    assert protocol['vep_arguments'][-2:]==['--fasta','/tmp/test.fa']
+    assert set(protocol['fasta_copy_sha256'])=={'test.fa','test.fa.fai'}
+    assert 'cp /cache/homo_sapiens/84_GRCh38/test.fa' in runner.ENTRY_COMMAND[2]
+    assert 'exec vep "$@"' in runner.ENTRY_COMMAND[2]

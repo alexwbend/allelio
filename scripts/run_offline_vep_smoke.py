@@ -21,7 +21,10 @@ from allelio.schema import validate_evidence
 from allelio.vep import import_vep
 from prepare_vep_smoke_resources import IMAGE, VOLUME, cache_inventory, docker, sha, verify_image_archive
 
-PROTOCOL = ROOT/'data/evaluation/vep-parsing-v1.protocol.json'
+PROTOCOL = ROOT/'data/evaluation/vep-parsing-v2.protocol.json'
+ENTRY_COMMAND = ['/bin/sh','-c',
+    'cp /cache/homo_sapiens/84_GRCh38/test.fa /cache/homo_sapiens/84_GRCh38/test.fa.fai /tmp/ && exec vep "$@"',
+    'vep-local-fasta']
 
 
 def require(condition):
@@ -37,9 +40,9 @@ def outside(path):
 def execute_case(context, source, directory, protocol):
     """No host mounts: invented VCF bytes enter stdin; only cache is mounted."""
     args = protocol['vep_arguments']
-    create = ['create','--interactive','--network','none','--read-only','--tmpfs','/tmp:rw,noexec,nosuid,size=64m',
+    create = ['create','--interactive','--network','none','--read-only','--tmpfs','/tmp:rw,noexec,nosuid,size=128m',
               '--cap-drop','ALL','--security-opt','no-new-privileges','--mount',
-              'type=volume,src='+VOLUME+',dst=/cache,readonly',IMAGE,'vep'] + args
+              'type=volume,src='+VOLUME+',dst=/cache,readonly',IMAGE] + ENTRY_COMMAND + args
     container = docker(context,create).stdout.decode().strip()
     try:
         before = json.loads(docker(context,['inspect',container]).stdout)[0]
@@ -79,6 +82,7 @@ def run(resources, output, context):
     require(verify_image_archive(resources/'vep-116.3-arm64.tar')==protocol['image_config_digest'])
     inventory = json.loads((resources/'cache-inventory.json').read_text())
     require(sha(resources/'cache-inventory.json')==protocol['cache_inventory_sha256'])
+    require(protocol['fasta_copy_sha256']=={name:inventory['homo_sapiens/84_GRCh38/'+name] for name in ('test.fa','test.fa.fai')})
     software = code_identity(); runner_hash = sha(__file__)
     helper = Path(__file__).with_name('prepare_vep_smoke_resources.py'); helper_hash = sha(helper)
     output.mkdir(parents=True,mode=0o700); output.chmod(0o700)
