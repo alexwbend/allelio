@@ -7,6 +7,11 @@ defines the diagnostic settings, measured fields, trace expectations, checks and
 denominators before execution. This is internal source-fidelity evidence, not
 independent clinical validation.
 
+Source attribution: ClinVar, National Center for Biotechnology Information,
+2026-09-03 snapshot, as pinned by the linked reference-set protocol. Attribute
+ClinVar and its publication in any paper or downstream use of these results;
+source data retains its own terms, separately from Allelio's MIT code license.
+
 ## Execution and trust boundary
 
 From a source checkout, first reconstruct the exact reference set as documented
@@ -27,9 +32,11 @@ before output is created. Existing outputs and output paths inside the frozen
 bundle are rejected. Missing or duplicated cases are errors, not exclusions.
 
 The adapter materializes nine VCF batches, one per scenario, preserving the case
-order and line-to-case mapping. Each case is still a single VCF record with a
-unique rsID within its batch; unrelated rsIDs are not combined into a shared
-genotype observation. All sample labels say `SYNTHETIC_CONSTRUCTED`. Source
+order and line-to-case mapping. Each case is scored as one VCF record with a
+unique rsID within its batch. The single synthetic sample is an execution
+container, not a plausible individual genome or an independent population
+sample. Batch gene-grouping output is retained but is not scored here. All
+sample labels say `SYNTHETIC_CONSTRUCTED`. Source
 records are inserted into a new minimal ClinVar-only database. Other reference
 sources remain empty. Each batch runs the production `record_run` path, including
 VCF parsing, annotation and structured evidence export, with explanations off.
@@ -95,6 +102,26 @@ source metadata, gene names, individual case IDs, trace notes, input paths,
 environment variables or row-level observations. Review the actual report before
 publication under the source/artifact policy; hashes are provenance, not
 anonymization. Do not publish the local VCF, evidence, database or per-case files.
+
+## First complete execution
+
+The [aggregate report](../data/evaluation/clinvar-reference-v1.results.json) records
+the first complete execution on 2026-10-21, using adapter/protocol commit
+`447cc19` and the exact package, adapter, source and protocol hashes in that report.
+All 66,492 constructed cases passed their applicable checks: 7,388 in each of
+the nine scenarios, with all nine cases passing for each of the 7,388 source-record
+clusters. All nine batches passed output accounting and evidence schema/semantic
+validation, with no unexpected outputs or validation errors.
+
+Source-record fidelity had 59,104 applicable opportunities; the 7,388 predefined
+no-call cases were inapplicable for that check. Each other check had 66,492
+opportunities. The execution used no participant genome, model or reference
+download. The report preserves aggregate results and provenance hashes only;
+the constructed inputs and detailed execution artifacts remain local.
+
+These are internal contract results under the diagnostic settings above. They
+do not estimate clinical accuracy, default report performance or independent
+scientific validation. No frozen expectations were changed after this execution.
 
 ## Interpretation limits
 
