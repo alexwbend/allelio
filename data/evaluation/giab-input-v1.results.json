@@ -1,0 +1,77 @@
+{
+  "schema": "allelio-public-input-demonstration/1",
+  "status": "complete",
+  "role": "bounded_raw_input_compatibility",
+  "source_sha256": "c7f9d7a4781f1f0a8a42ec54b051d6b95db1935c5e12318bae219740f9c50dc8",
+  "source_md5_matches_published": true,
+  "protocol_sha256": "a4241c3b1452db38ed5f8403f3c135768cf8215d2d74db8c51dbbd615303a796",
+  "runner_sha256": "e506de758ebe8232f4ba40a18ba51004c8195bcb5914d0dae7c14d4575bb288c",
+  "software": {
+    "package": "allelio",
+    "version": "0.4.1",
+    "content_sha256": "1b793d93dac97e76d25b9f29ad4bd4e4f3c46c8e683a82eeef38579ea1647d07"
+  },
+  "runtime": {
+    "python": "3.9.6",
+    "implementation": "CPython",
+    "sqlite": "3.51.0",
+    "packages": {
+      "click": "8.1.8",
+      "jsonschema": "4.17.3",
+      "httpx": "0.28.1",
+      "ollama": "0.6.1"
+    }
+  },
+  "references_logical_sha256": "ea38f06a5f00a543797fb038a16d4898c9abfabf14e0ffcc20519b2fc1a68f27",
+  "annotation_options": {
+    "include_benign": false,
+    "include_reference": false,
+    "frequency_adjustment": true,
+    "traits_only": false,
+    "detailed_trace": false,
+    "pgx_min_level": "2B"
+  },
+  "selection": {
+    "source_rows_scanned": 5945525,
+    "selected_rows": 1994,
+    "header_lines_retained": 52,
+    "selected_identifier_syntax": {
+      "missing": 1994,
+      "rsid_syntax": 0,
+      "other": 0
+    }
+  },
+  "processing": {
+    "parsed_rows": 0,
+    "parser_dispositions": {
+      "unsupported_identifier": 1994
+    },
+    "final_dispositions": {
+      "unsupported_identifier": 1994
+    },
+    "returned_findings": 0,
+    "accounting_complete": true,
+    "evidence_contract_valid": true,
+    "evidence_contract_errors": 0,
+    "annotation_replayed": true,
+    "annotation_accuracy_assessed": false
+  },
+  "local_artifact_sha256": {
+    "protocol.json": "a4241c3b1452db38ed5f8403f3c135768cf8215d2d74db8c51dbbd615303a796",
+    "selected.vcf": "67f92dc2de74c0af18cc54f571d4b7d553cc2e60f12f9a0eb807c27e044a8e9c",
+    "selection.json": "c1703668bccd45564e56f2d21213b0d894f57b24cf58395cd23ffa7d2834c182",
+    "run.json": "654882bdabc51df8a4f9b6b6947c7269c3e46c915e55e075b42d66a08e78a687",
+    "evidence.json": "0f727990c70d31c3626db08d4c2f3e0d69c26f56d87be387913707f1e8f713f2",
+    "validation-errors.json": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066",
+    "replay.json": "91aea5bbf94611429a0888b1174da31fbb07293913fef6b19f8fea4e0e86dfe3"
+  },
+  "execution_checks_passed": true,
+  "limitations": [
+    "One prespecified interval from one public broadly consented research genome; not anonymous.",
+    "No identifier/build repair, BED intersection or normalization; complete source rows and headers stay local.",
+    "Minimal ClinVar-only references and normal reporting options; no other source or explanation evaluation.",
+    "Processing/accounting and replay checks do not establish input support or clinical/variant-call accuracy.",
+    "Zero findings are not a negative genetic test. No whole-genome or population performance estimate.",
+    "Python network entry points were denied; this is not an operating-system isolation proof."
+  ]
+}

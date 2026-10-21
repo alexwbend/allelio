@@ -92,6 +92,30 @@ the first result, including limitations; any identifier/build overlay or softwar
 fix requires a separately named follow-up experiment with development reuse
 disclosed. Do not replace the raw result with a repaired input.
 
+## First execution and observed limitation
+
+The [first aggregate result](../data/evaluation/giab-input-v1.results.json) was
+recorded on 2026-10-21 with protocol/runner commit `10a5741`. The protocol file
+was written before source download and committed before interval selection or
+production execution; this is maintainer-run internal evidence, not independent
+preregistration or validation. The downloaded source matched its published MD5;
+its SHA-256 is recorded in the report.
+
+The selector scanned 5,945,525 source data rows and retained 1,994 rows in the
+fixed interval. Every selected row had a missing identifier. Allelio accounted
+for all 1,994 as `unsupported_identifier`, parsed zero observations and returned
+zero findings. Evidence validation and annotation replay completed successfully.
+These are successful execution/accounting checks over an **unsupported input**;
+they provide no annotation accuracy assessment. The minimal reference database
+cannot remedy identifier rejection before lookup. No identifiers were added to
+make the experiment produce findings, and the first result is retained unchanged.
+
+This reveals a concrete compatibility limit of the current rsID-based workflow.
+Do not generalize these counts beyond the selected interval or describe the run
+as successful annotation of a real genome. Any coordinate-based identity bridge
+needs its own supported-stage definition, ambiguity checks, source provenance
+and separate evaluation before clinical or coverage claims can change.
+
 Publication attribution should include the GIAB
 [data resource](https://doi.org/10.1038/sdata.2016.25),
 [benchmarking methods](https://doi.org/10.1038/s41587-019-0054-x),
