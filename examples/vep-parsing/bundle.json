@@ -1,0 +1,130 @@
+{
+  "schema": "allelio-challenges/1",
+  "version": "vep-parsing-smoke/1",
+  "data_kind": "synthetic",
+  "license": "MIT",
+  "references": "references.json",
+  "cases": [
+    {
+      "id": "diploid_het",
+      "input": "diploid_het.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "diploid_alt",
+      "input": "diploid_alt.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "diploid_ref",
+      "input": "diploid_ref.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "haploid",
+      "input": "haploid.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "phased_het",
+      "input": "phased_het.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "multi_record",
+      "input": "multi_record.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "missing_build",
+      "input": "missing_build.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "filtered",
+      "input": "filtered.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "excluded",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "no_call",
+      "input": "no_call.vcf",
+      "expected": {
+        "parsing": "excluded",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "indel",
+      "input": "indel.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    },
+    {
+      "id": "multiallelic",
+      "input": "multiallelic.vcf",
+      "expected": {
+        "parsing": "parsed",
+        "identifier_recovery": "not_applicable",
+        "identity_matching": "unsupported",
+        "source_selection": "excluded",
+        "reporting": "excluded"
+      }
+    }
+  ]
+}

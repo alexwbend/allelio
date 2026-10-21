@@ -1,0 +1,653 @@
+{
+  "schema": "allelio-offline-vep-smoke-results/1",
+  "status": "complete",
+  "data_kind": "synthetic",
+  "split": "development",
+  "independent_validation": false,
+  "source_equivalence": false,
+  "protocol_sha256": "61193958d1787ac733cf5225d7e860778562279585f8cee9c409ba607dc3ab58",
+  "runner_sha256": "ff7341592dcd3c3d8c0ed4766807f6b073675d46dbfb2e322aaee2c493750fbd",
+  "resource_preparer_sha256": "3742ad0c31586ea4317484e77d159ee53fac71efbf4b8595a1b15aea20d20108",
+  "software": {
+    "package": "allelio",
+    "version": "0.4.1",
+    "content_sha256": "1964a9bf555ead0df700499ff13066e04cf510020cac6975a74a7bee6da7e656"
+  },
+  "runtime": {
+    "python": "3.9.6",
+    "implementation": "CPython",
+    "sqlite": "3.51.0",
+    "packages": {
+      "click": "8.1.8",
+      "jsonschema": "4.17.3",
+      "httpx": "0.28.1",
+      "ollama": "0.6.1"
+    }
+  },
+  "vep_version": "116.3",
+  "image": "ensemblorg/ensembl-vep@sha256:d0c0ab9697f10f5c8b2c5f65cf51ad9e60254161c02a414db3c85f37ecfa620d",
+  "cache_version": "84_GRCh38 sparse upstream test cache",
+  "cache_inventory_sha256": "b31c797c032f8830d426ff0949535870534f05f2bfff9796dea2bf4417de78c4",
+  "vep_resource_set_sha256": "989751139f5187edf651570777922c4be5629ef0faf956219c796e7d90d205b7",
+  "allelio_reference_sha256": "0a68ae0147c43f1e5e624fdb47f567c7cc784179cbc3c6986c202f97fd146724",
+  "cases": [
+    {
+      "id": "diploid_het",
+      "input_sha256": "10f6da787c3b0d1aaf82ccc4660235e6c020da90a49143a79c2ba18d1fe40d30",
+      "parsing_outcome": "parsed",
+      "scope_reason": null,
+      "parsing_counts": {
+        "input_records": 1,
+        "emitted_records": 1,
+        "omitted_records": 0
+      },
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "diploid_alt",
+      "input_sha256": "b54b88fabe546b3c5f53194bde757f4e55c07537da212fdeb5f67d93c3271d9c",
+      "parsing_outcome": "parsed",
+      "scope_reason": null,
+      "parsing_counts": {
+        "input_records": 1,
+        "emitted_records": 1,
+        "omitted_records": 0
+      },
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "diploid_ref",
+      "input_sha256": "340adf06d1df8e348cf9d1964ff46c71ef51b31d546f4ff2b2b1f1fdd3a29af4",
+      "parsing_outcome": "parsed",
+      "scope_reason": null,
+      "parsing_counts": {
+        "input_records": 1,
+        "emitted_records": 1,
+        "omitted_records": 0
+      },
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "haploid",
+      "input_sha256": "9a0725369dfc717c2931448d3cf4012715948af3ce21dab2d0c5cd522eba6402",
+      "parsing_outcome": "parsed",
+      "scope_reason": null,
+      "parsing_counts": {
+        "input_records": 1,
+        "emitted_records": 1,
+        "omitted_records": 0
+      },
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "phased_het",
+      "input_sha256": "74a410403a8709089b2cfae6e368f276d073b4801fb8b4bc23d49e4f72612adb",
+      "parsing_outcome": "parsed",
+      "scope_reason": null,
+      "parsing_counts": {
+        "input_records": 1,
+        "emitted_records": 1,
+        "omitted_records": 0
+      },
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "multi_record",
+      "input_sha256": "8b340aa7334aebec930c027fc0580adbb31d04c11680148bac08a51e0cb69424",
+      "parsing_outcome": "parsed",
+      "scope_reason": null,
+      "parsing_counts": {
+        "input_records": 2,
+        "emitted_records": 2,
+        "omitted_records": 0
+      },
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "missing_build",
+      "input_sha256": "87b744dd07f92c9497294a49f99cbeccd9b1e5d0d33ad1e232c7da88d4279e44",
+      "parsing_outcome": "unsupported",
+      "scope_reason": "requires_explicit_matching_reference",
+      "parsing_counts": null,
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "filtered",
+      "input_sha256": "6b367bcbe0f7f1c9df1ec5a4008d68efa89b486aa7abab9fdb229b7029010688",
+      "parsing_outcome": "unsupported",
+      "scope_reason": "requires_unfiltered_biallelic_snp_with_rsid",
+      "parsing_counts": null,
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "no_call",
+      "input_sha256": "a4bad6d0bd7ec6f403fa0c9bf583769238c7bd8f35bd29b9b296fc2ad61867f9",
+      "parsing_outcome": "unsupported",
+      "scope_reason": "missing_unsupported_or_filtered_genotype",
+      "parsing_counts": null,
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "indel",
+      "input_sha256": "ee00578dcbc0e99d105f155222a8715236fccbf7c0109783c2ff1e67f96fd34a",
+      "parsing_outcome": "unsupported",
+      "scope_reason": "requires_unfiltered_biallelic_snp_with_rsid",
+      "parsing_counts": null,
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    },
+    {
+      "id": "multiallelic",
+      "input_sha256": "9fa3f23638a48fd82ce8912ece003b886b211d5311c6b7418d0b69c1e687b8c6",
+      "parsing_outcome": "unsupported",
+      "scope_reason": "requires_unfiltered_biallelic_snp_with_rsid",
+      "parsing_counts": null,
+      "vep_exit_code": 0,
+      "network_mode": "none"
+    }
+  ],
+  "comparison": {
+    "schema": "allelio-benchmark-comparison/1",
+    "tools": [
+      {
+        "name": "Allelio",
+        "version": "0.4.1"
+      },
+      {
+        "name": "Ensembl VEP",
+        "version": "116.3"
+      }
+    ],
+    "stages": {
+      "parsing": {
+        "paired_opportunities": 6,
+        "agreements": 6,
+        "excluded_opportunities": 5
+      },
+      "identifier_recovery": {
+        "paired_opportunities": 0,
+        "agreements": 0,
+        "excluded_opportunities": 11
+      },
+      "identity_matching": {
+        "paired_opportunities": 0,
+        "agreements": 0,
+        "excluded_opportunities": 11
+      },
+      "source_selection": {
+        "paired_opportunities": 0,
+        "agreements": 0,
+        "excluded_opportunities": 11
+      },
+      "reporting": {
+        "paired_opportunities": 0,
+        "agreements": 0,
+        "excluded_opportunities": 11
+      }
+    },
+    "paired_opportunities": 6,
+    "agreements": 6,
+    "pairs": [
+      {
+        "id": "diploid_het",
+        "stage": "parsing",
+        "left": "parsed",
+        "right": "parsed",
+        "agreement": true,
+        "alignment_basis": "identical_input_bytes_and_declared_assembly_only",
+        "left_references_sha256": "0a68ae0147c43f1e5e624fdb47f567c7cc784179cbc3c6986c202f97fd146724",
+        "right_references_sha256": "989751139f5187edf651570777922c4be5629ef0faf956219c796e7d90d205b7"
+      },
+      {
+        "id": "diploid_alt",
+        "stage": "parsing",
+        "left": "parsed",
+        "right": "parsed",
+        "agreement": true,
+        "alignment_basis": "identical_input_bytes_and_declared_assembly_only",
+        "left_references_sha256": "0a68ae0147c43f1e5e624fdb47f567c7cc784179cbc3c6986c202f97fd146724",
+        "right_references_sha256": "989751139f5187edf651570777922c4be5629ef0faf956219c796e7d90d205b7"
+      },
+      {
+        "id": "diploid_ref",
+        "stage": "parsing",
+        "left": "parsed",
+        "right": "parsed",
+        "agreement": true,
+        "alignment_basis": "identical_input_bytes_and_declared_assembly_only",
+        "left_references_sha256": "0a68ae0147c43f1e5e624fdb47f567c7cc784179cbc3c6986c202f97fd146724",
+        "right_references_sha256": "989751139f5187edf651570777922c4be5629ef0faf956219c796e7d90d205b7"
+      },
+      {
+        "id": "haploid",
+        "stage": "parsing",
+        "left": "parsed",
+        "right": "parsed",
+        "agreement": true,
+        "alignment_basis": "identical_input_bytes_and_declared_assembly_only",
+        "left_references_sha256": "0a68ae0147c43f1e5e624fdb47f567c7cc784179cbc3c6986c202f97fd146724",
+        "right_references_sha256": "989751139f5187edf651570777922c4be5629ef0faf956219c796e7d90d205b7"
+      },
+      {
+        "id": "phased_het",
+        "stage": "parsing",
+        "left": "parsed",
+        "right": "parsed",
+        "agreement": true,
+        "alignment_basis": "identical_input_bytes_and_declared_assembly_only",
+        "left_references_sha256": "0a68ae0147c43f1e5e624fdb47f567c7cc784179cbc3c6986c202f97fd146724",
+        "right_references_sha256": "989751139f5187edf651570777922c4be5629ef0faf956219c796e7d90d205b7"
+      },
+      {
+        "id": "multi_record",
+        "stage": "parsing",
+        "left": "parsed",
+        "right": "parsed",
+        "agreement": true,
+        "alignment_basis": "identical_input_bytes_and_declared_assembly_only",
+        "left_references_sha256": "0a68ae0147c43f1e5e624fdb47f567c7cc784179cbc3c6986c202f97fd146724",
+        "right_references_sha256": "989751139f5187edf651570777922c4be5629ef0faf956219c796e7d90d205b7"
+      }
+    ],
+    "excluded": [
+      {
+        "id": "diploid_het",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_het",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_het",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_het",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_alt",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_alt",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_alt",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_alt",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_ref",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_ref",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_ref",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "diploid_ref",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "haploid",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "haploid",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "haploid",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "haploid",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "phased_het",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "phased_het",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "phased_het",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "phased_het",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multi_record",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multi_record",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multi_record",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multi_record",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "missing_build",
+        "stage": "parsing",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "missing_build",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "missing_build",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "missing_build",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "missing_build",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "filtered",
+        "stage": "parsing",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "filtered",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "filtered",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "filtered",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "filtered",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "no_call",
+        "stage": "parsing",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "no_call",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "no_call",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "no_call",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "no_call",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "indel",
+        "stage": "parsing",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "indel",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "indel",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "indel",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "indel",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multiallelic",
+        "stage": "parsing",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multiallelic",
+        "stage": "identifier_recovery",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multiallelic",
+        "stage": "identity_matching",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multiallelic",
+        "stage": "source_selection",
+        "reason": "not_shared_supported_scope"
+      },
+      {
+        "id": "multiallelic",
+        "stage": "reporting",
+        "reason": "not_shared_supported_scope"
+      }
+    ],
+    "limitation": "Aligned software comparison only; not clinical validation."
+  },
+  "original_artifact_hashes": {
+    "diploid_het": {
+      "input": "10f6da787c3b0d1aaf82ccc4660235e6c020da90a49143a79c2ba18d1fe40d30",
+      "raw_output": "8ec4091e67def514168b0fff2f15ab13271787c915b0760234b34c91c994d404",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "diploid_alt": {
+      "input": "b54b88fabe546b3c5f53194bde757f4e55c07537da212fdeb5f67d93c3271d9c",
+      "raw_output": "c5ea5ee48e17c2aac0d973727377216944de92d57468c774139b4d80dec17a98",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "diploid_ref": {
+      "input": "340adf06d1df8e348cf9d1964ff46c71ef51b31d546f4ff2b2b1f1fdd3a29af4",
+      "raw_output": "376430e402fcc5c4a22e79de29cbf392f9126134d12ad1fc4e8bfe62da005eda",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "haploid": {
+      "input": "9a0725369dfc717c2931448d3cf4012715948af3ce21dab2d0c5cd522eba6402",
+      "raw_output": "9637fe7b751efef2ed12b6c6af8e26b6f5fb883ea1114f7168dd2c66db2a1440",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "phased_het": {
+      "input": "74a410403a8709089b2cfae6e368f276d073b4801fb8b4bc23d49e4f72612adb",
+      "raw_output": "403841bc79d2711a03b8b6ff34622b15dd5993a66c33865a3bdf0e50f095c6b7",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "multi_record": {
+      "input": "8b340aa7334aebec930c027fc0580adbb31d04c11680148bac08a51e0cb69424",
+      "raw_output": "b4d09e95645534f930e266520aa260ba88898248fe0d81ee55a1cbd7907d5e5b",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "missing_build": {
+      "input": "87b744dd07f92c9497294a49f99cbeccd9b1e5d0d33ad1e232c7da88d4279e44",
+      "raw_output": "7583f698c83edfa0ee72c70434eacad43f52b6a8983330be7d85480fa9275905",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "filtered": {
+      "input": "6b367bcbe0f7f1c9df1ec5a4008d68efa89b486aa7abab9fdb229b7029010688",
+      "raw_output": "2fa76049fcf4441a6f2b28efa4a5bfe087b32492939381bd5c905f994eaefd16",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "no_call": {
+      "input": "a4bad6d0bd7ec6f403fa0c9bf583769238c7bd8f35bd29b9b296fc2ad61867f9",
+      "raw_output": "16664647d5c68442023dfc7b0d80fd5b7cff545c76c47134f989b3b27052fe29",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "indel": {
+      "input": "ee00578dcbc0e99d105f155222a8715236fccbf7c0109783c2ff1e67f96fd34a",
+      "raw_output": "06cbce8c4f7343ece17c4b3792f22f5096ea263d972306838f9d29730e2faab0",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "multiallelic": {
+      "input": "9fa3f23638a48fd82ce8912ece003b886b211d5311c6b7418d0b69c1e687b8c6",
+      "raw_output": "f1bb9d07db0d09a03ef487e0577e7d199ee06f99edaee15a92fb4a31581823e4",
+      "log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "supporting_artifact_hashes": {
+    "protocol.json": "61193958d1787ac733cf5225d7e860778562279585f8cee9c409ba607dc3ab58",
+    "allelio/benchmark.json": "be10d3a495e3c52d260bfe3e2dfd5bbb03d9b24e62dd639a5652cda4be4d05f6",
+    "allelio/diploid_het/run.json": "c55863b461ebf308e66e6e08f5364ffeace49ff8ddefcec258966b51d0129b1a",
+    "allelio/diploid_het/evidence.json": "066a78e1a84a0cdd6401bd25fe82dac5025d2d1e59ebcdb056bd79b18509ea1f",
+    "allelio/diploid_alt/run.json": "51749aa1a283819d82cec3c63339382c15f63c63a5f5957f3cec1b50b453d750",
+    "allelio/diploid_alt/evidence.json": "850dc62aa554cf64c478da04101f06c29e47da66321a1374039d5e85d3c6422a",
+    "allelio/diploid_ref/run.json": "bb1f295391fb280f3d381827038041c6b9504a4fdf462802fc18e65176428642",
+    "allelio/diploid_ref/evidence.json": "c01e379d5d3eb02c1f3642e241fa59b829df36055fe087c2b7c19a90a5aa9c66",
+    "allelio/haploid/run.json": "3416536aab2ade5209a797122d0b3eb6689f170106164e3f42e372e34307fe1a",
+    "allelio/haploid/evidence.json": "a50e565a954664a54f39e0d6d0b6b485e40b45f4d8a177ee767ec6852629fbf8",
+    "allelio/phased_het/run.json": "b4a3d45f7f7984bfad6be63c138b771bfe1188ca823f0ebcc07d3a8cfe158fc4",
+    "allelio/phased_het/evidence.json": "85f0976b1f2a076cfea14d413745ea07fa922b102850dbd1a866a19f09f403d9",
+    "allelio/multi_record/run.json": "6f6c774604debc182c07a3f28373a831b88d2e73b0a8f4e6342ee0948f0ebe82",
+    "allelio/multi_record/evidence.json": "fe2a0e72b498170e54c84499a803e812f47625d30a847eb6b0c402a7215a5d20",
+    "allelio/missing_build/run.json": "d0e7664c12994aee7adfd9f38c0c7cb75b2410220a2652b4b0c1c23905bc54dc",
+    "allelio/missing_build/evidence.json": "4d9def4897d19a1f98ce33422a77a6ebbdb74b11bc4eb78150bd9e91203ef6a4",
+    "allelio/filtered/run.json": "9e2905ee7a209f20a3cbcea3e90596cd8c98c3336ea05f2c6389cab81a1d4793",
+    "allelio/filtered/evidence.json": "b7fee477f3305e8e194a1e8577d4658ddd45bad01b07e5ad91c7889bc834f52b",
+    "allelio/no_call/run.json": "abeaa84e0614e56386ff001f80ce1c634b9a7aa9ce1c2b09873440d23c97b5fa",
+    "allelio/no_call/evidence.json": "8fdcd5c2d40a0bfec5d1351edc85f55b2945df5c84b13f86d1e7619d70f98644",
+    "allelio/indel/run.json": "ce1781cfa610d714c8a1764484d35660732433e41d7d3708b5604665686deed0",
+    "allelio/indel/evidence.json": "5c7dd7ad1fa9b791b3e7f38b368982df713f30412310bf0f32700740cc8b1d6e",
+    "allelio/multiallelic/run.json": "e23cc47d41ba17aa4c06714304f9503245fb412e5aa2c76f451cd973c29276f5",
+    "allelio/multiallelic/evidence.json": "3de92639a41eadc2d747302bd375d497151630b119591019a9162cb109c705db",
+    "allelio/references.db": "bff4335249cc18089b78a04f1d21d732278699461fe72e61c4a66aad7392fb76",
+    "diploid_het/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "diploid_alt/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "diploid_ref/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "haploid/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "phased_het/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "multi_record/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "missing_build/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "filtered/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "no_call/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "indel/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "multiallelic/execution.json": "71e2f75515b09dc81e6670f776000890bd481257d7af193b923ca3f6f7a1af98",
+    "import-manifest.json": "228e97f26461c06cb10f4f41b9b6c485dc9da89f3b581f8c89ec39ba6e87274f",
+    "imported/benchmark.json": "22e78c32ca4923f346ec6ae54501030f3ebb23aac39cbf138834da9d0e19f16a",
+    "imported/import-manifest.json": "228e97f26461c06cb10f4f41b9b6c485dc9da89f3b581f8c89ec39ba6e87274f",
+    "imported/diploid_het/input.txt": "10f6da787c3b0d1aaf82ccc4660235e6c020da90a49143a79c2ba18d1fe40d30",
+    "imported/diploid_het/vep.jsonl": "8ec4091e67def514168b0fff2f15ab13271787c915b0760234b34c91c994d404",
+    "imported/diploid_het/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/diploid_alt/input.txt": "b54b88fabe546b3c5f53194bde757f4e55c07537da212fdeb5f67d93c3271d9c",
+    "imported/diploid_alt/vep.jsonl": "c5ea5ee48e17c2aac0d973727377216944de92d57468c774139b4d80dec17a98",
+    "imported/diploid_alt/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/diploid_ref/input.txt": "340adf06d1df8e348cf9d1964ff46c71ef51b31d546f4ff2b2b1f1fdd3a29af4",
+    "imported/diploid_ref/vep.jsonl": "376430e402fcc5c4a22e79de29cbf392f9126134d12ad1fc4e8bfe62da005eda",
+    "imported/diploid_ref/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/haploid/input.txt": "9a0725369dfc717c2931448d3cf4012715948af3ce21dab2d0c5cd522eba6402",
+    "imported/haploid/vep.jsonl": "9637fe7b751efef2ed12b6c6af8e26b6f5fb883ea1114f7168dd2c66db2a1440",
+    "imported/haploid/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/phased_het/input.txt": "74a410403a8709089b2cfae6e368f276d073b4801fb8b4bc23d49e4f72612adb",
+    "imported/phased_het/vep.jsonl": "403841bc79d2711a03b8b6ff34622b15dd5993a66c33865a3bdf0e50f095c6b7",
+    "imported/phased_het/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/multi_record/input.txt": "8b340aa7334aebec930c027fc0580adbb31d04c11680148bac08a51e0cb69424",
+    "imported/multi_record/vep.jsonl": "b4d09e95645534f930e266520aa260ba88898248fe0d81ee55a1cbd7907d5e5b",
+    "imported/multi_record/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/missing_build/input.txt": "87b744dd07f92c9497294a49f99cbeccd9b1e5d0d33ad1e232c7da88d4279e44",
+    "imported/missing_build/vep.jsonl": "7583f698c83edfa0ee72c70434eacad43f52b6a8983330be7d85480fa9275905",
+    "imported/missing_build/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/filtered/input.txt": "6b367bcbe0f7f1c9df1ec5a4008d68efa89b486aa7abab9fdb229b7029010688",
+    "imported/filtered/vep.jsonl": "2fa76049fcf4441a6f2b28efa4a5bfe087b32492939381bd5c905f994eaefd16",
+    "imported/filtered/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/no_call/input.txt": "a4bad6d0bd7ec6f403fa0c9bf583769238c7bd8f35bd29b9b296fc2ad61867f9",
+    "imported/no_call/vep.jsonl": "16664647d5c68442023dfc7b0d80fd5b7cff545c76c47134f989b3b27052fe29",
+    "imported/no_call/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/indel/input.txt": "ee00578dcbc0e99d105f155222a8715236fccbf7c0109783c2ff1e67f96fd34a",
+    "imported/indel/vep.jsonl": "06cbce8c4f7343ece17c4b3792f22f5096ea263d972306838f9d29730e2faab0",
+    "imported/indel/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "imported/multiallelic/input.txt": "9fa3f23638a48fd82ce8912ece003b886b211d5311c6b7418d0b69c1e687b8c6",
+    "imported/multiallelic/vep.jsonl": "f1bb9d07db0d09a03ef487e0577e7d199ee06f99edaee15a92fb4a31581823e4",
+    "imported/multiallelic/vep.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "comparison.json": "31a2c6e0aa661b153ec558738ef6632b0c53a946e51e9903d795a2fc29b7152a"
+  },
+  "limitations": [
+    "Small internal parsing smoke experiment; no independent validation or representative performance estimate.",
+    "VEP116.3 is intentionally paired with official upstream sparse test cache84_GRCh38; this is not a current complete human cache.",
+    "VCF input echo measures row acceptance/preservation, not identical genotype interpretation or annotation accuracy.",
+    "Six shared cases contain seven input records. Five cases are outside the adapter shared scope, not necessarily unsupported by VEP.",
+    "Allelio references contain one off-input invented initialization sentinel and no matching annotations; all identity/source/reporting/explanation comparisons remain unsupported.",
+    "Resources differ between tools; the pairing declaration binds their distinct identities only for parsing.",
+    "No plugins/custom annotations/check_existing/SIFT/PolyPhen are requested. Raw annotation payloads and upstream resources stay local.",
+    "Container networking is disabled, cache is read-only, root filesystem is read-only, and no host folders are mounted.",
+    "The first attempted case failed on a read-only FASTA lock; this execution is a separately recorded infrastructure correction, not unseen validation."
+  ]
+}

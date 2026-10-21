@@ -1,4 +1,4 @@
-# Offline VEP comparison preparation (issue #48)
+# Offline VEP parsing comparison (issue #48)
 
 `allelio import-vep manifest.json --output imported-vep` verifies and preserves
 an existing **development** run. It does not execute VEP or download caches.
@@ -7,10 +7,11 @@ Use a new output directory; inputs, raw JSON lines, logs and the original import
 manifest are copied unchanged. Software and cache archives remain at their
 original locations and must be retained separately.
 
-This is the first, deliberately bounded part of #48. No real VEP run, approved
-reference alignment, independent labels or human ratings are shipped. Synthetic
-VEP-shaped unit fixtures test the importer, not VEP's actual behavior. Held-out
-imports are rejected until an independently approved execution workflow exists.
+The legacy `allelio-vep-import/1` recorded-review format remains supported for
+development runs. The explicit `allelio-vep-internal-import/1` format records an
+honestly attributed internal parsing alignment without claiming independent
+approval. Both reject held-out imports. Synthetic VEP-shaped unit fixtures test
+the importer; only an actual retained VEP execution supplies tool-run evidence.
 
 ## Supported comparison
 
@@ -34,11 +35,122 @@ grouping are unsupported for every case. Neither a VEP consequence nor a
 `colocated_variants` rsID proves Allelio's ClinVar identity/source-selection stage.
 Explanations are outside the five-stage benchmark contract altogether.
 
-Comparisons pair only identical input/reference fingerprints. Every stage accepts
+Legacy comparisons pair only identical input/reference fingerprints. Every stage accepts
 `unsupported`, which is excluded rather than counted as disagreement. Comparison
 reports include per-stage paired, agreeing and excluded opportunity counts.
 Whole-case exclusions contribute one exclusion to each stage; denominators are
 case-stage opportunities, not patients or clinical sensitivity.
+
+Internal parsing comparisons retain VEP's actual software/cache resource-set
+digest separately from Allelio's actual database fingerprint. They pair differing
+references **only for parsing**, when a synthetic/development declaration binds
+those exact identities and identical input bytes. It explicitly states
+`independent_validation=false`, `source_equivalence=false`, and parsing-only
+scope. The input itself supplies the declared assembly checked by the importer.
+No resource fingerprint is copied or altered to imply biological equivalence.
+All other stages remain unsupported. These declarations record actual internal
+preparation/review; they do not authenticate reviewers or prove historical execution.
+
+## Pinned sparse-cache execution
+
+The [execution protocol](../data/evaluation/vep-parsing-v2.protocol.json) freezes
+VEP 116.3's exact official Linux arm64 image digest and archive, cache contents,
+commands, inputs and denominators before case execution. Use the
+[invented cases](../examples/vep-parsing/README.md): six shared cases/seven input
+records, plus five deliberately outside this adapter's shared scope. Preserve
+every actual exit status; a failed execution is an error, never a scope exclusion.
+Allelio's reference database has one explicitly invented, off-input sentinel
+needed for initialization, with no matching annotation for any input. It
+isolates input handling and supplies no annotation-source comparison.
+
+Ensembl's [upstream testing configuration](https://github.com/Ensembl/ensembl-vep/blob/f479099e2a9cd86887a48cf5c293fd7a208ddfb9/t/VEPTestingConfig.pm)
+intentionally uses the sparse `84_GRCh38` test cache with current VEP code.
+This is a historical, incomplete regression-test resource, not a current full
+human cache. The published container omits test data, so extract the exact cache
+from the separately pinned source archive. Keep version 84 explicit; do not
+rename it to 116. Software/cache archives and raw annotation output stay local.
+
+Code is Apache-2.0 upstream; Ensembl distinguishes its data from third-party
+material. Cache metadata lists legacy COSMIC, HGMD-PUBLIC, SIFT and PolyPhen
+sources. Do not infer blanket redistribution rights from VEP's software license.
+Keep upstream notices and raw cache/output local; publish reviewed commands,
+invented inputs, provenance hashes and parsing counts only. No plugins, custom
+annotations, `--check_existing`, SIFT or PolyPhen options are activated.
+See [software terms](https://www.ensembl.org/about/articles/software-license) and
+[data disclaimer](https://www.ensembl.org/info/about/legal/disclaimer.html).
+
+For reproduction, provision Docker separately, pull the protocol's exact arm64
+image digest, and save it as `vep-116.3-arm64.tar` in a private resources directory
+outside Git. Download the pinned source archive to
+`ensembl-vep-f479099e.tar.gz`. Then:
+
+```sh
+python3 scripts/prepare_vep_smoke_resources.py \
+  --resources "$VEP_RESEARCH_RESOURCES" --docker-context "$VEP_DOCKER_CONTEXT"
+python3 scripts/run_offline_vep_smoke.py \
+  --resources "$VEP_RESEARCH_RESOURCES" --docker-context "$VEP_DOCKER_CONTEXT" \
+  --output "$VEP_NEW_LOCAL_RUN"
+```
+
+The preparer verifies OCI descriptors/blobs, image version/digest, original
+source bytes, and every extracted cache file. It creates a dedicated cache volume
+and refuses to overwrite one. The runner checks the installed cache inventory
+before each case and after completion. Each container has networking disabled,
+a read-only root filesystem/cache and no host mounts; invented input enters stdin.
+The same pinned reference FASTA/index bytes are copied into private container
+tmpfs and passed explicitly to VEP, permitting its lock/index writes without
+changing the original cache. No source sequence or input allele is repaired.
+Retain command arguments, inspected execution policy, output/logs, software/cache
+archives, Allelio evidence, import and comparison artifacts. Public CI uses invented
+unit fixtures only and does not download or execute VEP. No participant input is
+used in this experiment.
+
+Archive serialization can vary across Docker versions; the protocol's archive
+hash identifies this retained artifact. A new export must still verify the same
+OCI digest/blobs; document a new resource/protocol revision rather than replacing
+recorded hashes. Source download archives can also change packaging; verify exact
+files and disclose any revision. Retain the first run, including discrepancies.
+
+The [first attempt](../data/evaluation/vep-parsing-v1.failed.json), using the
+[original protocol](../data/evaluation/vep-parsing-v1.protocol.json), stopped after
+one case with VEP exit 2: it could not create a FASTA lock inside the read-only
+cache. Ten cases were not executed and no comparison was completed. Revision 2
+corrects only that execution setup via the identical temporary FASTA copy.
+Inputs, expectations, image and cache are unchanged. The original failure and
+local artifacts are retained; this reuse is disclosed development work.
+
+## Recorded execution, 2026-10-21
+
+The [revision 2 aggregate results](../data/evaluation/vep-parsing-v2.results.json)
+come from actual offline VEP 116.3 execution after the reviewed runner/protocol
+were committed at
+[`d6d257d72d184f4d4a1af94297ed4f4e70e68406`](https://github.com/alexwbend/allelio/commit/d6d257d72d184f4d4a1af94297ed4f4e70e68406).
+All eleven VEP executions exited zero. Six shared cases agreed on the coarse
+`parsed` outcome. Their seven original VCF records were emitted, with zero
+omissions. Five cases were excluded from parsing comparison by the predefined
+adapter scope; they were not failed VEP executions.
+
+| Stage | Paired case opportunities | Agreements | Excluded case opportunities |
+| --- | ---: | ---: | ---: |
+| Parsing | 6 | 6 | 5 |
+| Identifier recovery | 0 | 0 | 11 |
+| Identity matching | 0 | 0 | 11 |
+| Source selection | 0 | 0 | 11 |
+| Reporting | 0 | 0 | 11 |
+
+There are 6 paired and 49 excluded opportunities across 11 cases and 5 stages.
+The seven-row accounting is descriptive, not a recall estimate or genotype
+concordance score. No identity, source, consequence, report or explanation
+agreement was established. The historical sparse cache and constructed
+development cases cannot establish representative performance or clinical truth.
+
+Original inputs, VEP output/logs, inspected execution receipts, Allelio evidence,
+imported copies, comparison and pinned software/cache archives are retained
+privately outside Git. The public report preserves their hashes, controlled
+case identifiers, counts and limitations, without annotation payloads or local
+machine paths. It retains the first failed attempt as a separate linked record.
+Both scientific-scope and privacy/licensing reviews are internal AI-assisted
+reviews, not independent validation. Held-out execution remains blocked.
 
 ## Import manifest
 
@@ -97,20 +209,17 @@ changed input requires a renewed approval declaration. The adapter
 checks these declarations and file integrity; it cannot authenticate reviewers,
 prove semantic alignment, verify historical execution, or prove network isolation.
 
-## Remaining work before completing #48
+## Separate later scopes
 
-1. Obtain reviewer approval for exact shared development cases and reference
-   alignment, and provision pinned VEP/cache/plugin resources.
-2. Run VEP offline on those approved cases, preserve raw artifacts, and validate
-   this importer against actual output from that pinned version.
-3. Define and independently approve allele-identity and source-retrieval mappings
-   against aligned source snapshots. Extend scope with explicit negative and
-   abstention cases; do not infer alignment from rsIDs or consequence names.
-4. Keep held-out cases frozen until reviewer-authored expectations are locked.
+Identity/source-retrieval comparisons need a new supported mapping against
+appropriate aligned source snapshots, with explicit negatives and abstentions.
+Genotype interpretation, consequence accuracy, representative production-cache
+performance and explanation quality are not measured by parsing. Keep held-out
+cases frozen until their separate genuine independent-review requirements are met.
 
 VEP agreement is software/source agreement, not clinical ground truth. Issues
-#45 and #46 still require independent reviewers and frozen cases; #47 depends on
-those results and the completed comparison. See the
+#45–47 track internal checks and paper claims separately from a later independent
+study. Internal AI-assisted review is not independent scientific validation. See the
 [independent evaluation package](independent-evaluation-package.md).
 
 ## Upstream format references

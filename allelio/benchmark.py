@@ -9,6 +9,35 @@ from allelio.evidence import write_evidence_export
 from allelio.runs import record_run, checksum
 
 STAGES=('parsing','identifier_recovery','identity_matching','source_selection','reporting')
+INTERNAL_VEP_SCHEMA = 'allelio-vep-internal-import/1'
+
+
+def resource_set_sha256(resources):
+    """Identify the actual external resources without impersonating Allelio's DB."""
+    rows = sorted((r['kind'], r['version'], r['sha256']) for r in resources)
+    return hashlib.sha256(json.dumps(rows, separators=(',', ':'), ensure_ascii=True).encode()).hexdigest()
+
+
+def internal_parsing_alignment(alignment):
+    return (isinstance(alignment, dict)
+            and alignment.get('schema') == 'allelio-internal-parsing-alignment/1'
+            and alignment.get('scope') == ['parsing']
+            and alignment.get('independent_validation') is False
+            and alignment.get('source_equivalence') is False
+            and 'approved' not in alignment and 'reviewer' not in alignment)
+
+
+def internal_parsing_pair(primary, row, external, match):
+    """Different reference sets can share input acceptance, never annotation stages."""
+    alignment = match.get('alignment', {})
+    return (external.get('adapter') == INTERNAL_VEP_SCHEMA
+            and external.get('split') == 'development' and external.get('data_kind') == 'synthetic'
+            and primary.get('data_kind') == 'synthetic' and primary.get('split', 'development') == 'development'
+            and primary.get('tool', {}).get('name') == 'Allelio'
+            and internal_parsing_alignment(alignment)
+            and alignment.get('input_sha256') == row['input_sha256'] == match['input_sha256']
+            and alignment.get('allelio_references_sha256') == row['references_sha256']
+            and match['references_sha256'] == external.get('resource_set_sha256'))
 
 
 def local_file(root,name):
@@ -111,17 +140,37 @@ def compare_benchmarks(left,right):
                 raise ValueError('Comparison requires explicit input and reference SHA-256 fingerprints.')
             if set(row.get('outcomes',{}))!=set(STAGES) or any(row['outcomes'][s] not in allowed[s] | {'unsupported'} for s in STAGES):
                 raise ValueError('Comparison outcomes must use supported stage definitions.')
+        if report.get('adapter') == INTERNAL_VEP_SCHEMA:
+            resources = report.get('provenance', {}).get('resources', [])
+            if (report.get('split') != 'development' or report.get('data_kind') != 'synthetic'
+                    or not resources or report.get('resource_set_sha256') != resource_set_sha256(resources)
+                    or any(not internal_parsing_alignment(row.get('alignment'))
+                           or row['references_sha256'] != report['resource_set_sha256']
+                           or row['alignment'].get('input_sha256') != row['input_sha256']
+                           or sorted(row['alignment'].get('resource_sha256', [])) != sorted(r['sha256'] for r in resources)
+                           or any(row['outcomes'][s] != 'unsupported' for s in STAGES if s != 'parsing')
+                           for row in cases)):
+                raise ValueError('Internal VEP alignment must bind synthetic parsing-only resource identities.')
     other={r['id']:r for r in right['cases']};paired=[];excluded=[]
     for row in left['cases']:
         match=other.pop(row['id'],None)
         if not match: excluded.append({'id':row['id'],'reason':'absent_in_other_tool'});continue
-        if any(row[k]!=match.get(k) for k in ('input_sha256','references_sha256')):
+        internal = (internal_parsing_pair(left, row, right, match)
+                    or internal_parsing_pair(right, match, left, row))
+        has_internal = left.get('adapter') == INTERNAL_VEP_SCHEMA or right.get('adapter') == INTERNAL_VEP_SCHEMA
+        if (row['input_sha256'] != match['input_sha256'] or (has_internal and not internal)
+                or (row['references_sha256'] != match['references_sha256'] and not internal)):
             excluded.append({'id':row['id'],'reason':'input_or_reference_not_aligned'});continue
         for stage in STAGES:
             a,b=row['outcomes'].get(stage),match['outcomes'].get(stage)
-            if a in (None,'unsupported','not_applicable') or b in (None,'unsupported','not_applicable'):
+            if (internal and stage != 'parsing') or a in (None,'unsupported','not_applicable') or b in (None,'unsupported','not_applicable'):
                 excluded.append({'id':row['id'],'stage':stage,'reason':'not_shared_supported_scope'})
-            else: paired.append({'id':row['id'],'stage':stage,'left':a,'right':b,'agreement':a==b})
+            else:
+                pair = {'id':row['id'],'stage':stage,'left':a,'right':b,'agreement':a==b}
+                if internal:
+                    pair.update(alignment_basis='identical_input_bytes_and_declared_assembly_only',
+                                left_references_sha256=row['references_sha256'], right_references_sha256=match['references_sha256'])
+                paired.append(pair)
     excluded.extend({'id':key,'reason':'absent_in_primary_tool'} for key in other)
     stages = {stage: {'paired_opportunities': sum(p['stage'] == stage for p in paired),
                       'agreements': sum(p['stage'] == stage and p['agreement'] for p in paired),

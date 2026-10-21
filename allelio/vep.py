@@ -8,8 +8,10 @@ import json
 import re
 import tempfile
 from pathlib import Path
+from datetime import date
 
-from allelio.benchmark import STAGES, local_file
+from allelio.benchmark import (STAGES, local_file, INTERNAL_VEP_SCHEMA,
+                               internal_parsing_alignment, resource_set_sha256)
 from allelio.evidence import write_evidence_export
 from allelio.runs import checksum
 
@@ -108,8 +110,11 @@ def import_vep(manifest_path, output):
     root = manifest_path.parent
     manifest_bytes = manifest_path.read_bytes()
     manifest = json.loads(manifest_bytes)
-    if not isinstance(manifest, dict) or manifest.get('schema') != SCHEMA or manifest.get('split') != 'development':
+    if not isinstance(manifest, dict) or manifest.get('schema') not in (SCHEMA, INTERNAL_VEP_SCHEMA) or manifest.get('split') != 'development':
         raise ValueError('Only development VEP imports are supported; held-out runs remain frozen.')
+    internal = manifest['schema'] == INTERNAL_VEP_SCHEMA
+    if internal and manifest.get('data_kind') != 'synthetic':
+        raise ValueError('Internal parsing imports require explicitly synthetic inputs.')
     _text(manifest.get('license'), 'Reuse license')
     version = _text(manifest.get('vep_version'), 'VEP version')
     _text(manifest.get('hardware'), 'Hardware')
@@ -146,12 +151,24 @@ def import_vep(manifest_path, output):
         approval = case['alignment']
         if not isinstance(approval, dict):
             raise ValueError('Alignment approval must be an object.')
-        _text(approval.get('reviewer'), 'Alignment reviewer')
+        if internal:
+            if not internal_parsing_alignment(approval):
+                raise ValueError('Internal alignment must declare parsing-only scope without independent approval or source equivalence.')
+            _text(approval.get('prepared_by'), 'Actual alignment preparer')
+            reviewers = approval.get('internal_review')
+            if (not isinstance(reviewers, list) or not reviewers
+                    or any(not isinstance(r, str) or not r.strip() for r in reviewers)):
+                raise ValueError('Record the actual internal review; do not invent independent approval.')
+            date.fromisoformat(_text(approval.get('date'), 'Alignment date'))
+        else:
+            _text(approval.get('reviewer'), 'Alignment reviewer')
         _text(approval.get('date'), 'Alignment date')
         _text(approval.get('rationale'), 'Alignment rationale')
-        if approval.get('approved') is not True or sorted(approval.get('resource_sha256', [])) != sorted(verified):
+        if ((not internal and approval.get('approved') is not True)
+                or sorted(approval.get('resource_sha256', [])) != sorted(verified)):
             raise ValueError('Approval must bind the exact VEP resource fingerprints.')
-        reference_sha = _sha(approval.get('allelio_references_sha256'))
+        allelio_reference_sha = _sha(approval.get('allelio_references_sha256'))
+        reference_sha = resource_set_sha256(resources) if internal else allelio_reference_sha
         if _sha(approval.get('input_sha256')) != case['input']['sha256']:
             raise ValueError('Alignment approval must bind the exact input fingerprint.')
         command = case.get('command')
@@ -181,13 +198,17 @@ def import_vep(manifest_path, output):
                                             for stage in STAGES if outcomes[stage] == 'unsupported'}})
         artifacts[case_id] = (input_bytes, raw_bytes, log_bytes)
     report = {'schema': 'allelio-benchmark/1', 'tool': {'name': 'Ensembl VEP', 'version': version},
-              'adapter': 'allelio-vep-import/1', 'split': 'development', 'cases': rows,
+              'adapter': manifest['schema'], 'split': 'development', 'cases': rows,
               'manifest_sha256': hashlib.sha256(manifest_bytes).hexdigest(),
               'provenance': manifest,
               'limitations': ['Only called, unfiltered, single-sample biallelic SNP VCF parsing is compared.',
                               'Reference alignment is a recorded reviewer assertion, not inferred or independently verified.',
                               'Command metadata does not prove network isolation or execution authenticity.',
                               'Source agreement is not clinical ground truth.']}
+    if internal:
+        report.update(data_kind='synthetic', resource_set_sha256=resource_set_sha256(resources))
+        report['limitations'][1] = ('Internal AI-assisted development alignment binds identical input bytes and declared assembly only; '
+                                    'VEP resources and the Allelio database retain distinct identities. No source equivalence or independent validation.')
     output = Path(output)
     if output.exists():
         raise ValueError('Use a new output directory to preserve prior runs.')

@@ -1,0 +1,21 @@
+{
+  "schema": "allelio-offline-vep-attempt/1",
+  "attempt": "run-v1",
+  "status": "incomplete",
+  "data_kind": "synthetic",
+  "code_commit": "0002c0ed322cbc2b5fc896e5b827be960b2ac1f6",
+  "protocol_sha256": "ab13fc3b6976fc19d2d3fff9fa1748f1ede5c791a0e9fa4d4d74edef05bb7ed1",
+  "executed_cases": 1,
+  "unexecuted_cases": 10,
+  "stopped_after_case": "diploid_het",
+  "vep_exit_code": 2,
+  "failure_category": "reference_fasta_lock_requires_writable_location",
+  "paired_comparison_available": false,
+  "retained_artifact_sha256": {
+    "protocol.json": "ab13fc3b6976fc19d2d3fff9fa1748f1ede5c791a0e9fa4d4d74edef05bb7ed1",
+    "diploid_het/execution.json": "4948f8830d3d485f68a00d2e8b0111a406e372dbe6eb2ff37793d759a4398d28",
+    "diploid_het/vep.log": "ea363a3f3c3e0c28639fc6d647a40db0cfc9b7beaadece5923f0f2303f480cff",
+    "diploid_het/vep.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "resolution": "New execution revision copies the same cache FASTA/index into private container tmpfs for lock/index writes; cache/input identities and expectations remain unchanged. Preserve this first failure."
+}
