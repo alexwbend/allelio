@@ -382,6 +382,7 @@ See [the synthetic replay example and contract](docs/reproducible-runs.md).
 - [Network-boundary experiments](docs/network-boundary.md), including a web annotation-only switch.
 - [Explicit custom-probe recovery](docs/probe-recovery.md), including a [two-probe F2/GBA1 catalogue](data/probe-mappings/README.md) backed by FDA, vendor and ClinVar evidence.
 - [Stage-by-stage synthetic benchmark](docs/regression-benchmark.md).
+- [Frozen ClinVar reference-set preparation](docs/clinvar-reference-set.md), with source-derived expectations and constructed genotypes for internal evaluation.
 - [Frozen-evidence explanation evaluation and blinded rating support](docs/explanation-evaluation.md).
 - [Independent evaluation handoff](docs/independent-evaluation-package.md), including held-out labels, an aligned local VEP comparison and human review gates.
 

@@ -1,0 +1,116 @@
+{
+  "artifacts": {
+    "cases.jsonl": "dba0d58cd5bcfb9c2fcb37320a1eb14b02e2cfdb4d03f26ea0688a2736c9f994",
+    "protocol.json": "32770f45840152dae045329b8c9e1edd015185c991ba568950a1e3145ed6f3b7",
+    "records.jsonl": "0a335121f572d3a9a852a9af430f04c3c757db40709c6059fe74d836c07199b7"
+  },
+  "builder_sha256": "c76db5442efa7be09d93021130e38407d1db947b97ea1ceae828929ba6770db8",
+  "case_counts": {
+    "by_scenario": {
+      "alternate": 7388,
+      "failed_filter": 7388,
+      "heterozygous": 7388,
+      "no_call": 7388,
+      "reference": 7388,
+      "unknown_build": 7388,
+      "wrong_allele": 7388,
+      "wrong_build": 7388,
+      "wrong_position": 7388
+    },
+    "total": 66492
+  },
+  "evidence_type": "internal_source_fidelity",
+  "genotypes": "constructed; not participant observations",
+  "independent_validation": false,
+  "limitations": [
+    "Source-derived expectations are not independent clinical truth.",
+    "Selected unambiguous GRCh38 autosomal SNVs are not representative of all variants.",
+    "No Allelio outcomes have been measured by building this set.",
+    "Case/reference records are local artifacts; publication requires separate review."
+  ],
+  "protocol_version": "1",
+  "rights_review": {
+    "attribution": "ClinVar, National Center for Biotechnology Information; snapshot 2026-09-03; cite ClinVar in publications.",
+    "basis": "NCBI molecular-data usage policy; ClinVar requests source attribution. No blanket transfer of submitter rights or MIT relicensing is asserted.",
+    "local_artifacts": [
+      "source snapshot",
+      "selected reference records",
+      "constructed cases"
+    ],
+    "public_artifacts": [
+      "protocol",
+      "builder",
+      "aggregate manifest and hashes"
+    ],
+    "redistribution": "Retrieve the exact source by checksum. The complete source is not added to Git. Review any proposed release of derived records separately.",
+    "review_date": "2026-10-21",
+    "terms_urls": [
+      "https://www.ncbi.nlm.nih.gov/clinvar/docs/maintenance_use/",
+      "https://www.ncbi.nlm.nih.gov/home/about/policies/"
+    ],
+    "transformations": "Select minimal structured variant records; construct artificial diploid SNP inputs and rule-derived expectations. No submitted narratives, patient records or participant genomes are used."
+  },
+  "schema": "allelio-clinvar-reference-set/1",
+  "selection_counts": {
+    "ambiguous_eligible_rows": 6432,
+    "ambiguous_rsids": 5084,
+    "candidate_rsids": 12472,
+    "eligible_source_rows": 13820,
+    "first_rule_exclusions": {
+      "assembly": 4558256,
+      "chromosome": 1401,
+      "germline_classification": 157,
+      "germline_review_status": 4468561,
+      "identity_missing_or_invalid": 521,
+      "unsupported_alleles": 3,
+      "variant_type": 6414
+    },
+    "selected_records": 7388,
+    "source_rows": 9049133
+  },
+  "source": {
+    "name": "ClinVar variant_summary.txt.gz",
+    "sha256": "186ad2838a138f0bc7a79b1b7b6dde5533b105175d293e1131652889529804c9",
+    "snapshot_date": "2026-09-03",
+    "snapshot_mirror": "https://arweave.net/QJ1NCBOzdVxazwJ_NZAARNbiWjhJmwf1JpXAGVdGGxQ",
+    "upstream_url": "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz"
+  },
+  "strata": {
+    "chromosome": {
+      "1": 589,
+      "10": 169,
+      "11": 186,
+      "12": 657,
+      "13": 1021,
+      "14": 204,
+      "15": 235,
+      "16": 109,
+      "17": 1558,
+      "18": 37,
+      "19": 561,
+      "2": 436,
+      "20": 141,
+      "21": 829,
+      "22": 18,
+      "3": 150,
+      "4": 88,
+      "5": 76,
+      "6": 4,
+      "7": 293,
+      "9": 27
+    },
+    "germline_classification": {
+      "Benign": 1729,
+      "Benign/Likely benign": 1,
+      "Likely benign": 1406,
+      "Likely pathogenic": 915,
+      "Pathogenic": 1432,
+      "Pathogenic/Likely pathogenic": 1,
+      "Uncertain significance": 1904
+    },
+    "germline_review_status": {
+      "practice guideline": 4,
+      "reviewed by expert panel": 7384
+    }
+  }
+}
