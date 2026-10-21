@@ -1,0 +1,743 @@
+{
+  "schema": "allelio-clinvar-reference-evaluation/1",
+  "status": "complete",
+  "evidence_type": "internal_source_fidelity",
+  "independent_validation": false,
+  "software": {
+    "package": "allelio",
+    "version": "0.4.1",
+    "content_sha256": "1b793d93dac97e76d25b9f29ad4bd4e4f3c46c8e683a82eeef38579ea1647d07"
+  },
+  "runtime": {
+    "python": "3.9.6",
+    "implementation": "CPython",
+    "sqlite": "3.51.0",
+    "packages": {
+      "click": "8.1.8",
+      "jsonschema": "4.17.3",
+      "httpx": "0.28.1",
+      "ollama": "0.6.1"
+    }
+  },
+  "adapter_sha256": "e095eebd0d0e4e0f5c3c42a0c962569cd3f874e40d1828f8cf44f75150b6239e",
+  "references_logical_sha256": "ea38f06a5f00a543797fb038a16d4898c9abfabf14e0ffcc20519b2fc1a68f27",
+  "set_manifest_sha256": "c8ef21be53bbfc383a8b999051119446c1ec4e30e088808cca3e1870e4601515",
+  "source_sha256": "186ad2838a138f0bc7a79b1b7b6dde5533b105175d293e1131652889529804c9",
+  "evaluation_protocol_sha256": "f00a791bc862af41e4b0b42ba785ab92fdbe19cb4a6ce38d938787bf655ef20f",
+  "annotation_options": {
+    "include_benign": true,
+    "include_reference": true,
+    "frequency_adjustment": false,
+    "traits_only": false,
+    "detailed_trace": true,
+    "pgx_min_level": "2B"
+  },
+  "cases": {
+    "total": 66492,
+    "passed": 66492,
+    "failed": 0
+  },
+  "source_record_clusters": {
+    "total": 7388,
+    "all_cases_passed": 7388
+  },
+  "by_scenario": {
+    "reference": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "heterozygous": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "alternate": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "unknown_build": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "wrong_build": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "wrong_position": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "wrong_allele": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "failed_filter": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    },
+    "no_call": {
+      "cases": 7388,
+      "passed": 7388,
+      "failed": 0,
+      "checks": {
+        "parsed": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "filter_excluded": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_allele_match": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_alt_copies": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "source_record_fidelity": {
+          "opportunities": 0,
+          "passed": 0,
+          "failed": 0,
+          "not_applicable": 7388
+        },
+        "trace_contract": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "observation_accounting": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        },
+        "row_disposition": {
+          "opportunities": 7388,
+          "passed": 7388,
+          "failed": 0,
+          "not_applicable": 0
+        }
+      }
+    }
+  },
+  "by_source_stratum": {
+    "germline_classification": {
+      "Likely benign": {
+        "passed": 12654
+      },
+      "Uncertain significance": {
+        "passed": 17136
+      },
+      "Benign": {
+        "passed": 15561
+      },
+      "Likely pathogenic": {
+        "passed": 8235
+      },
+      "Pathogenic": {
+        "passed": 12888
+      },
+      "Benign/Likely benign": {
+        "passed": 9
+      },
+      "Pathogenic/Likely pathogenic": {
+        "passed": 9
+      }
+    },
+    "germline_review_status": {
+      "reviewed by expert panel": {
+        "passed": 66456
+      },
+      "practice guideline": {
+        "passed": 36
+      }
+    }
+  },
+  "batches": {
+    "reference": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "309eafaa0cfe9c3b8f1dfb3ec454568069a0870038428c98de897fd798820f11",
+      "evidence_sha256": "5ddb0c6733aa050e1711c90d506a2153686d34903d51239f6dda49e8c8c2b895",
+      "annotation_sha256": "abeff2aad55b688bda0ce118723fafe99f459cf2259a055009b5c81f78c601fd",
+      "run_sha256": "009563ec0aeaf6d29b225f2164c22029e9460d0785731ebdc4a90a32638a46ec",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "heterozygous": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "730e2f1a5dcf307223c5f48f317202096b57b9b53dc9a5aa2b1fa88bd6405bce",
+      "evidence_sha256": "0cf13019c81a38858d07f71bf2a9230b17be76b8552154ccc4d04325e098fc1d",
+      "annotation_sha256": "7dbd42572a670bafb781e8b173f1a24b9802669c30f1ce5aede7e2b17324271e",
+      "run_sha256": "7e554a116e87c4362b62fc18ceaeddaf1f62d47bfa5bc3df807ed97ea9b7a498",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "alternate": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "f8cc76a83edaa2dd230676381c768c64700e40aa015a9b96b9aa6f3e25cc07ce",
+      "evidence_sha256": "34c3c63375386c282f2f4dbe877495fe421a7ac476f9613216455af417e0920f",
+      "annotation_sha256": "a13b55cacb22b27fbef71ed42c64bc1bea0a046036e001363aa5be7fd0f67b86",
+      "run_sha256": "086212a2f54b540ca1153ed9d374872e71e9217712929ffcae7da94067e4e40e",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "unknown_build": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "4f1b6db4dcaad06c9b24a488ed99979e4ea67f8fd25b7797e8e83838a6936534",
+      "evidence_sha256": "cc961ce2d9cd430497edfede8b6ee4257fc3d700cef40faf4a0edc52bb05223d",
+      "annotation_sha256": "7fd477411235440e31481580aa01f3cd4dbf0e4dedc0c0302d39574123d8cbad",
+      "run_sha256": "a49ed63991dc0046752ef49282168ddc74c4155ef5bbc7e16adbff7e2de0b12a",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "wrong_build": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "a8b8144ced8144428a709df945056333c694e7400388a1de2980eff6bb8cd328",
+      "evidence_sha256": "2cebcc7b0a83e414402bfd3ba57494595ed80c39e2d7eaa10e9a8c268f530fdf",
+      "annotation_sha256": "8ee57a4b21e13d43103d06da0390be7d1291ae93ab166a25fd1630f4dc2f8c17",
+      "run_sha256": "aac8883ef023605fe667a07c226a2921e2246a572eb682d137a282e034676173",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "wrong_position": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "465987ce560179118e616c119763c824a4fa7130c946d76253b6f1c4ca4b97fc",
+      "evidence_sha256": "1c9757bcc673d661f623fb88ac31c328c40b99d7ee0023df4f79705fff179946",
+      "annotation_sha256": "7a1bb19b0c2cac8d60c9affc60e1ad459c71755dd3c53b68d79b1b58fb9dd317",
+      "run_sha256": "bc658fa9dfbe8e514c793a021ea391a6bd985e19773fa1e9c2feeb89aeb99b6f",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "wrong_allele": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "861c2395fce1a69cec0d242a582ac9215ba52e6d1b8b7e6017c9e1db9d053d10",
+      "evidence_sha256": "7930b7603bc74f278e67f88f4b3e4d5645c588ea355593368e2e3dc3e7a51754",
+      "annotation_sha256": "8010c37b5114a820047df34ca4fa1df54e48a229247db8986722f89f0842d6c5",
+      "run_sha256": "ebf306edda2243a2b00832edcb7a6e6643336784dd244eeecfc9bc386fcff8ae",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "failed_filter": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "5309aea1f2b440dbe26e5eeb16bf977e2e7d5e9a7dee074ddc7de881060ddd12",
+      "evidence_sha256": "123ae03c107c7f595356e9daaad9577e0ebd4f270e9c0c34babed57d6c89357c",
+      "annotation_sha256": "58e2446aee51815b8226a9b6b802bfc30dc6c8e038985a28f95f3ab84949dfe1",
+      "run_sha256": "a27736e32df397138f2e17f9c53bbba5203b77aa92df271af176db207c81e7fe",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    },
+    "no_call": {
+      "accounted": true,
+      "unexpected_outputs": {
+        "inputs": 0,
+        "coverage": 0,
+        "findings": 0,
+        "candidates": 0
+      },
+      "evidence_contract_valid": true,
+      "evidence_contract_errors": 0,
+      "input_sha256": "ee9d5ec29d92e390cfd4c4ccfb78331b7e10803d18788513e68ba80c8b868730",
+      "evidence_sha256": "e5f624c9bb1a64ab83836baa9397a3da3a186e7809b05e7ce27e8dc9f809921c",
+      "annotation_sha256": "60e33fa6fba5943d7ef6df5a82f414a5bd6ab6c079d8701874d4b074ee7184aa",
+      "run_sha256": "66227fa5dfcaef8affadb19bad1dba37ad2fba09cd44ac04596132249e3e3c16",
+      "validation_errors_sha256": "339acc3b09add3c3d0e689adf17878a1bd264d3a3f00fccce7db538630e20066"
+    }
+  },
+  "case_results_sha256": "41de97e31ba88d72382f1e5f72cd8b32a26c70a84cba7a6d6114ff93cfe93b61",
+  "source_fidelity_fields": [
+    "allele_id",
+    "variation_id",
+    "assembly",
+    "chromosome",
+    "position_vcf",
+    "ref_allele",
+    "alt_allele",
+    "gene",
+    "clinical_significance",
+    "review_status"
+  ],
+  "limitations": [
+    "Internal contracts over constructed cases, not independent biological samples or clinical accuracy.",
+    "Nine cases per selected source record are paired and clustered; no independence-based intervals are reported.",
+    "Minimal ClinVar-only database loading bypasses the production TSV importer and all other reference sources.",
+    "Source-field checks measure selected-record to database to lookup/export round-trip fidelity; HGNC ID is not measured.",
+    "Diagnostic include_reference/include_benign options differ from default reporting; ranking and report usefulness are not evaluated.",
+    "No models, model discovery, reference downloads, real participant data, or clinical interpretations are used.",
+    "Full row-level artifacts remain local; this report contains aggregate measurements and provenance hashes."
+  ],
+  "passed": true
+}

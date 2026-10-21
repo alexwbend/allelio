@@ -1,0 +1,31 @@
+{
+  "schema": "allelio-clinvar-reference-evaluation-protocol/1",
+  "version": "1",
+  "case_batching": "one VCF batch per scenario; unique rsIDs within each batch",
+  "annotation_options": {
+    "include_benign": true,
+    "include_reference": true,
+    "frequency_adjustment": false,
+    "traits_only": false,
+    "detailed_trace": true,
+    "pgx_min_level": "2B"
+  },
+  "source_fidelity_fields": ["allele_id", "variation_id", "assembly", "chromosome", "position_vcf", "ref_allele", "alt_allele", "gene", "clinical_significance", "review_status"],
+  "source_fidelity_observations": "Candidate trace for every parsed case and returned source entry where a finding is expected. Failed-filter cases use the rejected candidate only; no-call cases are inapplicable.",
+  "batch_evidence_contract": "Validate the production evidence schema and semantic references. Invalid document-local associations fail batch accounting and overall success; preserve validation errors locally and publish counts only.",
+  "checks": ["parsed", "filter_excluded", "source_allele_match", "source_alt_copies", "source_record_fidelity", "trace_contract", "observation_accounting", "row_disposition"],
+  "trace_contracts": {
+    "reference": ["rejected", "allele", "allele_absent"],
+    "heterozygous": ["retained", "allele", "allele_carried"],
+    "alternate": ["retained", "allele", "allele_carried"],
+    "unknown_build": ["unresolved", "identity", "vcf_build_undeclared"],
+    "wrong_build": ["unresolved", "identity", "build_mismatch"],
+    "wrong_position": ["unresolved", "identity", "position_mismatch"],
+    "wrong_allele": ["unresolved", "allele", "vcf_alternate_undeclared"],
+    "failed_filter": ["rejected", "filter", "vcf_filter_failed"],
+    "no_call": null
+  },
+  "applicability": "Every frozen case remains in every check denominator except source_record_fidelity for the predefined no_call scenario. Missing or extra outputs are failures.",
+  "unit": "Constructed case contracts; nine paired cases per source-record cluster. Not independent biological samples.",
+  "scope": "Selected-record to minimal ClinVar database to production VCF parser, lookup and evidence export. No production TSV import, default report/ranking evaluation, other reference sources, model generation or clinical validation."
+}
