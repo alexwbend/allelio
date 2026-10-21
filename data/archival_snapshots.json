@@ -26,7 +26,9 @@
       "arweave_tx": "QJ1NCBOzdVxazwJ_NZAARNbiWjhJmwf1JpXAGVdGGxQ",
       "arweave_url": "https://arweave.net/QJ1NCBOzdVxazwJ_NZAARNbiWjhJmwf1JpXAGVdGGxQ",
       "bitcoin_anchor_block": 965447,
-      "license": "public domain (NCBI/NIH, available without restriction)",
+      "license": "NCBI molecular-data usage policy; source attribution requested; submitter rights may apply",
+      "license_url": "https://www.ncbi.nlm.nih.gov/clinvar/docs/maintenance_use/",
+      "terms_url": "https://www.ncbi.nlm.nih.gov/home/about/policies/",
       "note": "variant_summary.txt.gz. Weekly rolling release; this is an insurance/reproducibility snapshot, NOT loaded by the tool (which fetches ClinVar live)."
     },
     {
