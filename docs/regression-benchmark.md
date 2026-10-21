@@ -39,10 +39,14 @@ The comparison records tool versions and raw agreement denominators. Producing
 another tool's aligned export is a separate, explicit adapter task; the benchmark
 does not guess alignment from rsIDs or run another program automatically.
 
-The development-only [`import-vep` adapter](vep-comparison.md) preserves frozen
+The development [`import-vep` adapter](vep-comparison.md) preserves frozen
 offline VEP output and currently maps only a narrow VCF parsing scope. Every
 stage accepts `unsupported`; these opportunities are excluded, not failures.
 Comparison exports also report paired, agreeing and excluded counts per stage.
+The explicit synthetic internal-parsing schema can bind distinct VEP resource
+and Allelio database identities for input-row acceptance only. It requires the
+same input bytes and a parsing-only declaration; all annotation stages remain
+unsupported. Legacy comparisons still require identical reference fingerprints.
 
 The fixtures are public invented developmental cases, not held-out patients or
 independent clinical reference material. Source lookup agreement does not establish

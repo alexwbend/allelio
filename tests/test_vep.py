@@ -6,7 +6,7 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from allelio.benchmark import STAGES, compare_benchmarks
+from allelio.benchmark import STAGES, compare_benchmarks, INTERNAL_VEP_SCHEMA, resource_set_sha256
 from allelio.cli import allelio
 from allelio.vep import import_vep
 
@@ -211,3 +211,66 @@ def test_failed_export_is_removed_and_retry_succeeds(bundle, monkeypatch):
     monkeypatch.setattr(vep, 'write_evidence_export', original)
     assert run(bundle)['cases'][0]['outcomes']['parsing'] == 'parsed'
     assert not list(root.glob('.allelio-vep-*'))
+
+
+def internal_bundle(bundle):
+    root, manifest = bundle
+    manifest.update(schema=INTERNAL_VEP_SCHEMA, data_kind='synthetic')
+    a = manifest['cases'][0]['alignment']
+    a.pop('approved'); a.pop('reviewer')
+    a.update(schema='allelio-internal-parsing-alignment/1', scope=['parsing'],
+             prepared_by='Synthetic unit fixture', internal_review=['Synthetic test; no actual review'],
+             independent_validation=False, source_equivalence=False)
+    return bundle
+
+
+def test_internal_parsing_retains_distinct_reference_identities(bundle):
+    internal_bundle(bundle)
+    report = run(bundle)
+    assert report['resource_set_sha256'] == resource_set_sha256(bundle[1]['resources'])
+    assert report['cases'][0]['references_sha256'] == report['resource_set_sha256'] != 'a' * 64
+    left = copy.deepcopy(report)
+    left.update(tool={'name': 'Allelio', 'version': 'synthetic'}, adapter='unit-fixture')
+    left['cases'][0]['references_sha256'] = 'a' * 64
+    left['cases'][0]['outcomes'].update(identity_matching='matched', source_selection='selected', reporting='reported')
+    for first, second in ((left, report), (report, left)):
+        comparison = compare_benchmarks(first, second)
+        assert comparison['paired_opportunities'] == comparison['agreements'] == 1
+        assert comparison['pairs'][0]['alignment_basis'] == 'identical_input_bytes_and_declared_assembly_only'
+        assert sum(s['excluded_opportunities'] for s in comparison['stages'].values()) == 4
+    left['cases'][0]['references_sha256'] = 'b' * 64
+    assert compare_benchmarks(left, report)['paired_opportunities'] == 0
+    # An accidental/equivocated equality cannot bypass the internal binding.
+    left['cases'][0]['references_sha256'] = report['resource_set_sha256']
+    assert compare_benchmarks(left, report)['paired_opportunities'] == 0
+
+
+@pytest.mark.parametrize('mutation', [
+    lambda m: m.update(data_kind='external'),
+    lambda m: m.update(split='held-out'),
+    lambda m: m['cases'][0]['alignment'].update(scope=['parsing', 'identity_matching']),
+    lambda m: m['cases'][0]['alignment'].update(independent_validation=True),
+    lambda m: m['cases'][0]['alignment'].update(source_equivalence=True),
+    lambda m: m['cases'][0]['alignment'].update(approved=True),
+    lambda m: m['cases'][0]['alignment'].update(internal_review=[]),
+    lambda m: m['cases'][0]['alignment'].update(resource_sha256=[]),
+    lambda m: m['cases'][0].update(exit_code=1),
+])
+def test_internal_gate_preserves_scope_and_execution_safeguards(bundle, mutation):
+    internal_bundle(bundle); mutation(bundle[1])
+    with pytest.raises(ValueError):
+        run(bundle)
+    assert not (bundle[0] / 'output').exists()
+
+
+@pytest.mark.parametrize('mutation', [
+    lambda r: r['cases'][0]['outcomes'].update(identity_matching='matched'),
+    lambda r: r['cases'][0]['alignment'].update(resource_sha256=[]),
+    lambda r: r.update(resource_set_sha256='0' * 64),
+    lambda r: r.update(split='held-out'),
+])
+def test_modified_internal_exports_cannot_expand_comparison_scope(bundle, mutation):
+    internal_bundle(bundle); report = run(bundle)
+    mutation(report)
+    with pytest.raises(ValueError, match='Internal VEP alignment'):
+        compare_benchmarks(report, report)

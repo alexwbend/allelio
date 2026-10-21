@@ -1,0 +1,18 @@
+{
+  "clinvar": [
+    {
+      "rsid": "rs999999999",
+      "allele_id": "1",
+      "variation_id": "1",
+      "gene": "SYNTHETIC_SENTINEL",
+      "chromosome": "1",
+      "position_vcf": 100,
+      "assembly": "GRCh38",
+      "ref_allele": "A",
+      "alt_allele": "C",
+      "clinical_significance": "Uncertain significance",
+      "review_status": "no assertion criteria provided",
+      "classification_type": "germline"
+    }
+  ]
+}

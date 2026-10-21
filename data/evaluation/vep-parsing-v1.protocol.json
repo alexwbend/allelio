@@ -1,0 +1,110 @@
+{
+  "schema": "allelio-offline-vep-smoke/1",
+  "split": "development",
+  "data_kind": "synthetic",
+  "independent_validation": false,
+  "review_date": "2026-10-21",
+  "image": "ensemblorg/ensembl-vep@sha256:d0c0ab9697f10f5c8b2c5f65cf51ad9e60254161c02a414db3c85f37ecfa620d",
+  "image_id": "sha256:d0c0ab9697f10f5c8b2c5f65cf51ad9e60254161c02a414db3c85f37ecfa620d",
+  "image_config_digest": "sha256:81b207c574cd9dc766a19bc74603644d1797e9578a23b7c0cb4e82db1b616fdb",
+  "vep_version": "116.3",
+  "cache_version": "84_GRCh38",
+  "cache_source_commit": "f479099e2a9cd86887a48cf5c293fd7a208ddfb9",
+  "source_archive_url": "https://codeload.github.com/Ensembl/ensembl-vep/tar.gz/f479099e2a9cd86887a48cf5c293fd7a208ddfb9",
+  "source_archive_sha256": "401c50c126e04254ec34993fe5a3c0ba122fa3631114135b1dd5d3ef889f5d42",
+  "runtime_metadata_sha256": "37971332e960891e346ecdb8e3b1534a0ab60e4aee494a0dfccf2a1557994d0d",
+  "cache_inventory_sha256": "b31c797c032f8830d426ff0949535870534f05f2bfff9796dea2bf4417de78c4",
+  "resources": [
+    {
+      "kind": "software",
+      "path": "vep-116.3-arm64.tar",
+      "sha256": "ba6b780d5ccf2b94f7c072f7a597d9752451e9fd3461f96346cc360f4851728d",
+      "version": "VEP116.3 linux/arm64; ensemblorg/ensembl-vep@sha256:d0c0ab9697f10f5c8b2c5f65cf51ad9e60254161c02a414db3c85f37ecfa620d"
+    },
+    {
+      "kind": "cache",
+      "path": "cache-84-GRCh38.tar.gz",
+      "sha256": "89c0884cc8d0552e648c946ebb078dc9a22ef4c71d7ad1c915fe88f05ff16d49",
+      "version": "upstream sparse test cache 84_GRCh38; f479099e2a9cd86887a48cf5c293fd7a208ddfb9"
+    }
+  ],
+  "inputs": {
+    "bundle.json": "12897ececf4fce1c9afadd811aeeadabc4db600cb8bcb7105d95767761f7c813",
+    "diploid_alt.vcf": "b54b88fabe546b3c5f53194bde757f4e55c07537da212fdeb5f67d93c3271d9c",
+    "diploid_het.vcf": "10f6da787c3b0d1aaf82ccc4660235e6c020da90a49143a79c2ba18d1fe40d30",
+    "diploid_ref.vcf": "340adf06d1df8e348cf9d1964ff46c71ef51b31d546f4ff2b2b1f1fdd3a29af4",
+    "filtered.vcf": "6b367bcbe0f7f1c9df1ec5a4008d68efa89b486aa7abab9fdb229b7029010688",
+    "haploid.vcf": "9a0725369dfc717c2931448d3cf4012715948af3ce21dab2d0c5cd522eba6402",
+    "indel.vcf": "ee00578dcbc0e99d105f155222a8715236fccbf7c0109783c2ff1e67f96fd34a",
+    "missing_build.vcf": "87b744dd07f92c9497294a49f99cbeccd9b1e5d0d33ad1e232c7da88d4279e44",
+    "multi_record.vcf": "8b340aa7334aebec930c027fc0580adbb31d04c11680148bac08a51e0cb69424",
+    "multiallelic.vcf": "9fa3f23638a48fd82ce8912ece003b886b211d5311c6b7418d0b69c1e687b8c6",
+    "no_call.vcf": "a4bad6d0bd7ec6f403fa0c9bf583769238c7bd8f35bd29b9b296fc2ad61867f9",
+    "phased_het.vcf": "74a410403a8709089b2cfae6e368f276d073b4801fb8b4bc23d49e4f72612adb",
+    "references.json": "e0380f33ef674699d339a8e2729702ca9c17de267243cc2f2ba4d20a97895454"
+  },
+  "compared_stages": [
+    "parsing"
+  ],
+  "shared_cases": [
+    "diploid_het",
+    "diploid_alt",
+    "diploid_ref",
+    "haploid",
+    "phased_het",
+    "multi_record"
+  ],
+  "adapter_outside_scope_cases": [
+    "missing_build",
+    "filtered",
+    "no_call",
+    "indel",
+    "multiallelic"
+  ],
+  "vep_arguments": [
+    "--offline",
+    "--cache",
+    "--cache_version",
+    "84",
+    "--dir_cache",
+    "/cache",
+    "--assembly",
+    "GRCh38",
+    "--format",
+    "vcf",
+    "--json",
+    "--input_file",
+    "STDIN",
+    "--output_file",
+    "STDOUT",
+    "--no_stats",
+    "--no_progress"
+  ],
+  "plugins": [],
+  "hardware": "macOS arm64 host; dedicated Colima VZ Linux aarch64 VM with 2 vCPU and 2 GiB RAM; Docker 29.5.2 / API 1.54",
+  "internal_review": [
+    "Codex scientific_review: internal AI-assisted code/protocol/alignment review",
+    "Codex privacy_licensing_review: internal AI-assisted code/protocol/alignment review"
+  ],
+  "alignment_rationale": "Identical frozen synthetic input bytes and explicit declared GRCh38 are the shared parsing contract. Allelio uses a synthetic-only database with one off-input initialization sentinel and no matching annotations; VEP uses a historical sparse transcript test cache. Keep their real resource fingerprints distinct. No reference-source equivalence, genotype interpretation, allele/source matching or independent approval is asserted.",
+  "rights": {
+    "inputs": "Constructed non-personal fixtures, MIT; identifiers are invented syntax labels, not observed genotype/identity assertions.",
+    "software": "Official VEP software Apache-2.0; retain upstream image archive and LICENSE locally; no code copied from upstream into Allelio.",
+    "cache": "Official upstream sparse test fixture, retained locally with its source archive/notice. Includes legacy external-source metadata; software licensing does not relicense all cached material.",
+    "public": "Code, synthetic inputs, reviewed protocol/commands/provenance hashes and parsing counts only; no image/cache or raw VEP annotation payloads.",
+    "terms_urls": [
+      "https://www.ensembl.org/about/articles/software-license",
+      "https://www.ensembl.org/info/about/legal/disclaimer.html"
+    ]
+  },
+  "limitations": [
+    "Small internal parsing smoke experiment; no independent validation or representative performance estimate.",
+    "VEP116.3 is intentionally paired with official upstream sparse test cache84_GRCh38; this is not a current complete human cache.",
+    "VCF input echo measures row acceptance/preservation, not identical genotype interpretation or annotation accuracy.",
+    "Six shared cases contain seven input records. Five cases are outside the adapter shared scope, not necessarily unsupported by VEP.",
+    "Allelio references contain one off-input invented initialization sentinel and no matching annotations; all identity/source/reporting/explanation comparisons remain unsupported.",
+    "Resources differ between tools; the pairing declaration binds their distinct identities only for parsing.",
+    "No plugins/custom annotations/check_existing/SIFT/PolyPhen are requested. Raw annotation payloads and upstream resources stay local.",
+    "Container networking is disabled, cache is read-only, root filesystem is read-only, and no host folders are mounted."
+  ]
+}
