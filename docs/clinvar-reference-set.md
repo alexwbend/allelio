@@ -65,9 +65,10 @@ included in Git; their hashes permit checking a local reconstruction.
 
 The existing synthetic-only benchmark does **not** accept this external-source
 set. Do not relabel reference-derived records as invented fixtures to bypass it.
-An evaluation adapter must be separately reviewed, materialize the specified
-single-record VCFs, preserve expectations, define actual-outcome mapping and
-denominators, and record results/failures without changing this set. A frozen
+The separately reviewed [reference evaluation adapter](clinvar-reference-evaluation.md)
+materializes the specified single-record contracts in scenario batches, preserves
+expectations, defines actual-outcome mapping and denominators, and records
+results/failures without changing this set. A frozen
 set is not a passing result. Preserve the nine cases per source record as paired,
 clustered observations rather than independent biological samples. Gene grouping, inheritance, PGx, consumer-array
 measurement, general indels and explanation quality are not tested by v1.
