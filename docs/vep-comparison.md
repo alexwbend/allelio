@@ -119,6 +119,39 @@ corrects only that execution setup via the identical temporary FASTA copy.
 Inputs, expectations, image and cache are unchanged. The original failure and
 local artifacts are retained; this reuse is disclosed development work.
 
+## Recorded execution, 2026-10-21
+
+The [revision 2 aggregate results](../data/evaluation/vep-parsing-v2.results.json)
+come from actual offline VEP 116.3 execution after the reviewed runner/protocol
+were committed at
+[`d6d257d72d184f4d4a1af94297ed4f4e70e68406`](https://github.com/alexwbend/allelio/commit/d6d257d72d184f4d4a1af94297ed4f4e70e68406).
+All eleven VEP executions exited zero. Six shared cases agreed on the coarse
+`parsed` outcome. Their seven original VCF records were emitted, with zero
+omissions. Five cases were excluded from parsing comparison by the predefined
+adapter scope; they were not failed VEP executions.
+
+| Stage | Paired case opportunities | Agreements | Excluded case opportunities |
+| --- | ---: | ---: | ---: |
+| Parsing | 6 | 6 | 5 |
+| Identifier recovery | 0 | 0 | 11 |
+| Identity matching | 0 | 0 | 11 |
+| Source selection | 0 | 0 | 11 |
+| Reporting | 0 | 0 | 11 |
+
+There are 6 paired and 49 excluded opportunities across 11 cases and 5 stages.
+The seven-row accounting is descriptive, not a recall estimate or genotype
+concordance score. No identity, source, consequence, report or explanation
+agreement was established. The historical sparse cache and constructed
+development cases cannot establish representative performance or clinical truth.
+
+Original inputs, VEP output/logs, inspected execution receipts, Allelio evidence,
+imported copies, comparison and pinned software/cache archives are retained
+privately outside Git. The public report preserves their hashes, controlled
+case identifiers, counts and limitations, without annotation payloads or local
+machine paths. It retains the first failed attempt as a separate linked record.
+Both scientific-scope and privacy/licensing reviews are internal AI-assisted
+reviews, not independent validation. Held-out execution remains blocked.
+
 ## Import manifest
 
 Paths are relative to the manifest and must remain inside its directory. Every
