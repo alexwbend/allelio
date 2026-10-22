@@ -1,0 +1,128 @@
+{
+  "schema": "allelio-explanation-pilot/1",
+  "version": 1,
+  "issue": 45,
+  "freeze_date": "2026-10-22",
+  "data_kind": "synthetic",
+  "split": "previously_available_internal_development_material",
+  "independent_validation": false,
+  "prior_access": "Existing MIT invented examples/evaluation cases were created 2026-09-13 and exercised in tests. Codex read both before this protocol. Neither is unseen, independently curated, or a real ClinVar observation. No case or prompt was modified for this experiment.",
+  "software": {
+    "package": "allelio",
+    "version": "0.4.1",
+    "content_sha256": "1964a9bf555ead0df700499ff13066e04cf510020cac6975a74a7bee6da7e656"
+  },
+  "runner_sha256": "e9bdf85c7c69ae817ac200af201cc2dd8e5c9757a8a6f22e25f3f1e963f5df29",
+  "inputs": {
+    "bundle.json": "c743c8151763a5c1aa7b6c3a1630581c5c5bedf90e77fbe5454b082107bd16d8",
+    "evidence.json": "3f4149a8fa9688afcf35be3cceb6f72ed8ff2db751e17fa98bcc0b3f3096447f",
+    "run.json": "3cd96c7122c6f74577a1136354e43d38e7e95ddaa8cacece4ef2630aa15d92c8"
+  },
+  "system_prompt_sha256": "f01f7a8bbfa991c8e0b809a604145ab016427531a795cccba0577c979734e876",
+  "case_prompt_sha256": {
+    "evaluation-1": "926b3d259e0422c3ecb395d3b88c3eda73ad6ffa8afddff94fa5117cc8ff6a3d",
+    "evaluation-2": "b7504c85409a504d243b1e431bb3654d92a4bf169485f24f6d9a359e5b86603e"
+  },
+  "cases": [
+    {
+      "id": "evaluation-1",
+      "scope": "invented Pathogenic classification; one carried allele, unknown classification type, inheritance not curated, no gnomAD/GWAS/PGx evidence"
+    },
+    {
+      "id": "evaluation-2",
+      "scope": "invented Uncertain significance classification; one carried allele, unknown classification type, inheritance not curated, no gnomAD/GWAS/PGx evidence"
+    }
+  ],
+  "models": [
+    {
+      "name": "llama3.1:8b",
+      "digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e",
+      "quantization": "Q4_K_M",
+      "selection": "Installed Allelio default; non-thinking instruction model. Selected before any model output inspection.",
+      "declared_parameters": "stop tokens only; sampling values and seed not declared in /api/show",
+      "license": "Llama 3.1 Community License",
+      "terms_url": "https://ollama.com/library/llama3.1:8b/blobs/0ba8f0e314b4"
+    },
+    {
+      "name": "qwen3:4b",
+      "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+      "quantization": "Q4_K_M",
+      "selection": "Downloaded smaller alternative with thinking capability; fits this host sequentially. Selected before any model output inspection. No explicit think override; record actual reasoning removal.",
+      "declared_parameters": {
+        "temperature": 0.6,
+        "top_k": 20,
+        "top_p": 0.95,
+        "repeat_penalty": 1
+      },
+      "license": "Apache-2.0",
+      "terms_url": "https://ollama.com/library/qwen3:4b/blobs/d18a5cc71b84"
+    }
+  ],
+  "ollama_version": "0.40.7",
+  "hardware": {
+    "architecture": "arm64",
+    "os": "macOS 26.3.1",
+    "chip": "Apple M3 Pro",
+    "cpu_cores": 11,
+    "memory": "18 GB",
+    "accelerator": "Apple integrated GPU via Ollama; actual offload not independently measured"
+  },
+  "generation": {
+    "max_tokens": 4096,
+    "timeout_seconds": 900,
+    "repetitions": 3,
+    "temperature": null,
+    "seed": null,
+    "effective_context_length": null,
+    "sampling": "No request temperature, seed, top_k, top_p or think override. /api/show declared defaults retained separately; effective server sampling/context values are not independently verified. No warmup; fixed sequential model/case/repetition order."
+  },
+  "order": [
+    "template baseline once per case",
+    "template second pass for exact text repeatability; not additional cases",
+    "Llama 3.1 8B, cases in bundle order, repetitions 1-3 each",
+    "Qwen3 4B, cases in bundle order, repetitions 1-3 each"
+  ],
+  "automated_checks": {
+    "template": "Two of two output opportunities: exact production formatter text and presence of rsID, genotype, not-curated inheritance, condition/classification and consultation line. Two repeatability comparisons. Socket connect and DNS denied only inside the baseline process.",
+    "models": "Twelve model-call opportunities in two case clusters: status, error, actual prompt hashes, text hashes, lexical flag categories, production safety/disclaimer wrapping consistency, reasoning removal count, server stop reason and timing. Model-arm fallbacks remain failures and are excluded from generated-output observations.",
+    "denominators": "Two distinct cases. Six calls per model = two cases x three repetitions. Fourteen primary output opportunities including two templates. Baseline repeat and model-run template regeneration are integrity checks, not extra evaluation cases. No independent observation assumption, pooled quality score, intervals, sensitivity, or significance test."
+  },
+  "qualitative_criteria": {
+    "factual_support": "Inspect claims against the supplied invented evidence; note invented gene biology, citations or unsupported causal/personal risk inferences. No external clinical truth assessment.",
+    "unsupported_certainty": "Look for diagnoses, penetrance or medication instructions exceeding the evidence. Lexical flags alone do not measure this.",
+    "material_omissions": "Inspect classification/type uncertainty, unknown inheritance and absent frequency evidence. Record missing context without assigning invented human scores.",
+    "uncertainty_communication": "Inspect whether evidence uncertainty and source limitations are stated coherently.",
+    "readability": "Describe organization and jargon as an attributed Codex observation; no human comprehension metric."
+  },
+  "inspection_attribution": "Codex conducts internal AI-assisted qualitative inspection after freezing outputs. No human ratings, human inspection, independent review or adjudication is implied. Ratings templates remain untouched.",
+  "retention": "Use a fresh local directory outside Git with preserved inputs, protocol, private-run, receipts, stripped answers, errors, hashes and model metadata. No reasoning content is retained. Keep any failed attempt; never tune or silently replace this protocol in response to its results.",
+  "source_artifact_register": [
+    {
+      "artifact": "Invented cases, frozen origin manifests, Allelio prompts/template and runner",
+      "source": "This repository, MIT",
+      "review_date": "2026-10-22",
+      "public_handling": "Existing synthetic inputs remain public. Publish reviewed protocol, runner, tests, aggregate counts, hashes and observations. Invented rsID-like syntax labels do not assert real variant identities; no participant data."
+    },
+    {
+      "artifact": "Model weights, runtime templates and licenses",
+      "source": "Ollama local model registry; exact advertised manifest digests above",
+      "review_date": "2026-10-22",
+      "public_handling": "Acquire upstream under each model license; weights/templates/license payloads stay local. MIT code license does not relicense these materials. No model redistribution or fine-tuning."
+    },
+    {
+      "artifact": "Synthetic model answers, requests, timing/error receipts and masked rating scaffolds",
+      "source": "This internal experiment; Llama and Qwen model outputs",
+      "review_date": "2026-10-22",
+      "public_handling": "Full originals stay local; publish separately reviewed aggregate/hash records and paraphrased observations only. Do not label generated answers as MIT source records or human assessments. No participant linkage; inspect generated names, citations, local paths, credentials and metadata before publication."
+    }
+  ],
+  "limitations": [
+    "Two previously available invented records are a pilot, not representative genetic evidence or a held-out test.",
+    "No curated inheritance, verified frequency, GWAS, PGx, high-impact warning, conflict or multi-record strata are exercised.",
+    "A generated status, correct wrapping or absence of lexical flags does not establish factual accuracy, safety or comprehension.",
+    "Template has a narrower information-only remit than the model prompt; differences are descriptive.",
+    "Adapters constrain prompt endpoints to loopback but a model server is trusted software. This is not OS-level network isolation or a complete privacy/security audit.",
+    "Sampling settings and stochastic generation are not fully controlled. Bitwise model regeneration is not promised. Hashes identify retained outputs.",
+    "Case reuse and any discovered deficiencies must remain disclosed; future fixes require a distinct protocol/run and do not replace these results."
+  ]
+}
