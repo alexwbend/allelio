@@ -1,0 +1,263 @@
+{
+  "schema": "allelio-explanation-pilot-public-result/1",
+  "status": "complete",
+  "experiment_date": "2026-10-22",
+  "evidence_type": "internal_synthetic_explanation_pilot",
+  "independent_validation": false,
+  "pre_execution_commit": "a138c119fdf32c4e4932ad778de885e886c7f00c",
+  "protocol_sha256": "0475e93513e0a0c5ceaceb7bef2ac0410dd201f37221f831ff7dbf7cc36ac9e5",
+  "software": {
+    "package": "allelio",
+    "version": "0.4.1",
+    "content_sha256": "1964a9bf555ead0df700499ff13066e04cf510020cac6975a74a7bee6da7e656"
+  },
+  "runtime": {
+    "python": "3.9.6",
+    "implementation": "CPython",
+    "sqlite": "3.51.0",
+    "packages": {
+      "click": "8.1.8",
+      "jsonschema": "4.17.3",
+      "httpx": "0.28.1",
+      "ollama": "0.6.1"
+    }
+  },
+  "denominators": {
+    "distinct_previously_available_synthetic_cases": 2,
+    "template_primary_outputs": 2,
+    "model_arms": 2,
+    "repetitions_per_case_per_model": 3,
+    "model_call_opportunities": 12,
+    "primary_output_opportunities": 14,
+    "human_ratings": 0,
+    "human_inspections": 0
+  },
+  "automated": {
+    "template": {
+      "generated": 2,
+      "exact_formatter_matches": 2,
+      "selected_field_checks_passed": 2,
+      "identical_repeat_comparisons": 2,
+      "model_calls": 0,
+      "network_guard": "socket connect and DNS denied in process",
+      "outputs": [
+        {
+          "case_id": "evaluation-1",
+          "text_sha256": "dbac56b0602edaf9f022c9051f3a29ca32a666abd010926b6c7a1d48387d67ad",
+          "generated": true,
+          "template_exact": true,
+          "selected_fields_present": true
+        },
+        {
+          "case_id": "evaluation-2",
+          "text_sha256": "c1ca1221996ef5e41739dadf8096383daa6b1e21c2d6fb316a9ab0068576ce6f",
+          "generated": true,
+          "template_exact": true,
+          "selected_fields_present": true
+        }
+      ]
+    },
+    "models": [
+      {
+        "model": "llama3.1:8b",
+        "digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e",
+        "opportunities": 6,
+        "statuses": {
+          "generated": 6
+        },
+        "lexically_flagged_outputs": 1,
+        "reasoning_removed_outputs": 0,
+        "length_stopped_outputs": 0,
+        "wrapper_verified_outputs": 6,
+        "outputs": [
+          {
+            "case_id": "evaluation-1",
+            "repeat": 1,
+            "status": "generated",
+            "text_sha256": "05768321dc4d5c63cd57287dadac82fc712ad30c3887c9f7fb5c5cef3f7ffed2"
+          },
+          {
+            "case_id": "evaluation-1",
+            "repeat": 2,
+            "status": "generated",
+            "text_sha256": "f4a3fa5d3f90456c14d1cddc9663beb77e439650842d101a0c04b4b8b286af88"
+          },
+          {
+            "case_id": "evaluation-1",
+            "repeat": 3,
+            "status": "generated",
+            "text_sha256": "589e38f8272ea7fd75747715e32a1856fb0fe83f459acaaca29a4a1636662bc4"
+          },
+          {
+            "case_id": "evaluation-2",
+            "repeat": 1,
+            "status": "generated",
+            "text_sha256": "d0eaf6fec567cd0093661804caa4b20679276a48a6d1c3acbf0a635e361c9bd6"
+          },
+          {
+            "case_id": "evaluation-2",
+            "repeat": 2,
+            "status": "generated",
+            "text_sha256": "fe7305884c2f2a5ab46b616fb61823b05de427e6d1fb05a982460ad90dc1a614"
+          },
+          {
+            "case_id": "evaluation-2",
+            "repeat": 3,
+            "status": "generated",
+            "text_sha256": "47dc099d05077f2bed25207ec6316bf49d4d8fe534a3f3c12eacd14671c1c344"
+          }
+        ]
+      },
+      {
+        "model": "qwen3:4b",
+        "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7",
+        "opportunities": 6,
+        "statuses": {
+          "generated": 6
+        },
+        "lexically_flagged_outputs": 1,
+        "reasoning_removed_outputs": 0,
+        "length_stopped_outputs": 0,
+        "wrapper_verified_outputs": 6,
+        "outputs": [
+          {
+            "case_id": "evaluation-1",
+            "repeat": 1,
+            "status": "generated",
+            "text_sha256": "152c9076ccd3ac0b58c3c20950283705dec2f86b154757ecda7c80b660c90673"
+          },
+          {
+            "case_id": "evaluation-1",
+            "repeat": 2,
+            "status": "generated",
+            "text_sha256": "3534bf438bf4dd02798c261cbf2885f6ca2bb6c99fbfd19d40129923f75cb872"
+          },
+          {
+            "case_id": "evaluation-1",
+            "repeat": 3,
+            "status": "generated",
+            "text_sha256": "79e97f19f661f9871455f420f213e2acd9ee701de4907ea5097211a33c8c1a75"
+          },
+          {
+            "case_id": "evaluation-2",
+            "repeat": 1,
+            "status": "generated",
+            "text_sha256": "dff6802cfabdb4907469c9e30afa1265dd467364efbe901e5267add0d1ef0098"
+          },
+          {
+            "case_id": "evaluation-2",
+            "repeat": 2,
+            "status": "generated",
+            "text_sha256": "3ec5c1ff965bee98cfaa854f9f09d91bb5a974599a707cca4578abba98b8105b"
+          },
+          {
+            "case_id": "evaluation-2",
+            "repeat": 3,
+            "status": "generated",
+            "text_sha256": "659398bef0c3a0d961f5dff3492fda6154cfecc465f81147bf17ab62c33b92b5"
+          }
+        ]
+      }
+    ],
+    "model_call_totals": {
+      "generated": 12,
+      "fallbacks": 0,
+      "timeouts": 0,
+      "connection_refusals": 0,
+      "length_stops": 0,
+      "lexically_flagged_outputs": 2,
+      "wrapper_verified_outputs": 12,
+      "recognized_reasoning_removed_outputs": 0
+    },
+    "interpretation": "Generated is an adapter completion/attribution status, not a quality pass. Lexical flags are pattern matches, not diagnoses or factual-error labels. Zero recognized reasoning removals does not establish that a model did not reason internally. All returned done_reason values were stop; this alone is not a semantic completeness measure."
+  },
+  "qualitative_inspection": {
+    "attribution": "Codex internal AI-assisted inspection of all two template and twelve model outputs; no human or independent assessment. Criteria were frozen in the protocol; the specific observations below were identified after execution and are exploratory. No human rating template was completed.",
+    "observations": [
+      {
+        "arm": "template",
+        "cases": [
+          "evaluation-1",
+          "evaluation-2"
+        ],
+        "repetitions": [
+          1
+        ],
+        "observation": "The information-only baseline preserves the condition/classification, genotype and copy count, unknown classification type and not-curated inheritance. It does not attempt the broader educational prose or frequency discussion requested of models. These selected-field and repeatability results are not a general factual-quality score."
+      },
+      {
+        "arm": "llama3.1:8b",
+        "cases": [
+          "evaluation-1"
+        ],
+        "repetitions": [
+          1,
+          2,
+          3
+        ],
+        "observation": "All three outputs omit the supplied Pathogenic label and condition name. They retain inheritance uncertainty but discuss general inheritance or limited information rather than faithfully restating that classification. Repeat 2 expands absent supplied frequency data into a claim about gnomAD database contents."
+      },
+      {
+        "arm": "llama3.1:8b",
+        "cases": [
+          "evaluation-2"
+        ],
+        "repetitions": [
+          1,
+          2,
+          3
+        ],
+        "observation": "Repeats 1 and 3 retain the uncertain-significance label and invented condition. Repeat 2 omits them and claims no condition/trait association in ClinVar despite a supplied condition assertion. Not-curated inheritance is sometimes conflated with absent variant-condition evidence. None explicitly preserves the supplied unknown classification type."
+      },
+      {
+        "arm": "qwen3:4b",
+        "cases": [
+          "evaluation-1",
+          "evaluation-2"
+        ],
+        "repetitions": [
+          1,
+          2,
+          3
+        ],
+        "observation": "All six outputs react to placeholder gene/condition wording and infer no real health consequences or no action needed. Identifying an artificial example is appropriate, but the added claims about ClinVar placeholder policies, actual database contents, commonness, harmlessness or personal risk do not follow from the supplied fields. Unknown inheritance is sometimes treated as absence of a disease relationship. This cue-driven behavior is a dataset confound, not representative performance on real findings."
+      },
+      {
+        "arm": "both_local_models",
+        "cases": [
+          "evaluation-1",
+          "evaluation-2"
+        ],
+        "repetitions": [
+          1,
+          2,
+          3
+        ],
+        "observation": "Both arms use multiple headings, lists and repeated caveats beyond the requested two-to-four paragraphs. They often explain heterozygosity and recommend professional consultation. Those are stylistic observations, not human readability/comprehension scores. No output was an ordinary-prose refusal; no generated status is interpreted as factual acceptance."
+      }
+    ],
+    "lexical_inspection": "The two flagged answers were Llama evaluation-1 repeat 1 and Qwen evaluation-1 repeat 2. Detected diagnostic fragments include genotype-related or negated language; flags do not count substantive unsupported claims, and the unsupported reassurance observed in Qwen is not comprehensively captured. The production formatter appends notices rather than removing flagged text."
+  },
+  "retention": {
+    "template_summary_sha256": "78fd2b74c900edc70b3b0b3f6a4bb011eba2307de6a27ade2e299e2ec020c7ee",
+    "models_summary_sha256": "2829712ffa0c1c5cd08b984287f73cf0659a5b0ce19f5333d40dd21ed2037043",
+    "model_metadata_sha256": "b285bb73aa6ca4b9f043ed9bb803870f473e1752739db8c39eb4c66257925918",
+    "originals": "Full frozen inputs, protocol, per-call requests, stripped answers, final text, errors, timing/stop metadata, model metadata and unscored rating scaffolds retained locally outside Git. Private reasoning content is not retained. This public record contains aggregates, output hashes and paraphrased observations only.",
+    "public_answer_audit_limit": "Public aggregates and hashes permit repeating the execution method, but do not expose original answer text for audit. Auditing the exact wording and qualitative observations requires deliberate access to retained local synthetic answers. Any later public answer release needs separate content and rights review."
+  },
+  "public_review": {
+    "review_date": "2026-10-22",
+    "reviewer": "Codex internal AI-assisted content, source-rights and metadata review",
+    "scope": "Protocol, runner, tests, aggregate/hash record and methods/results documentation. Synthetic cases only; no participant data, raw model outputs, model weights/templates/licenses, credentials, private machine paths or external source annotation payloads published. Model terms remain the upstream terms linked in the protocol. This is not independent scientific or legal review."
+  },
+  "limitations": [
+    "Two previously available invented records are a pilot, not representative genetic evidence or a held-out test.",
+    "No curated inheritance, verified frequency, GWAS, PGx, high-impact warning, conflict or multi-record strata are exercised.",
+    "A generated status, correct wrapping or absence of lexical flags does not establish factual accuracy, safety or comprehension.",
+    "Template has a narrower information-only remit than the model prompt; differences are descriptive.",
+    "Adapters constrain prompt endpoints to loopback but a model server is trusted software. This is not OS-level network isolation or a complete privacy/security audit.",
+    "Sampling settings and stochastic generation are not fully controlled. Bitwise model regeneration is not promised. Hashes identify retained outputs.",
+    "Case reuse and any discovered deficiencies must remain disclosed; future fixes require a distinct protocol/run and do not replace these results."
+  ],
+  "next_scope": "Use these bounded observations and limitations in issue #47. Broader case construction and any prompt changes require a new disclosed development revision; preserve this initial experiment. Human ratings and independent validation remain separate future work."
+}
